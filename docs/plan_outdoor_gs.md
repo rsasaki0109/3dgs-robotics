@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-29（Pi3X production comparison asset 反映）
+更新日: 2026-04-29（Pi3X production comparison asset / MCD Profile 3 2-camera redefine 反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -28,6 +28,7 @@
 - adoption step + CLI (`gs-mapper route-policy-scenario-ci-workflow-adopt`) + adoption-aware review bundle まで実装済み。review には `--adoption-report` を渡すと Pages の `review.{json,md,html}` に trigger mode / branches / manual vs adopted YAML の unified diff が乗る。
 - Pages `/reviews/` には synthetic smoke fixture 由来の `docs/reviews/smoke-route-policy-ci/` sample bundle を置く方針に変更。`scripts/build_pages_sample_review_bundle.py` が smoke chain を回し、temp path を self-contained な `sample-artifacts/` 相対リンクへ書き換えて index も再生成する。
 - 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
+- MCD Profile 3 が参照していた `/d455t/color/image_raw` topic は MCDVIRAL 全 18 session に存在しないと判明 (Download page + calibration_atv.yaml で交差確認)。「data-blocked」と思われていた状態は実は spec ミスであり、2-camera (d455b + d435i) の `multi_2cam_300each_ba` に redefine 済み。詳細は §3.2 に recipe 化。
 - 同時に env-hardening 側も IMU finite-diff renderer (#111) → ObstaclePolicy protocol (#112) → IMU + peer-aware features を gym adapter feature dict へ surface (#122/#123) → query_collision / score_trajectory に per-step peer cache を threading (#124/#127) で multi-agent サポートが整った。
 
 ## 2. 現在の主戦場
@@ -50,6 +51,7 @@
 
 | Commit | 内容 |
 | --- | --- |
+| _PR #137_ | MCD Profile 3 (`ntu_day02_multi_3cam_300each_ba`) を 2-camera (d455b + d435i) に redefine。`/d455t/color/image_raw` は MCDVIRAL ATV に存在しない topic と判明したため `multi_2cam_300each_ba` に rename。`mcd_quality_plan.py` / `test_mcd_quality_plan.py` / `plan_outdoor_gs.md` を更新。 |
 | `2262f22` | Per-window correlation stats (mean/p95/max/heading + bag-time span) を review bundle の Markdown / HTML に surface。 |
 | `95f1ea4` | `pair_distribution_strata_mode` で `equal-pair-count` を選べるように。スパース bag でも各 window を統計的に成立させる。 |
 | `cef2659` | aggregate-statistic (mean/p95/max/heading-mean) を per-window 評価に切り替え可能に。stratified 時は aggregate tag を suppress。 |
@@ -114,13 +116,38 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 - mypy note:
   - touched 個別モジュール(policy_scenario_multi_agent.py、policy_scenario_sharding.py、policy_scenario_set.py、policy_scenario_ci_review.py の追加部)は pass。
   - `src/gs_sim2real/cli.py` を含む mypy は Waymo / MCD 周辺の既知型不整合で落ちる。今回 chain は regression を入れていない。
-- Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 はもとは `multi_3cam_300each_ba` (`/d455t/color/image_raw` 含む) として定義されていたが、MCDVIRAL Download page を 2026-04-26 に再確認したところ ATV rig は `d435i` + `d455b` の 2 camera 構成で `d455t` topic は upstream に存在しない (calibration_atv.yaml にも無い)。そのため `multi_2cam_300each_ba` (d455b + d435i) に redefine 済み。残課題は `d435i.bag` (4.7 GB, drive id `1svtLKBcoxixWZjatwSP1MtJEmVTPE3wA`) を `data/mcd/ntu_day_02/` に取得して GPU 実走するだけ。
+- Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 はもとは `multi_3cam_300each_ba` (`/d455t/color/image_raw` 含む) として定義されていたが、MCDVIRAL Download page を 2026-04-26 に再確認したところ ATV rig は `d435i` + `d455b` の 2 camera 構成で `d455t` topic は upstream に存在しない (calibration_atv.yaml にも無い)。そのため `multi_2cam_300each_ba` (d455b + d435i) に redefine 済み。
+- 2026-04-26 セッション記録では `ntu_day_02_d435i.bag` (5.0 GB, drive id `1svtLKBcoxixWZjatwSP1MtJEmVTPE3wA`) は追加取得済みで、`rosbags.AnyReader` により `/d435i/color/image_raw` + IMU + infra topics を確認済み。残課題は GPU 実走 (preprocess/train/export) と gate report 更新。
 - 2026-05-17 セッション以降のオーナーは codex。次に触る candidate(優先順位順):
   1. **Pairwise clearance histogram の実値化(§17.7)**: `InteractionMetricsSpec.pairwise_clearance_histogram_bins` は spec のみで aggregator / runtime / review surface 未実装。Sprint 4 follow-up step 2 として natural な次タスク。設計とコード断片は §17.7 に詳述、stash@{0} に途中状態あり。
   2. **PR A2 production data**: production benchmark run の review.json が届いたら `scripts/publish_production_review_bundle.py` で `docs/reviews/<id>/` 公開。Pages index で `productionCount: 1` になる(data-blocked)。
   3. **Sprint 4 staging extension**: smoke の 2-agent crossing を 4 → 16 → 32+ agent に段階的に拡張(§17.5 staging plan)。histogram 実値化後、production-shaped traffic で意味のある分布が確認できる。
   4. **Sprint 5 設計**: real-vs-sim correlation の policy 行動レベル拡張、または env-side noise / sensor profile の更なる充実、Waymo E2E 等。
-  5. その後の backlog: LoGeR production comparison (§12.3)、MCD `ntu_day_02` `multi_2cam_300each_ba` d435i.bag fetch + GPU rerun、Applanix `read_gsof_ins_pose_stream` (vendor 依存)。
+  5. その後の backlog: LoGeR production comparison (§12.3)、MCD `ntu_day_02` `multi_2cam_300each_ba` GPU rerun、Applanix `read_gsof_ins_pose_stream` (vendor 依存)。
+- 反すべきでない方向:
+  - `src/gs_sim2real/datasets/mcd.py` の `DEFAULT_IMAGE_TOPICS` / `DEFAULT_IMU_TOPICS` から `/d455t/*` を削るのは scope 外。tolerant catalog として残しておく方が test_cli / test_mcd の synthetic-bag fixture を壊さない。詳細は PR #137 body の "Out of scope" 参照。
+  - Profile 3 の `requires_full_folder=True` は「single d455b バッグ以外も要る」というヒントとして残す。リテラルに「14.8 GB 全部 download せよ」という意味ではない。
+
+### 3.2 MCDVIRAL spec audit recipe (2026-04-26 d455t finding)
+
+「Profile 3 が data-blocked」だと思われていたが、実際は **upstream に存在しない topic 名** (`/d455t/color/image_raw`) を含んでいたという spec ミスだった。同種の罠を避けるため、MCDVIRAL profile を新規追加 / 改修する際の verification recipe を以下に固定化する。
+
+1. **Download page で session row を見る** — https://mcdviral.github.io/Download.html を `curl -sL ... > /tmp/mcd.html` で取得。各 NTU / KTH / TUHH session の row には `<a href="https://drive.google.com/file/d/<ID>" ...>d435i<br />(4.7 GB)</a>` のような per-bag リンクがある。提供されている camera は **d435i と d455b の 2 つだけ** (color)。`d455t` という camera は MCDVIRAL ATV / handheld rig どちらにも存在しない。
+2. **Calibration YAML と交差検査** — `scripts/download_mcd_calibration.sh atv` で `data/mcd/calibration_atv.yaml` を落とし、`body:` 配下の sensor 名を確認。Profile が指す topic 名は必ずこの YAML に対応する extrinsic がある (`d455b_color`, `d455b_imu`, `d455b_infra1`, `d455b_infra2`, `d435i_imu`, `d435i_infra1`, `d435i_infra2`, `os_*`, `vn100_imu`, `vn200_imu`, `ltpb_tag*`, `mid70`)。`d455t_*` は無い。
+3. **rosbag を直接覗く** (1 本でも download し終わったら) — 期待 topic が実 bag に居るか必ず確認。
+
+   ```python
+   from rosbags.highlevel import AnyReader
+   from pathlib import Path
+   with AnyReader([Path("data/mcd/ntu_day_02/ntu_day_02_d435i.bag")]) as reader:
+       for t in sorted({c.topic for c in reader.connections}):
+           print(t)
+   ```
+
+   `/d435i/color/image_raw` のような期待 topic がここに無ければ、`MCDQualityRunProfile.image_topics` 側 (= profile の spec) を直すのが先。Download し直しても解決しない。
+4. **profile を組み立てる順序** — (a) MCDVIRAL の per-bag size を見て GPU + 帯域コストを試算、(b) calibration YAML の sensor list で extrinsic の有無を確認、(c) test bag を一本落として `AnyReader` で topic 列挙、(d) `MCDQualityRunProfile` の `image_topics` / `camera_frame` を埋める、(e) `tests/test_mcd_quality_plan.py` で構造 assert を追加。順序を守れば「download した後で topic が無いと判明」が起きない。
+
+この recipe は memory にも `project_mcdviral_atv_cameras.md` として固定化済み (next session 起動時に自動で参照される)。
 
 ## 4. System Map
 
@@ -715,7 +742,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | --- | --- |
 | Pi3 production comparison | 完了。Pi3X VO 20 frames → `external-slam` import → gsplat 15k → `docs/assets/outdoor-demo/bag6-pi3x-20-15k.splat`。 |
 | LoGeR production comparison | 引き続き OOS。External SLAM comparison の説得力が増す。要 GPU run。 |
-| MCD `ntu_day_02` quality reruns | 部分完了。`single_400_depth_long` (L1=0.1951) と `single_800_ba` (L1=0.2699) は gate pass。元の `multi_3cam_300each_ba` 案は `d455t` topic が MCDVIRAL ATV に存在しないことが 2026-04-26 に判明したため `multi_2cam_300each_ba` (d455b + d435i) に redefine。残るのは `d435i.bag` (4.7 GB) を取得して GPU 実走するだけ。 |
+| MCD `ntu_day_02` quality reruns | 部分完了。`single_400_depth_long` (L1=0.1951) と `single_800_ba` (L1=0.2699) は gate pass。元の `multi_3cam_300each_ba` 案は `d455t` topic が MCDVIRAL ATV に存在しないことが 2026-04-26 に判明したため `multi_2cam_300each_ba` (d455b + d435i) に redefine。`d435i.bag` (5.0 GB, 5,014,702,681 bytes) は同日 evening に `data/mcd/ntu_day_02/` へ取得済 + topic 検証済み。残るのは GPU 実走 (1〜2h) と gate report 更新。 |
 | Waymo E2E | high-value だが dataset access と env blocker がある。 |
 
 #### 12.3.1 MCD quality gate targets
@@ -757,6 +784,7 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 
 - MCD topic は `/vn200/GPS` の大文字 `GPS`。`/vn200/gps` ではない。
 - `tuhh_day_04` の `/vn200/GPS` は all-zero。supervised GNSS demo には使わない。
+- MCDVIRAL ATV / handheld rig は color camera が **d435i + d455b の 2 つのみ**。`/d455t/*` topic は upstream に存在しない (Download page 全 18 session で 0 件、calibration_atv.yaml にも `d455t_*` 無し)。新規 profile を組むときは §3.2 の audit recipe に従い、Download page + calibration YAML + rosbag の 3 点で必ず交差検査する。
 - MCD calibration YAML は公式 Download page から取得できるが、license 上 repo に YAML を commit しない。
 - IMU orientation CSV は zero-length / non-finite quaternion を無視し、全 identity のときだけ姿勢なし扱いにする。一定の non-identity mount orientation は有効な姿勢として残す。
 - Orientation が全 identity でも `angular_velocity_z` が非ゼロなら yaw-only fallback として積分する。
@@ -809,7 +837,7 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | 5 | — | Sprint 4 follow-up step 1: per-step min-peer-separation collection | aggregate を peer-count placeholder から実値に | 完(`13e3b56`、2026-05-17 セッション。`nearest-dynamic-obstacle-distance-meters` を rollout 全 step 最悪値で集計) |
 | 6 | — | Sprint 4 follow-up step 2: pairwise clearance histogram 実値化 | `InteractionMetricsSpec.pairwise_clearance_histogram_bins` を spec から runtime / aggregator / review 配線へ | **codex 次タスク**(§17.7 に full design + stash@{0} に WIP) |
 | 7 | — | LoGeR production comparison asset | asset 比較の厚み | §12.3 既存 backlog |
-| 8 | — | MCD `ntu_day_02` `multi_2cam_300each_ba` d435i.bag fetch + GPU rerun | asset 品質補完 | §12.3 既存 backlog |
+| 8 | — | MCD `ntu_day_02` `multi_2cam_300each_ba` GPU rerun | asset 品質補完 | §12.3 既存 backlog |
 | 9 | — | Applanix `read_gsof_ins_pose_stream` | data input 拡張（vendor 依存） | §3.1 OOS |
 
 「splat を 1 個増やす」より「実屋外 scene を使った policy evaluation が CI artifact として継続的に出る」方が GS Mapper の現在地では効く、という判断。
