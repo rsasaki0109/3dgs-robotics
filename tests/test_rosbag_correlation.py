@@ -1127,3 +1127,171 @@ def test_real_vs_sim_correlation_window_stats_round_trips_through_json() -> None
     payload = no_heading.to_dict()
     assert "headingErrorMeanRadians" not in payload
     assert real_vs_sim_correlation_window_stats_from_dict(payload) == no_heading
+
+
+# ---------------------------------------------------------------------------
+# Event-aligned stratification (Sprint 2 / PR B)
+# ---------------------------------------------------------------------------
+
+
+def test_correlation_event_window_round_trips_through_json() -> None:
+    from gs_sim2real.robotics import CorrelationEventWindow, correlation_event_window_from_dict
+
+    window = CorrelationEventWindow(
+        name="turn_left",
+        start_time=8.5,
+        end_time=12.2,
+        tags=("corner", "intersection"),
+        source="policy_trace",
+    )
+    payload = window.to_dict()
+    assert payload == {
+        "name": "turn_left",
+        "startTime": 8.5,
+        "endTime": 12.2,
+        "tags": ["corner", "intersection"],
+        "source": "policy_trace",
+    }
+    assert correlation_event_window_from_dict(payload) == window
+
+
+def test_correlation_event_window_defaults_omit_external_source_and_empty_tags() -> None:
+    from gs_sim2real.robotics import CorrelationEventWindow
+
+    window = CorrelationEventWindow(name="approach", start_time=0.0, end_time=8.5)
+    payload = window.to_dict()
+    assert "source" not in payload
+    assert "tags" not in payload
+
+
+def test_correlation_event_window_rejects_invalid_inputs() -> None:
+    from gs_sim2real.robotics import CorrelationEventWindow
+
+    with pytest.raises(ValueError):
+        CorrelationEventWindow(name="", start_time=0.0, end_time=1.0)
+    with pytest.raises(ValueError):
+        CorrelationEventWindow(name="bad", start_time=5.0, end_time=4.0)
+    with pytest.raises(ValueError):
+        CorrelationEventWindow(name="bad", start_time=0.0, end_time=1.0, source="unknown")
+
+
+def test_load_correlation_event_windows_json_validates_record_type(tmp_path: Path) -> None:
+    from gs_sim2real.robotics import load_correlation_event_windows_json
+
+    valid = tmp_path / "windows.json"
+    valid.write_text(
+        json.dumps(
+            {
+                "recordType": "gs-mapper-correlation-event-windows/v1",
+                "bagSourceTopic": "/odom/imu",
+                "windows": [
+                    {"name": "approach", "startTime": 0.0, "endTime": 8.5, "tags": ["straight"]},
+                    {"name": "turn", "startTime": 8.5, "endTime": 12.2, "tags": ["corner"], "source": "policy_trace"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    windows = load_correlation_event_windows_json(valid)
+    assert tuple(w.name for w in windows) == ("approach", "turn")
+    assert windows[1].source == "policy_trace"
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"recordType": "something-else"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="recordType"):
+        load_correlation_event_windows_json(bad)
+
+
+def test_compute_per_window_correlation_stats_event_aligned_buckets_pairs_and_keeps_empty_events() -> None:
+    """Event-aligned mode buckets by event window and retains empty events with pair_count=0."""
+    from gs_sim2real.robotics import CorrelationEventWindow
+
+    pairs_timeline = [(0.0, 0.1), (1.0, 0.1), (2.0, 0.1), (9.0, 0.5), (10.0, 0.5), (50.0, 0.9)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    events = (
+        CorrelationEventWindow(name="approach", start_time=0.0, end_time=5.0),
+        CorrelationEventWindow(name="turn", start_time=8.0, end_time=12.0, tags=("corner",), source="policy_trace"),
+        CorrelationEventWindow(name="dead", start_time=20.0, end_time=30.0),
+    )
+    stats = compute_per_window_correlation_stats(report, strata=3, mode="event-aligned", event_windows=events)
+    # All three events surface — even the empty "dead" window.
+    assert len(stats) == 3
+    assert stats[0].event_name == "approach"
+    assert stats[0].pair_count == 3
+    assert stats[1].event_name == "turn"
+    assert stats[1].event_source == "policy_trace"
+    assert stats[1].event_tags == ("corner",)
+    assert stats[1].pair_count == 2
+    assert stats[2].event_name == "dead"
+    assert stats[2].pair_count == 0
+    # Pair at 50.0s outside every event window is dropped from the universe.
+
+
+def test_compute_per_window_correlation_stats_event_aligned_falls_back_when_windows_missing() -> None:
+    """Empty / missing event_windows with event-aligned mode falls back to equal-pair-count.
+
+    The library-level fallback keeps the gate functional even when a caller
+    forgot to plumb the resolved windows; structured "fallback applied"
+    bookkeeping lives at the review-bundle layer (where
+    ``correlationStratificationFallbacks`` is recorded in metadata).
+    """
+    pairs_timeline = [(float(i), 0.1 * i) for i in range(8)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    stats = compute_per_window_correlation_stats(report, strata=4, mode="event-aligned", event_windows=None)
+    # Falls back to equal-pair-count → 8 pairs / 4 strata = 2 pairs per window.
+    assert len(stats) == 4
+    assert all(stat.event_name is None for stat in stats)
+    assert [stat.pair_count for stat in stats] == [2, 2, 2, 2]
+
+    # Empty event_windows tuple behaves the same as None.
+    stats_empty_tuple = compute_per_window_correlation_stats(report, strata=4, mode="event-aligned", event_windows=())
+    assert [stat.pair_count for stat in stats_empty_tuple] == [2, 2, 2, 2]
+
+
+def test_evaluate_real_vs_sim_correlation_thresholds_event_aligned_labels_windows() -> None:
+    from gs_sim2real.robotics import CorrelationEventWindow
+
+    pairs_timeline = (
+        [(0.0, 0.05), (1.0, 0.05), (2.0, 0.05)] + [(9.0, 0.4), (10.0, 0.4), (11.0, 0.4)] + [(20.0, 0.05), (21.0, 0.05)]
+    )
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    events = (
+        CorrelationEventWindow(name="straight", start_time=0.0, end_time=5.0),
+        CorrelationEventWindow(name="turn", start_time=8.0, end_time=15.0),
+        CorrelationEventWindow(name="exit", start_time=18.0, end_time=25.0),
+    )
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=0.2,
+        pair_distribution_strata=3,
+        pair_distribution_strata_mode="event-aligned",
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds, event_windows=events)
+    # Only the turn window exceeds 0.2 mean — the failure tag is keyed by the
+    # window index inside event_windows.
+    assert passed is False
+    assert "translation-mean-window-1" in failed
+    assert "translation-mean-window-0" not in failed
+    assert "translation-mean-window-2" not in failed
+
+
+def test_thresholds_round_trip_carries_event_windows_path() -> None:
+    """event_windows_path stays attached when present and is dropped when None."""
+    with_path = RealVsSimCorrelationThresholds(
+        pair_distribution_strata=3,
+        pair_distribution_strata_mode="event-aligned",
+        event_windows_path="/tmp/events.json",
+    )
+    payload = with_path.to_dict()
+    assert payload["pairDistributionStrataMode"] == "event-aligned"
+    assert payload["eventWindowsPath"] == "/tmp/events.json"
+    assert real_vs_sim_correlation_thresholds_from_dict(payload) == with_path
+
+    without = RealVsSimCorrelationThresholds(max_translation_error_mean_meters=0.5)
+    assert "eventWindowsPath" not in without.to_dict()
+
+
+def test_correlation_strata_mode_accepts_event_aligned_value() -> None:
+    """The mode enum now includes event-aligned alongside the two existing modes."""
+    RealVsSimCorrelationThresholds(pair_distribution_strata_mode="event-aligned")
+    with pytest.raises(ValueError):
+        RealVsSimCorrelationThresholds(pair_distribution_strata_mode="something-else")

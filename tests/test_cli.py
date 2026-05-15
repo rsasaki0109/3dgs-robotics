@@ -2265,6 +2265,30 @@ class TestCLIHelp:
         assert args.bundle_dir == "pages/review"
         assert args.fail_on_review is True
 
+    def test_cli_route_policy_scenario_ci_review_event_aligned_flags(self) -> None:
+        """route-policy-scenario-ci-review accepts --correlation-event-windows
+        and the event-aligned stratification mode value."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-review",
+                "--shard-merge",
+                "shard-merge.json",
+                "--validation-report",
+                "validation.json",
+                "--activation-report",
+                "activation.json",
+                "--correlation-pair-distribution-strata",
+                "3",
+                "--correlation-pair-distribution-strata-mode",
+                "event-aligned",
+                "--correlation-event-windows",
+                "events.json",
+            ]
+        )
+        assert args.correlation_pair_distribution_strata == 3
+        assert args.correlation_pair_distribution_strata_mode == "event-aligned"
+        assert args.correlation_event_windows == "events.json"
+
     def test_cli_route_policy_scenario_ci_review_provenance_flags(self) -> None:
         """route-policy-scenario-ci-review accepts the new provenance flags."""
         args = build_parser().parse_args(

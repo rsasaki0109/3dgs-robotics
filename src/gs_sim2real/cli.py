@@ -1579,12 +1579,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rpsrev.add_argument(
         "--correlation-pair-distribution-strata-mode",
-        choices=("equal-duration", "equal-pair-count"),
+        choices=("equal-duration", "equal-pair-count", "event-aligned"),
         default="equal-duration",
         help=(
             "Stratification mode for --correlation-pair-distribution-strata: 'equal-duration' splits "
             "by bag_timestamp_seconds (default), 'equal-pair-count' splits by pair index so windows hold "
-            "near-equal pair counts even when bag sample density is uneven"
+            "near-equal pair counts even when bag sample density is uneven, 'event-aligned' buckets "
+            "pairs by externally-supplied scenario event windows (see --correlation-event-windows)"
+        ),
+    )
+    rpsrev.add_argument(
+        "--correlation-event-windows",
+        default=None,
+        help=(
+            "Path to a gs-mapper-correlation-event-windows/v1 JSON file. Required when "
+            "--correlation-pair-distribution-strata-mode=event-aligned. The file lists "
+            "{name, startTime, endTime, tags, source} windows; pairs whose bag timestamp "
+            "falls outside every window are dropped. Missing files or zero-window files "
+            "fall back to equal-pair-count and the fallback is recorded in the review "
+            "bundle metadata (correlationStratificationFallbacks)."
         ),
     )
     rpsrev.add_argument(

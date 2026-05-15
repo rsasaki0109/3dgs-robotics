@@ -49,8 +49,101 @@ from typing import Any
 
 
 REAL_VS_SIM_CORRELATION_REPORT_VERSION = "gs-mapper-real-vs-sim-correlation-report/v1"
+CORRELATION_EVENT_WINDOWS_VERSION = "gs-mapper-correlation-event-windows/v1"
 
-_PAIR_DISTRIBUTION_STRATA_MODES: frozenset[str] = frozenset({"equal-duration", "equal-pair-count"})
+_PAIR_DISTRIBUTION_STRATA_MODES: frozenset[str] = frozenset({"equal-duration", "equal-pair-count", "event-aligned"})
+_CORRELATION_EVENT_SOURCES: frozenset[str] = frozenset({"external", "policy_trace"})
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationEventWindow:
+    """One scenario-phase / event-aligned bag-time window.
+
+    Used by the ``event-aligned`` pair distribution stratification mode to
+    bucket :class:`CorrelatedPosePair` instances by which scenario event
+    (turn-left, slowdown, obstacle-avoid, …) their bag timestamp falls in.
+
+    ``source`` is included from day one so Sprint 3 can feed
+    policy-trace-derived event timelines through the same path without a
+    schema change. ``tags`` is a free-form set of labels (e.g. ``corner``,
+    ``dynamic``); per-tag threshold overrides are deliberately out of
+    scope for the MVP and may be added later via the threshold overrides
+    config.
+    """
+
+    name: str
+    start_time: float
+    end_time: float
+    tags: tuple[str, ...] = ()
+    source: str = "external"
+
+    def __post_init__(self) -> None:
+        name = str(self.name)
+        if not name:
+            raise ValueError("CorrelationEventWindow name must not be empty")
+        object.__setattr__(self, "name", name)
+        start = float(self.start_time)
+        end = float(self.end_time)
+        if end <= start:
+            raise ValueError(f"CorrelationEventWindow end_time ({end}) must be greater than start_time ({start})")
+        object.__setattr__(self, "start_time", start)
+        object.__setattr__(self, "end_time", end)
+        source = str(self.source)
+        if source not in _CORRELATION_EVENT_SOURCES:
+            raise ValueError(
+                f"CorrelationEventWindow source must be one of {sorted(_CORRELATION_EVENT_SOURCES)}; got {source!r}"
+            )
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "tags", tuple(str(tag) for tag in self.tags))
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "name": self.name,
+            "startTime": float(self.start_time),
+            "endTime": float(self.end_time),
+        }
+        if self.tags:
+            payload["tags"] = list(self.tags)
+        if self.source != "external":
+            payload["source"] = self.source
+        return payload
+
+
+def correlation_event_window_from_dict(payload: Mapping[str, Any]) -> CorrelationEventWindow:
+    """Rebuild :class:`CorrelationEventWindow` from a JSON payload."""
+
+    tags_payload = payload.get("tags") or ()
+    if isinstance(tags_payload, (str, bytes, bytearray)):
+        raise ValueError("CorrelationEventWindow tags must be a list of strings, not a string")
+    return CorrelationEventWindow(
+        name=str(payload["name"]),
+        start_time=float(payload["startTime"]),
+        end_time=float(payload["endTime"]),
+        tags=tuple(str(tag) for tag in tags_payload),
+        source=str(payload.get("source") or "external"),
+    )
+
+
+def load_correlation_event_windows_json(
+    path: str | Path,
+) -> tuple[CorrelationEventWindow, ...]:
+    """Load a ``gs-mapper-correlation-event-windows/v1`` JSON file."""
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, Mapping):
+        raise ValueError("correlation event windows JSON root must be an object")
+    record_type = raw.get("recordType")
+    if record_type != CORRELATION_EVENT_WINDOWS_VERSION:
+        raise ValueError(
+            f"unexpected correlation event windows recordType: {record_type!r} "
+            f"(expected {CORRELATION_EVENT_WINDOWS_VERSION!r})"
+        )
+    windows_payload = raw.get("windows")
+    if windows_payload is None:
+        return ()
+    if isinstance(windows_payload, (str, bytes, bytearray)) or not isinstance(windows_payload, Sequence):
+        raise ValueError("correlation event windows JSON 'windows' must be a list")
+    return tuple(correlation_event_window_from_dict(item) for item in windows_payload if isinstance(item, Mapping))
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,6 +357,7 @@ class RealVsSimCorrelationThresholds:
     max_exceeding_heading_pair_fraction: float | None = None
     pair_distribution_strata: int | None = None
     pair_distribution_strata_mode: str = "equal-duration"
+    event_windows_path: str | None = None
 
     def __post_init__(self) -> None:
         if self.pair_distribution_strata is not None:
@@ -312,6 +406,8 @@ class RealVsSimCorrelationThresholds:
             payload["pairDistributionStrata"] = int(self.pair_distribution_strata)
             if self.pair_distribution_strata_mode != "equal-duration":
                 payload["pairDistributionStrataMode"] = self.pair_distribution_strata_mode
+        if self.event_windows_path is not None:
+            payload["eventWindowsPath"] = str(self.event_windows_path)
         return payload
 
 
@@ -324,6 +420,7 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
 
     strata_value = payload.get("pairDistributionStrata")
     mode_value = payload.get("pairDistributionStrataMode")
+    event_windows_value = payload.get("eventWindowsPath")
     return RealVsSimCorrelationThresholds(
         max_translation_error_mean_meters=_optional("maxTranslationErrorMeanMeters"),
         max_translation_error_p95_meters=_optional("maxTranslationErrorP95Meters"),
@@ -335,6 +432,7 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
         max_exceeding_heading_pair_fraction=_optional("maxExceedingHeadingPairFraction"),
         pair_distribution_strata=None if strata_value is None else int(strata_value),
         pair_distribution_strata_mode="equal-duration" if mode_value is None else str(mode_value),
+        event_windows_path=None if event_windows_value is None else str(event_windows_value),
     )
 
 
@@ -386,6 +484,8 @@ def correlation_threshold_overrides_to_dict(
 def evaluate_real_vs_sim_correlation_thresholds(
     report: RealVsSimCorrelationReport,
     thresholds: RealVsSimCorrelationThresholds,
+    *,
+    event_windows: Sequence[CorrelationEventWindow] | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
     """Return ``(passed, failed_checks)`` for ``report`` against ``thresholds``.
 
@@ -395,6 +495,13 @@ def evaluate_real_vs_sim_correlation_thresholds(
     ``translation-max`` / ``heading-mean``) is added to ``failed_checks``
     when the report exceeds the bound. Reports without heading data
     skip the ``heading-mean`` check (no failure recorded).
+
+    When ``thresholds.pair_distribution_strata_mode == "event-aligned"``
+    the caller is expected to pre-resolve ``event_windows`` (e.g. via
+    :func:`load_correlation_event_windows_json`). When ``event_windows``
+    is empty or omitted, the gate falls back to ``equal-pair-count``
+    inside :func:`_split_pairs` — failure tags still include the window
+    index but no longer correspond to a named event.
     """
 
     failed: list[str] = []
@@ -406,7 +513,9 @@ def evaluate_real_vs_sim_correlation_thresholds(
         # per-window aggregates computed from report.pairs (the strided
         # sample). Empty windows skip silently. Aggregates from heading
         # use the heading-bearing subset of the window.
-        for window_index, window_pairs in enumerate(_split_pairs(report.pairs, int(strata), strata_mode)):
+        for window_index, window_pairs in enumerate(
+            _split_pairs(report.pairs, int(strata), strata_mode, event_windows=event_windows)
+        ):
             if not window_pairs:
                 continue
             translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
@@ -470,7 +579,9 @@ def evaluate_real_vs_sim_correlation_thresholds(
             if exceeding / len(report.pairs) > limit:
                 failed.append("translation-pair-distribution")
         else:
-            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode)):
+            for window_index, window_pairs in enumerate(
+                _split_pairs(report.pairs, strata, strata_mode, event_windows=event_windows)
+            ):
                 if not window_pairs:
                     continue
                 exceeding = sum(1 for pair in window_pairs if float(pair.translation_error_meters) > bound)
@@ -490,7 +601,9 @@ def evaluate_real_vs_sim_correlation_thresholds(
                 if exceeding / len(with_heading) > limit:
                     failed.append("heading-pair-distribution")
         else:
-            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode)):
+            for window_index, window_pairs in enumerate(
+                _split_pairs(report.pairs, strata, strata_mode, event_windows=event_windows)
+            ):
                 with_heading = [pair for pair in window_pairs if pair.heading_error_radians is not None]
                 if not with_heading:
                     continue
@@ -512,6 +625,11 @@ class RealVsSimCorrelationWindowStats:
     the actual bag-time span of the pairs that landed in the window.
     ``heading_error_mean_radians`` is ``None`` when no pair in the window
     carries heading data.
+
+    ``event_name`` / ``event_tags`` / ``event_source`` are populated only
+    for the ``event-aligned`` mode. They roundtrip through JSON only when
+    non-empty so v1 payloads from the equal-duration / equal-pair-count
+    modes stay byte-equivalent.
     """
 
     window_index: int
@@ -522,6 +640,12 @@ class RealVsSimCorrelationWindowStats:
     translation_error_p95_meters: float
     translation_error_max_meters: float
     heading_error_mean_radians: float | None = None
+    event_name: str | None = None
+    event_tags: tuple[str, ...] = ()
+    event_source: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "event_tags", tuple(str(tag) for tag in self.event_tags))
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -535,6 +659,12 @@ class RealVsSimCorrelationWindowStats:
         }
         if self.heading_error_mean_radians is not None:
             payload["headingErrorMeanRadians"] = float(self.heading_error_mean_radians)
+        if self.event_name is not None:
+            payload["eventName"] = self.event_name
+        if self.event_tags:
+            payload["eventTags"] = list(self.event_tags)
+        if self.event_source is not None:
+            payload["eventSource"] = self.event_source
         return payload
 
 
@@ -544,6 +674,7 @@ def real_vs_sim_correlation_window_stats_from_dict(
     """Rebuild :class:`RealVsSimCorrelationWindowStats` from JSON."""
 
     heading_value = payload.get("headingErrorMeanRadians")
+    event_tags_payload = payload.get("eventTags") or ()
     return RealVsSimCorrelationWindowStats(
         window_index=int(payload["windowIndex"]),
         pair_count=int(payload["pairCount"]),
@@ -553,6 +684,9 @@ def real_vs_sim_correlation_window_stats_from_dict(
         translation_error_p95_meters=float(payload["translationErrorP95Meters"]),
         translation_error_max_meters=float(payload["translationErrorMaxMeters"]),
         heading_error_mean_radians=None if heading_value is None else float(heading_value),
+        event_name=None if payload.get("eventName") is None else str(payload["eventName"]),
+        event_tags=tuple(str(tag) for tag in event_tags_payload),
+        event_source=None if payload.get("eventSource") is None else str(payload["eventSource"]),
     )
 
 
@@ -561,40 +695,96 @@ def compute_per_window_correlation_stats(
     *,
     strata: int,
     mode: str = "equal-duration",
+    event_windows: Sequence[CorrelationEventWindow] | None = None,
 ) -> tuple[RealVsSimCorrelationWindowStats, ...]:
     """Return per-window aggregate stats for ``report.pairs``.
 
-    Empty windows (no pairs landed) are dropped from the returned tuple.
+    Empty windows (no pairs landed) are dropped from the returned tuple
+    for the equal-duration / equal-pair-count modes. For ``event-aligned``
+    mode empty windows are *retained* so a missing event (e.g. policy
+    skipped the turn) is still surfaced in the review bundle with
+    pair_count=0 and zeroed stats.
+
     Heading mean is ``None`` when no pair in the window carries heading
     data. The bag-time span fields describe the actual min/max
-    ``bag_timestamp_seconds`` of the pairs in each window.
+    ``bag_timestamp_seconds`` of the pairs in each window for non-event
+    modes; for ``event-aligned`` empty windows they fall back to the
+    event's declared ``[start_time, end_time]``.
+
+    When ``mode == "event-aligned"`` and ``event_windows`` is non-empty,
+    each emitted stat carries the event's ``name`` / ``tags`` / ``source``
+    so the review bundle can label rows by event.
     """
 
-    if strata <= 1 or not report.pairs:
-        return ()
-    windows = _split_pairs(report.pairs, strata, mode)
-    stats: list[RealVsSimCorrelationWindowStats] = []
+    use_event_mode = mode == "event-aligned" and bool(event_windows)
+    if not use_event_mode:
+        if strata <= 1 or not report.pairs:
+            return ()
+        windows = _split_pairs(report.pairs, strata, mode)
+        stats: list[RealVsSimCorrelationWindowStats] = []
+        for window_index, window_pairs in enumerate(windows):
+            if not window_pairs:
+                continue
+            stats.append(_build_window_stats(window_index, window_pairs))
+        return tuple(stats)
+
+    assert event_windows is not None  # narrowed by use_event_mode
+    windows = _split_pairs_by_events(report.pairs, event_windows)
+    stats = []
     for window_index, window_pairs in enumerate(windows):
-        if not window_pairs:
-            continue
-        translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
-        timestamps = [float(pair.bag_timestamp_seconds) for pair in window_pairs]
-        heading_errors = [
-            float(pair.heading_error_radians) for pair in window_pairs if pair.heading_error_radians is not None
-        ]
+        event = event_windows[window_index]
+        if window_pairs:
+            stat = _build_window_stats(window_index, window_pairs)
+        else:
+            stat = RealVsSimCorrelationWindowStats(
+                window_index=window_index,
+                pair_count=0,
+                bag_time_start_seconds=event.start_time,
+                bag_time_end_seconds=event.end_time,
+                translation_error_mean_meters=0.0,
+                translation_error_p95_meters=0.0,
+                translation_error_max_meters=0.0,
+                heading_error_mean_radians=None,
+            )
         stats.append(
             RealVsSimCorrelationWindowStats(
-                window_index=window_index,
-                pair_count=len(window_pairs),
-                bag_time_start_seconds=min(timestamps),
-                bag_time_end_seconds=max(timestamps),
-                translation_error_mean_meters=sum(translation_errors) / len(translation_errors),
-                translation_error_p95_meters=_percentile(translation_errors, 95.0),
-                translation_error_max_meters=max(translation_errors),
-                heading_error_mean_radians=(sum(heading_errors) / len(heading_errors) if heading_errors else None),
+                window_index=stat.window_index,
+                pair_count=stat.pair_count,
+                bag_time_start_seconds=stat.bag_time_start_seconds,
+                bag_time_end_seconds=stat.bag_time_end_seconds,
+                translation_error_mean_meters=stat.translation_error_mean_meters,
+                translation_error_p95_meters=stat.translation_error_p95_meters,
+                translation_error_max_meters=stat.translation_error_max_meters,
+                heading_error_mean_radians=stat.heading_error_mean_radians,
+                event_name=event.name,
+                event_tags=event.tags,
+                event_source=event.source,
             )
         )
     return tuple(stats)
+
+
+def _build_window_stats(
+    window_index: int,
+    window_pairs: Sequence[CorrelatedPosePair],
+) -> RealVsSimCorrelationWindowStats:
+    """Compute the aggregate window stats for a non-empty bucket of pairs."""
+
+    translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
+    timestamps = [float(pair.bag_timestamp_seconds) for pair in window_pairs]
+    heading_errors = [
+        float(pair.heading_error_radians) for pair in window_pairs if pair.heading_error_radians is not None
+    ]
+    return RealVsSimCorrelationWindowStats(
+        window_index=window_index,
+        pair_count=len(window_pairs),
+        bag_time_start_seconds=min(timestamps),
+        bag_time_end_seconds=max(timestamps),
+        translation_error_mean_meters=sum(translation_errors) / len(translation_errors),
+        translation_error_p95_meters=_percentile(translation_errors, 95.0),
+        translation_error_max_meters=max(translation_errors),
+        heading_error_mean_radians=(sum(heading_errors) / len(heading_errors) if heading_errors else None),
+    )
 
 
 def _split_pairs_by_time(
@@ -655,13 +845,54 @@ def _split_pairs_by_count(
     return windows
 
 
+def _split_pairs_by_events(
+    pairs: Sequence[CorrelatedPosePair],
+    event_windows: Sequence[CorrelationEventWindow],
+) -> list[list[CorrelatedPosePair]]:
+    """Partition ``pairs`` into one bucket per :class:`CorrelationEventWindow`.
+
+    Each pair lands in the *first* event whose ``[start_time, end_time)``
+    range contains its ``bag_timestamp_seconds``; pairs that fall outside
+    every event window are dropped (the windows define the universe of
+    interest). When ``event_windows`` is empty the caller is expected to
+    fall back to a non-event mode — this function returns an empty list
+    of windows in that case rather than implicitly bucketing all pairs.
+    """
+
+    if not event_windows:
+        return []
+    windows: list[list[CorrelatedPosePair]] = [[] for _ in event_windows]
+    if not pairs:
+        return windows
+    for pair in pairs:
+        ts = float(pair.bag_timestamp_seconds)
+        for index, event in enumerate(event_windows):
+            if event.start_time <= ts < event.end_time:
+                windows[index].append(pair)
+                break
+    return windows
+
+
 def _split_pairs(
     pairs: Sequence[CorrelatedPosePair],
     strata: int,
     mode: str,
+    *,
+    event_windows: Sequence[CorrelationEventWindow] | None = None,
 ) -> list[list[CorrelatedPosePair]]:
-    """Dispatch to the requested stratification splitter."""
+    """Dispatch to the requested stratification splitter.
 
+    For ``event-aligned`` mode the caller must pass ``event_windows`` that
+    are non-empty; an empty / missing sequence falls back to
+    ``equal-pair-count`` to keep the gate evaluable rather than silently
+    skipping the per-window check.
+    """
+
+    if mode == "event-aligned":
+        if event_windows:
+            return _split_pairs_by_events(pairs, event_windows)
+        # Fallback: keep gate functional when caller forgot to plumb windows.
+        return _split_pairs_by_count(pairs, strata)
     if mode == "equal-pair-count":
         return _split_pairs_by_count(pairs, strata)
     return _split_pairs_by_time(pairs, strata)

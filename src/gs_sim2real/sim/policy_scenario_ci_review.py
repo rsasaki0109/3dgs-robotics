@@ -28,6 +28,7 @@ from .policy_scenario_sharding import (
 )
 from .policy_scenario_set import load_route_policy_scenario_set_run_json
 from ..robotics.rosbag_correlation import (
+    CorrelationEventWindow,
     RealVsSimCorrelationReport,
     RealVsSimCorrelationThresholds,
     RealVsSimCorrelationWindowStats,
@@ -35,6 +36,7 @@ from ..robotics.rosbag_correlation import (
     correlation_threshold_overrides_from_dict,
     correlation_threshold_overrides_to_dict,
     evaluate_real_vs_sim_correlation_thresholds,
+    load_correlation_event_windows_json,
     real_vs_sim_correlation_report_from_dict,
     real_vs_sim_correlation_thresholds_from_dict,
     real_vs_sim_correlation_window_stats_from_dict,
@@ -406,14 +408,22 @@ def build_route_policy_scenario_ci_review_artifact(
     }
     default_thresholds = correlation_thresholds if correlation_thresholds is not None else None
     gate_active = (default_thresholds is not None and not default_thresholds.is_empty) or bool(overrides_map)
+    stratification_fallbacks: list[Mapping[str, Any]] = []
     if gate_active:
         failed: list[tuple[int, str, tuple[str, ...]]] = []
         per_window: list[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]]] = []
+        event_windows_cache: dict[str, tuple[CorrelationEventWindow, ...]] = {}
         for index, report in enumerate(correlation_reports):
             applied = overrides_map.get(report.bag_source.source_topic, default_thresholds)
             if applied is None or applied.is_empty:
                 continue
-            _, failed_checks = evaluate_real_vs_sim_correlation_thresholds(report, applied)
+            event_windows = _resolve_event_windows_or_record_fallback(
+                applied,
+                report=report,
+                cache=event_windows_cache,
+                fallbacks=stratification_fallbacks,
+            )
+            _, failed_checks = evaluate_real_vs_sim_correlation_thresholds(report, applied, event_windows=event_windows)
             if failed_checks:
                 failed.append((index, report.bag_source.source_topic, failed_checks))
             if applied.pair_distribution_strata is not None and applied.pair_distribution_strata > 1:
@@ -421,6 +431,7 @@ def build_route_policy_scenario_ci_review_artifact(
                     report,
                     strata=int(applied.pair_distribution_strata),
                     mode=applied.pair_distribution_strata_mode,
+                    event_windows=event_windows,
                 )
                 if window_stats:
                     per_window.append((index, report.bag_source.source_topic, window_stats))
@@ -455,8 +466,99 @@ def build_route_policy_scenario_ci_review_artifact(
             "historyMarkdownPath": merge_report.history_markdown_path,
             "validationFailedChecks": list(validation_report.failed_checks),
             "activationFailedChecks": list(activation_report.failed_checks),
+            **(
+                {"correlationStratificationFallbacks": list(stratification_fallbacks)}
+                if stratification_fallbacks
+                else {}
+            ),
             **_json_mapping(metadata or {}),
         },
+    )
+
+
+def _resolve_event_windows_or_record_fallback(
+    applied: RealVsSimCorrelationThresholds,
+    *,
+    report: RealVsSimCorrelationReport,
+    cache: dict[str, tuple[CorrelationEventWindow, ...]],
+    fallbacks: list[Mapping[str, Any]],
+) -> tuple[CorrelationEventWindow, ...] | None:
+    """Load event windows for an event-aligned threshold or note the fallback.
+
+    Returns the loaded event windows tuple when the applied thresholds use
+    ``event-aligned`` mode and the file resolves to at least one window.
+    When the file is missing, unreadable, or contains zero windows,
+    records a structured fallback entry in ``fallbacks`` (so the review
+    bundle metadata makes the slippage visible) and emits a stderr
+    warning. Reports whose applied mode is not ``event-aligned`` short-
+    circuit and return ``None`` without recording anything.
+
+    The cache key includes both the bag topic and the path so per-topic
+    overrides each load their own file once.
+    """
+
+    if applied.pair_distribution_strata_mode != "event-aligned":
+        return None
+    path = applied.event_windows_path
+    if not path:
+        _record_event_aligned_fallback(
+            fallbacks,
+            bag_topic=report.bag_source.source_topic,
+            path=None,
+            reason="event-aligned mode requested but event_windows_path is empty",
+        )
+        return None
+    cache_key = f"{report.bag_source.source_topic}::{path}"
+    if cache_key in cache:
+        cached = cache[cache_key]
+        if cached:
+            return cached
+        return None
+    try:
+        loaded = load_correlation_event_windows_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        cache[cache_key] = ()
+        _record_event_aligned_fallback(
+            fallbacks,
+            bag_topic=report.bag_source.source_topic,
+            path=path,
+            reason=f"{type(exc).__name__}: {exc}",
+        )
+        return None
+    if not loaded:
+        cache[cache_key] = ()
+        _record_event_aligned_fallback(
+            fallbacks,
+            bag_topic=report.bag_source.source_topic,
+            path=path,
+            reason="event windows file is empty",
+        )
+        return None
+    cache[cache_key] = loaded
+    return loaded
+
+
+def _record_event_aligned_fallback(
+    fallbacks: list[Mapping[str, Any]],
+    *,
+    bag_topic: str,
+    path: str | None,
+    reason: str,
+) -> None:
+    """Append one fallback record to the artifact metadata and warn on stderr."""
+
+    fallbacks.append(
+        {
+            "bagSourceTopic": bag_topic,
+            "requested": "event-aligned",
+            "applied": "equal-pair-count",
+            "eventWindowsPath": path,
+            "reason": reason,
+        }
+    )
+    sys.stderr.write(
+        f"warning: event-aligned correlation stratification fell back to "
+        f"equal-pair-count for topic {bag_topic!r}: {reason}\n"
     )
 
 
@@ -840,28 +942,57 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
         if artifact.correlation_per_window_stats:
             lines.extend(["", "### Per-window correlation stats", ""])
             for report_index, topic, windows in artifact.correlation_per_window_stats:
+                has_events = any(stat.event_name is not None for stat in windows)
                 lines.append(f"- `{topic}` (report #{report_index}):")
                 lines.append("")
-                lines.append(
-                    "| Window | Bag time (s) | Pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) |"
-                )
-                lines.append("| ---: | --- | ---: | ---: | ---: | ---: | ---: |")
+                if has_events:
+                    lines.append(
+                        "| Window | Event | Bag time (s) | Pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) |"
+                    )
+                    lines.append("| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |")
+                else:
+                    lines.append(
+                        "| Window | Bag time (s) | Pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) |"
+                    )
+                    lines.append("| ---: | --- | ---: | ---: | ---: | ---: | ---: |")
                 for stat in windows:
                     heading = (
                         f"{stat.heading_error_mean_radians:.4f}"
                         if stat.heading_error_mean_radians is not None
                         else "n/a"
                     )
-                    lines.append(
-                        f"| {stat.window_index} | "
-                        f"{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f} | "
-                        f"{stat.pair_count} | "
-                        f"{stat.translation_error_mean_meters:.4f} | "
-                        f"{stat.translation_error_p95_meters:.4f} | "
-                        f"{stat.translation_error_max_meters:.4f} | "
-                        f"{heading} |"
-                    )
+                    if has_events:
+                        event_cell = _render_event_cell_markdown(stat)
+                        lines.append(
+                            f"| {stat.window_index} | "
+                            f"{event_cell} | "
+                            f"{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f} | "
+                            f"{stat.pair_count} | "
+                            f"{stat.translation_error_mean_meters:.4f} | "
+                            f"{stat.translation_error_p95_meters:.4f} | "
+                            f"{stat.translation_error_max_meters:.4f} | "
+                            f"{heading} |"
+                        )
+                    else:
+                        lines.append(
+                            f"| {stat.window_index} | "
+                            f"{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f} | "
+                            f"{stat.pair_count} | "
+                            f"{stat.translation_error_mean_meters:.4f} | "
+                            f"{stat.translation_error_p95_meters:.4f} | "
+                            f"{stat.translation_error_max_meters:.4f} | "
+                            f"{heading} |"
+                        )
                 lines.append("")
+        if artifact.metadata.get("correlationStratificationFallbacks"):
+            fallbacks = artifact.metadata["correlationStratificationFallbacks"]
+            lines.extend(["", "### Correlation stratification fallbacks", ""])
+            for entry in fallbacks:
+                lines.append(
+                    f"- `{entry.get('bagSourceTopic', '?')}`: requested "
+                    f"`{entry.get('requested')}` → applied `{entry.get('applied')}` "
+                    f"(reason: {entry.get('reason')})"
+                )
     if artifact.adoption is not None:
         adoption = artifact.adoption
         lines.extend(
@@ -1016,6 +1147,7 @@ def run_review_cli(args: Any) -> None:
         max_exceeding_heading_pair_fraction=getattr(args, "max_correlation_heading_pair_fraction", None),
         pair_distribution_strata=getattr(args, "correlation_pair_distribution_strata", None),
         pair_distribution_strata_mode=getattr(args, "correlation_pair_distribution_strata_mode", "equal-duration"),
+        event_windows_path=getattr(args, "correlation_event_windows", None),
     )
     if correlation_thresholds.is_empty:
         correlation_thresholds = None
@@ -1268,23 +1400,14 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
     if artifact.correlation_per_window_stats:
         groups: list[str] = []
         for report_index, topic, windows in artifact.correlation_per_window_stats:
-            window_rows = "\n".join(
-                "<tr>"
-                f"<td>{stat.window_index}</td>"
-                f"<td>{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f}</td>"
-                f"<td>{stat.pair_count}</td>"
-                f"<td>{stat.translation_error_mean_meters:.4f}</td>"
-                f"<td>{stat.translation_error_p95_meters:.4f}</td>"
-                f"<td>{stat.translation_error_max_meters:.4f}</td>"
-                f"<td>{f'{stat.heading_error_mean_radians:.4f}' if stat.heading_error_mean_radians is not None else 'n/a'}</td>"
-                "</tr>"
-                for stat in windows
-            )
+            has_events = any(stat.event_name is not None for stat in windows)
+            window_rows = "\n".join(_render_per_window_row_html(stat, has_events) for stat in windows)
+            event_header = "<th>Event</th>" if has_events else ""
             groups.append(
                 f"<h4><code>{escape(topic)}</code> (report #{report_index})</h4>"
                 "<table>"
                 "<thead><tr>"
-                "<th>Window</th><th>Bag time (s)</th><th>Pairs</th>"
+                f"<th>Window</th>{event_header}<th>Bag time (s)</th><th>Pairs</th>"
                 "<th>Translation mean (m)</th><th>Translation p95 (m)</th><th>Translation max (m)</th>"
                 "<th>Heading mean (rad)</th>"
                 "</tr></thead>"
@@ -1308,6 +1431,49 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
         f"{per_window_html}"
         "</section>"
     )
+
+
+def _render_per_window_row_html(stat: RealVsSimCorrelationWindowStats, has_events: bool) -> str:
+    """Render one ``<tr>`` for the per-window correlation stats table."""
+
+    event_cell = ""
+    if has_events:
+        if stat.event_name is None:
+            event_cell = "<td>—</td>"
+        else:
+            parts = [f"<code>{escape(stat.event_name)}</code>"]
+            if stat.event_source and stat.event_source != "external":
+                parts.append(f"<span>({escape(stat.event_source)})</span>")
+            if stat.event_tags:
+                tag_block = " ".join(f"<code>{escape(tag)}</code>" for tag in stat.event_tags)
+                parts.append(tag_block)
+            event_cell = f"<td>{' '.join(parts)}</td>"
+    heading_cell = f"{stat.heading_error_mean_radians:.4f}" if stat.heading_error_mean_radians is not None else "n/a"
+    return (
+        "<tr>"
+        f"<td>{stat.window_index}</td>"
+        f"{event_cell}"
+        f"<td>{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f}</td>"
+        f"<td>{stat.pair_count}</td>"
+        f"<td>{stat.translation_error_mean_meters:.4f}</td>"
+        f"<td>{stat.translation_error_p95_meters:.4f}</td>"
+        f"<td>{stat.translation_error_max_meters:.4f}</td>"
+        f"<td>{heading_cell}</td>"
+        "</tr>"
+    )
+
+
+def _render_event_cell_markdown(stat: RealVsSimCorrelationWindowStats) -> str:
+    """Render the Event column cell for a per-window correlation stat row."""
+
+    if stat.event_name is None:
+        return "—"
+    parts = [f"`{stat.event_name}`"]
+    if stat.event_source and stat.event_source != "external":
+        parts.append(f"({stat.event_source})")
+    if stat.event_tags:
+        parts.append(", ".join(f"`{tag}`" for tag in stat.event_tags))
+    return " ".join(parts)
 
 
 def _provenance_markdown_lines(provenance: RoutePolicyScenarioCIReviewProvenance | None) -> list[str]:

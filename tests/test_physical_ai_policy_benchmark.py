@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -2121,6 +2122,101 @@ def test_route_policy_scenario_ci_review_artifact_writes_pages_outputs(tmp_path:
     assert "provenance" not in review_payload
     assert "Run Provenance" not in render_route_policy_scenario_ci_review_markdown(loaded)
     assert "Run Provenance" not in render_route_policy_scenario_ci_review_html(loaded)
+
+
+def test_route_policy_scenario_ci_review_records_event_aligned_fallback(tmp_path: Path) -> None:
+    """When event-aligned mode is requested but the windows file is missing, the
+    review bundle records a structured fallback entry in metadata."""
+
+    from gs_sim2real.robotics import RealVsSimCorrelationThresholds
+    from gs_sim2real.sim.policy_scenario_ci_review import _resolve_event_windows_or_record_fallback
+
+    class _StubBagSource:
+        source_topic = "/odom/imu"
+
+    class _StubReport:
+        bag_source = _StubBagSource()
+
+    fallbacks: list[Mapping] = []  # type: ignore[name-defined]
+    cache: dict = {}
+    thresholds = RealVsSimCorrelationThresholds(
+        pair_distribution_strata=3,
+        pair_distribution_strata_mode="event-aligned",
+        event_windows_path=str(tmp_path / "does-not-exist.json"),
+    )
+    result = _resolve_event_windows_or_record_fallback(
+        thresholds, report=_StubReport(), cache=cache, fallbacks=fallbacks
+    )
+    assert result is None
+    assert len(fallbacks) == 1
+    assert fallbacks[0]["bagSourceTopic"] == "/odom/imu"
+    assert fallbacks[0]["applied"] == "equal-pair-count"
+    assert "does-not-exist.json" in fallbacks[0]["eventWindowsPath"]
+
+    # Calling again with the same topic+path reuses the cache and does not
+    # double-record the fallback.
+    result2 = _resolve_event_windows_or_record_fallback(
+        thresholds, report=_StubReport(), cache=cache, fallbacks=fallbacks
+    )
+    assert result2 is None
+    assert len(fallbacks) == 1
+
+    # Empty event_windows_path also falls back with a clear reason.
+    fallbacks_empty: list[Mapping] = []  # type: ignore[name-defined]
+    thresholds_empty = RealVsSimCorrelationThresholds(
+        pair_distribution_strata=3,
+        pair_distribution_strata_mode="event-aligned",
+        event_windows_path=None,
+    )
+    _resolve_event_windows_or_record_fallback(
+        thresholds_empty, report=_StubReport(), cache={}, fallbacks=fallbacks_empty
+    )
+    assert fallbacks_empty[0]["reason"].startswith("event-aligned mode requested")
+
+
+def test_route_policy_scenario_ci_review_loads_event_windows_when_available(tmp_path: Path) -> None:
+    """Event-aligned mode with a readable file yields the loaded windows."""
+    from gs_sim2real.robotics import RealVsSimCorrelationThresholds
+    from gs_sim2real.sim.policy_scenario_ci_review import _resolve_event_windows_or_record_fallback
+
+    windows_file = tmp_path / "events.json"
+    windows_file.write_text(
+        json.dumps(
+            {
+                "recordType": "gs-mapper-correlation-event-windows/v1",
+                "windows": [
+                    {"name": "approach", "startTime": 0.0, "endTime": 5.0},
+                    {"name": "turn", "startTime": 5.0, "endTime": 10.0, "tags": ["corner"]},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _StubBagSource:
+        source_topic = "/odom/imu"
+
+    class _StubReport:
+        bag_source = _StubBagSource()
+
+    thresholds = RealVsSimCorrelationThresholds(
+        pair_distribution_strata=2,
+        pair_distribution_strata_mode="event-aligned",
+        event_windows_path=str(windows_file),
+    )
+    fallbacks: list = []
+    cache: dict = {}
+    result = _resolve_event_windows_or_record_fallback(
+        thresholds, report=_StubReport(), cache=cache, fallbacks=fallbacks
+    )
+    assert result is not None
+    assert len(result) == 2
+    assert result[0].name == "approach"
+    assert result[1].name == "turn"
+    assert fallbacks == []
+    # Cache is populated for the next call.
+    cache_key = "/odom/imu::" + str(windows_file)
+    assert cache_key in cache
 
 
 def test_route_policy_scenario_ci_review_artifact_carries_production_provenance(tmp_path: Path) -> None:
