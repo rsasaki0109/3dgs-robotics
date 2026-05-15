@@ -23,6 +23,7 @@ from .policy_imitation import (
 from .policy_quality import (
     RoutePolicyBaselineEvaluation,
     RoutePolicyQualityThresholds,
+    RoutePolicyTraceEmitterFactory,
     evaluate_route_policy_baselines,
 )
 from .policy_replay import (
@@ -216,6 +217,7 @@ def run_route_policy_imitation_benchmark(
     max_steps: int | None = None,
     thresholds: RoutePolicyQualityThresholds | None = None,
     metadata: Mapping[str, Any] | None = None,
+    trace_emitter_factory: RoutePolicyTraceEmitterFactory | None = None,
 ) -> RoutePolicyBenchmarkReport:
     """Evaluate a fitted imitation model, optionally beside a direct-goal baseline."""
 
@@ -238,6 +240,7 @@ def run_route_policy_imitation_benchmark(
             "includeDirectBaseline": include_direct_baseline,
             **_json_mapping(metadata or {}),
         },
+        trace_emitter_factory=trace_emitter_factory,
     )
     return RoutePolicyBenchmarkReport(
         benchmark_id=benchmark_id,
@@ -264,6 +267,7 @@ def run_route_policy_registry_benchmark(
     max_steps: int | None = None,
     thresholds: RoutePolicyQualityThresholds | None = None,
     metadata: Mapping[str, Any] | None = None,
+    trace_emitter_factory: RoutePolicyTraceEmitterFactory | None = None,
 ) -> RoutePolicyBenchmarkReport:
     """Evaluate every policy in a registry under one fixed route policy task."""
 
@@ -289,6 +293,7 @@ def run_route_policy_registry_benchmark(
             "includeDirectBaseline": include_direct_baseline,
             **_json_mapping(metadata or {}),
         },
+        trace_emitter_factory=trace_emitter_factory,
     )
     return RoutePolicyBenchmarkReport(
         benchmark_id=benchmark_id,

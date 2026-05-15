@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import math
 from pathlib import Path
@@ -16,6 +16,9 @@ from .policy_dataset import (
     RoutePolicyGoal,
     collect_route_policy_dataset,
 )
+from .policy_trace import RoutePolicyTraceEmitter
+
+RoutePolicyTraceEmitterFactory = Callable[[str], RoutePolicyTraceEmitter | None]
 
 
 ROUTE_POLICY_QUALITY_VERSION = "gs-mapper-route-policy-quality/v1"
@@ -216,27 +219,40 @@ def evaluate_route_policy_baselines(
     max_steps: int | None = None,
     thresholds: RoutePolicyQualityThresholds | None = None,
     metadata: Mapping[str, Any] | None = None,
+    trace_emitter_factory: RoutePolicyTraceEmitterFactory | None = None,
 ) -> RoutePolicyBaselineEvaluation:
-    """Collect and score comparable rollout datasets for named policy baselines."""
+    """Collect and score comparable rollout datasets for named policy baselines.
+
+    Pass ``trace_emitter_factory`` to stream live :class:`PolicyTraceEvent`s
+    per policy: the factory is called once with each ``policy_name`` and the
+    returned emitter is attached to every cloned adapter for that policy. The
+    emitter is closed automatically after the policy's rollout collection
+    completes, so file-backed JSONL streams are flushed even on errors.
+    """
 
     if not policies:
         raise ValueError("policies must contain at least one policy")
     results: list[RoutePolicyBaselineResult] = []
     for index, (policy_name, policy) in enumerate(policies.items()):
         dataset_id = f"{evaluation_id}-{index:02d}-{_slug(policy_name)}"
-        dataset = collect_route_policy_dataset(
-            _fresh_route_policy_adapters(adapters),
-            policy,
-            episode_count=episode_count,
-            dataset_id=dataset_id,
-            seed_start=seed_start,
-            goals=goals,
-            max_steps=max_steps,
-            metadata={
-                **dict(metadata or {}),
-                "baselinePolicy": policy_name,
-            },
-        )
+        emitter = trace_emitter_factory(policy_name) if trace_emitter_factory else None
+        try:
+            dataset = collect_route_policy_dataset(
+                _fresh_route_policy_adapters(adapters, emitter=emitter),
+                policy,
+                episode_count=episode_count,
+                dataset_id=dataset_id,
+                seed_start=seed_start,
+                goals=goals,
+                max_steps=max_steps,
+                metadata={
+                    **dict(metadata or {}),
+                    "baselinePolicy": policy_name,
+                },
+            )
+        finally:
+            if emitter is not None:
+                emitter.close()
         quality = evaluate_route_policy_dataset_quality(
             dataset,
             thresholds=thresholds,
@@ -300,8 +316,15 @@ def _failed_quality_checks(
     return tuple(checks)
 
 
-def _fresh_route_policy_adapters(adapters: Sequence[RoutePolicyGymAdapter]) -> tuple[RoutePolicyGymAdapter, ...]:
-    return tuple(RoutePolicyGymAdapter(adapter.environment, adapter.config) for adapter in adapters)
+def _fresh_route_policy_adapters(
+    adapters: Sequence[RoutePolicyGymAdapter],
+    *,
+    emitter: RoutePolicyTraceEmitter | None = None,
+) -> tuple[RoutePolicyGymAdapter, ...]:
+    return tuple(
+        RoutePolicyGymAdapter(adapter.environment, adapter.config, trace_emitter=emitter)
+        for adapter in adapters
+    )
 
 
 def _transition_collision_count(info: Mapping[str, Any], next_observation: Mapping[str, float]) -> float:
