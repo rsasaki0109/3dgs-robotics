@@ -1695,6 +1695,77 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional adopted workflow YAML path (defaults to adoption report's adopted active path)",
     )
 
+    # route policy dataset -> policy trace events (offline extractor)
+    rpd2t = subparsers.add_parser(
+        "route-policy-dataset-to-trace",
+        help="Extract policy trace events (goal_reached / collision / near_miss / truncated) from a route policy dataset JSON",
+    )
+    rpd2t.add_argument("--dataset", required=True, help="route policy dataset JSON path")
+    rpd2t.add_argument("--output", required=True, help="policy trace JSONL output path")
+    rpd2t.add_argument(
+        "--segment-duration-seconds",
+        type=float,
+        default=1.0,
+        help="Per-step duration used to synthesize event timestamps (default: 1.0)",
+    )
+    rpd2t.add_argument(
+        "--near-miss-clearance-meters",
+        type=float,
+        default=None,
+        help=(
+            "When set, also emit a near_miss event per transition whose nearest obstacle "
+            "clearance feature is below this threshold"
+        ),
+    )
+    rpd2t.add_argument(
+        "--near-miss-feature-key",
+        default="nearest-dynamic-obstacle-clearance-meters",
+        help=(
+            "next_observation feature key inspected for the --near-miss-clearance-meters gate "
+            "(default: nearest-dynamic-obstacle-clearance-meters)"
+        ),
+    )
+    rpd2t.add_argument(
+        "--time-offset-seconds",
+        type=float,
+        default=0.0,
+        help="Offset added to every synthesized timestamp (default: 0.0)",
+    )
+
+    # policy trace -> correlation event windows
+    rpt2ew = subparsers.add_parser(
+        "route-policy-trace-to-event-windows",
+        help="Convert a policy trace JSONL into a gs-mapper-correlation-event-windows/v1 JSON file",
+    )
+    rpt2ew.add_argument("--trace", required=True, help="Policy trace JSONL path")
+    rpt2ew.add_argument("--output", required=True, help="Correlation event windows JSON output path")
+    rpt2ew.add_argument(
+        "--half-width-seconds",
+        type=float,
+        default=0.5,
+        help=(
+            "Half-width of the synthesized window around each point event "
+            "(window = [t - hw, t + hw]; default: 0.5)"
+        ),
+    )
+    rpt2ew.add_argument(
+        "--time-offset-seconds",
+        type=float,
+        default=0.0,
+        help=(
+            "Offset added to timestamp_seconds when no bag_timestamp_seconds is set on the event "
+            "(use this to align a sim-time trace into bag-time)"
+        ),
+    )
+    rpt2ew.add_argument(
+        "--name-template",
+        default="{event_name}-{episode_id}-{step_index}",
+        help=(
+            "Window name template; format keys: {event_name}, {episode_id}, {episode_index}, {step_index} "
+            "(default: '{event_name}-{episode_id}-{step_index}')"
+        ),
+    )
+
     # route policy scenario CI workflow trigger promotion
     rpswfp = subparsers.add_parser(
         "route-policy-scenario-ci-workflow-promote",
@@ -2734,6 +2805,20 @@ def cmd_route_policy_scenario_ci_review(args: argparse.Namespace) -> None:
     run_review_cli(args)
 
 
+def cmd_route_policy_dataset_to_trace(args: argparse.Namespace) -> None:
+    """Handle the route-policy-dataset-to-trace subcommand."""
+    from gs_sim2real.sim.policy_trace import run_dataset_to_trace_cli
+
+    run_dataset_to_trace_cli(args)
+
+
+def cmd_route_policy_trace_to_event_windows(args: argparse.Namespace) -> None:
+    """Handle the route-policy-trace-to-event-windows subcommand."""
+    from gs_sim2real.sim.policy_trace import run_trace_to_event_windows_cli
+
+    run_trace_to_event_windows_cli(args)
+
+
 def cmd_route_policy_scenario_ci_workflow_promote(args: argparse.Namespace) -> None:
     """Handle the route-policy-scenario-ci-workflow-promote subcommand."""
     from gs_sim2real.sim.policy_scenario_ci_promotion import run_promotion_cli
@@ -2926,6 +3011,7 @@ def main(argv: list[str] | None = None) -> None:
         "sim2real-benchmark-images": cmd_sim2real_benchmark_images,
         "route-policy-benchmark": cmd_route_policy_benchmark,
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
+        "route-policy-dataset-to-trace": cmd_route_policy_dataset_to_trace,
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
         "route-policy-scenario-ci-review": cmd_route_policy_scenario_ci_review,
         "route-policy-scenario-ci-workflow-activate": cmd_route_policy_scenario_ci_workflow_activate,
@@ -2937,6 +3023,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-scenario-shard-merge": cmd_route_policy_scenario_shard_merge,
         "route-policy-scenario-shards": cmd_route_policy_scenario_shards,
         "route-policy-scenario-set": cmd_route_policy_scenario_set,
+        "route-policy-trace-to-event-windows": cmd_route_policy_trace_to_event_windows,
         "experiment": cmd_experiment,
     }
 
