@@ -836,6 +836,50 @@ scenario matrix の段階拡張:
 
 各段階で review bundle / shard merge gate が安定することを確認してから次の規模へ。最初の public scenario は 4〜8 agent 程度で良い（CI / shard / review contract が安定してから Pi3-style dense に拡張する方が安全）。
 
+#### 17.5.1 Schema additions（design draft）
+
+3 つの追加 dataclass / JSON record を新設する。いずれも既存 `RoutePolicyScenarioMatrix` を壊さず、フィールドは optional として追加する。
+
+| 新規 record | 主なフィールド | 役割 |
+| --- | --- | --- |
+| `AgentRoleSpec` | `agent_id`、`role` ∈ {`ego`、`peer-obstacle`、`peer-coop`}、`start_pose` または `start_volume`、`goal_pose` (optional)、`policy_ref` (registry key) または `builtin_policy` (`waypoint` / `chase` / `flee` / `maintain_separation`)、`seed_offset` | 個別 agent の明示宣言。deterministic scenario でも、roster を population 由来にしない場合の入口 |
+| `PopulationSpec` | `agent_count_per_scenario: int`、`peer_role_distribution: Mapping[str, float]` (例: `chase=0.25, flee=0.25, maintain_separation=0.5`)、`random_seed: int`、`spawn_volume: AxisAlignedBounds`、`homogeneous: bool` | population 由来の peer roster 生成。`agents` か `population` のどちらか一方だけ与える契約 |
+| `InteractionMetricsSpec` | `min_separation_meters: float \| None`、`aggregate_keys: tuple[str, ...]`、`pairwise_clearance_histogram_bins: tuple[float, ...] \| None`、`require_ego_survives: bool` | rollout 中に収集する multi-agent metric の宣言。集計は shard merge 側で平均 / 最悪値 / histogram |
+
+JSON schema 拡張は `gs-mapper-route-policy-scenario-matrix/v1` の追加 optional key のみ（version bump はしない）。旧 matrix 入力は引き続き ego-only として読まれる。
+
+#### 17.5.2 既存 pipeline へのフック箇所
+
+| Layer | 既存 module | 追加が必要な hook |
+| --- | --- | --- |
+| Scenario matrix | `policy_scenario_matrix.py` | 各 `RoutePolicyMatrixSceneSpec` に optional `agents` / `population` / `interaction_metrics` を持たせる。expansion 時に `population.random_seed` の値域を外側 axis として `(scenario, seed)` ペアを fan-out |
+| Scenario set | `policy_scenario_set.py` | run loop が `agents` を解釈し、peer policy を `ObstaclePolicy` instance として instantiate。per-step peer cache (#123/#127) に rollout 中の peer poses を threading |
+| Sharding | `policy_scenario_sharding.py` | shard 分割は `(scenario_id, seed)` ペア単位でハッシュ。同じ scenario でも seed 違いは別 shard に行ける |
+| Shard merge | `policy_scenario_set.py` の merge path | ego metric に加え、`InteractionMetricsSpec.aggregate_keys` 由来の cross-scenario aggregate（mean / p95 / max / histogram）を `interactionMetricsAggregate` キーで report に attach |
+| Review bundle | `policy_scenario_ci_review.py` | review JSON / Markdown / HTML に "multi-agent" badge と interaction-metrics block を surface。`agents.length` ≥ 2 の bundle のみ表示 |
+| Correlation gate | `route-policy-scenario-ci-review` の `--correlation-*` | 実機 bag に peer GT が無いことを前提に、初期 delivery では **ego trajectory のみ correlation 比較**を続ける。peer correlation は OOS |
+
+#### 17.5.3 Risks / open questions
+
+1. **Seed determinism under sharding**: shard 数変更で peer spawn が drift しないよう、population sampling は `hash((scenario_id, scenario_seed, agent_index))` で行う。shard merge は roster identity だけ assert する。
+2. **Peer rollout cost**: 32-agent dense は headless env の per-step cost が線形以上に効く可能性。staging plan（2 → 4 → 16 → 32）を厳守し、各段で smoke chain の wall-clock を観測する。
+3. **Backwards compat**: 既存 matrix JSON は `agents` field を持たない。loader 側で empty/missing = legacy ego-only path に fallback、unit test で旧 fixture が壊れないことを assert。
+4. **Real-vs-sim correlation の扱い**: 実機 bag に peer の GT pose が無い場合が大半なので、第一弾は ego trajectory correlation のみ。peer correlation は GT 付き synthetic 由来 bag が手に入った段階で別 PR。
+5. **Review bundle schema versioning**: multi-agent surface は optional フィールドとして追加し、`route-policy-scenario-ci-review/v1` の中で表現する。schema bump は population spec が must field になる時点まで遅らせる。
+
+#### 17.5.4 PR breakdown
+
+| PR | scope | 既存 layer への影響 |
+| --- | --- | --- |
+| D | `AgentRoleSpec` / `PopulationSpec` / `InteractionMetricsSpec` dataclass + JSON roundtrip + ego-only legacy fallback test | 新規 module、既存触らず |
+| D2 | scenario matrix loader / expander が新 field を受理、`(scenario, seed)` fan-out | `policy_scenario_matrix.py` のみ |
+| D3 | scenario set run loop が peer policy を spawn し per-step peer cache に流す、interaction metrics を collect | `policy_scenario_set.py` |
+| D4 | shard merge が `interactionMetricsAggregate` を attach | `policy_scenario_set.py` の merge path |
+| D5 | review bundle JSON / Markdown / HTML に multi-agent block / badge を追加、`docs/reviews/index.json` の per-entry summary に agent count | `policy_scenario_ci_review.py`、`scripts/build_pages_reviews_index.py` |
+| D6 | 2-agent deterministic crossing fixture を smoke chain に追加、`scripts/smoke_route_policy_scenario_ci.py` を multi-agent path にも対応させる | smoke recipe + `tests/test_smoke_route_policy_scenario_ci.py` |
+
+D6 完了後、production matrix で 4-agent route conflict scenario を 1 つ走らせて `kind=production` review bundle を `scripts/publish_production_review_bundle.py` 経由で publish するのが Sprint 4 の Definition of Done。
+
 ### 17.6 Sprint 1 完了後に有効化する CI 自動化
 
 | CI | 頻度 | 目的 | 起点 |
