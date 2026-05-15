@@ -536,6 +536,16 @@ PYTHONPATH=src python3 scripts/build_pages_sample_review_bundle.py
 
 生成後の bundle は `review.json` / `review.md` / `index.html` と、リンク先の `sample-artifacts/` を含む。`/tmp/...` や `https://example.test/...` は commit しない。
 
+Production benchmark run を Pages `/reviews/` に公開する場合は `scripts/publish_production_review_bundle.py` を使う。`route-policy-scenario-ci-review` が外部の production 実行で吐いた `review.json`(`provenance.kind="production"`)を `docs/reviews/<bundle-id>/` に bundle 化し、`docs/reviews/index.{html,json}` も再生成する。
+
+```bash
+PYTHONPATH=src python3 scripts/publish_production_review_bundle.py \
+  --review-json runs/outdoor-demo/ci-review.json \
+  --bundle-id outdoor-demo-direct-baseline-001
+```
+
+`provenance.kind` が `production` 以外だと exit 2 で reject される。bundle id は lowercase kebab-case のみ。
+
 ## 10. Public / Launch Track
 
 ### 10.1 現状
