@@ -24,12 +24,14 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 import json
 import math
 from pathlib import Path
 import sys
-from typing import Any
+from types import TracebackType
+from typing import IO, Any, Protocol, runtime_checkable
 
 from ..robotics.rosbag_correlation import (
     CORRELATION_EVENT_WINDOWS_VERSION,
@@ -461,9 +463,292 @@ def _json_value(value: Any) -> Any:
     raise TypeError(f"value is not JSON serializable: {type(value).__name__}")
 
 
+@runtime_checkable
+class PolicyTraceEventStream(Protocol):
+    """Sink for live :class:`PolicyTraceEvent` records.
+
+    Implementations are expected to be append-only and to flush eagerly so
+    that crashes mid-rollout still leave a usable trace on disk. ``close``
+    must be idempotent.
+    """
+
+    def emit(self, event: PolicyTraceEvent) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class JsonlPolicyTraceEventStream(AbstractContextManager["JsonlPolicyTraceEventStream"]):
+    """JSONL-backed :class:`PolicyTraceEventStream`.
+
+    One line per event, ``json.dumps(..., sort_keys=True)`` for stable diff
+    output, ``flush`` after every write so a crashed rollout still produces
+    a parseable JSONL prefix. Re-opening an existing file appends.
+    """
+
+    def __init__(self, path: str | Path, *, mode: str = "a") -> None:
+        if mode not in ("a", "w"):
+            raise ValueError("JsonlPolicyTraceEventStream mode must be 'a' or 'w'")
+        self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._handle: IO[str] | None = self._path.open(mode, encoding="utf-8")
+        self._closed = False
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def emit(self, event: PolicyTraceEvent) -> None:
+        if self._closed or self._handle is None:
+            raise RuntimeError("JsonlPolicyTraceEventStream is closed")
+        self._handle.write(
+            json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
+            + "\n"
+        )
+        self._handle.flush()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._handle is not None:
+            try:
+                self._handle.close()
+            finally:
+                self._handle = None
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self.close()
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyTraceEmissionConfig:
+    """Configuration for :class:`RoutePolicyTraceEmitter`.
+
+    The defaults match :func:`extract_policy_trace_events_from_dataset` so
+    a live trace and a post-hoc trace of the same rollout produce the same
+    event timeline. ``near_miss_feature_key`` defaults to the key the
+    Gym adapter actually emits (``nearest-dynamic-obstacle-distance-meters``).
+    """
+
+    segment_duration_seconds: float = 1.0
+    near_miss_clearance_meters: float | None = None
+    near_miss_feature_key: str = "nearest-dynamic-obstacle-distance-meters"
+    near_miss_edge_only: bool = True
+    time_offset_seconds: float = 0.0
+    episode_id_template: str = "{scene_id}-episode-{episode_index}"
+
+    def __post_init__(self) -> None:
+        if self.segment_duration_seconds <= 0.0 or not math.isfinite(
+            self.segment_duration_seconds
+        ):
+            raise ValueError("segment_duration_seconds must be positive and finite")
+        if self.near_miss_clearance_meters is not None:
+            threshold = float(self.near_miss_clearance_meters)
+            if not math.isfinite(threshold):
+                raise ValueError("near_miss_clearance_meters must be finite")
+            object.__setattr__(self, "near_miss_clearance_meters", threshold)
+        if not str(self.near_miss_feature_key):
+            raise ValueError("near_miss_feature_key must not be empty")
+        if "{episode_index}" not in self.episode_id_template:
+            raise ValueError(
+                "episode_id_template must reference {episode_index} to stay unique per episode"
+            )
+
+
+class RoutePolicyTraceEmitter:
+    """State machine for emitting trace events from a *live* rollout.
+
+    The emitter is intentionally decoupled from the Gym adapter: the
+    adapter (or any custom rollout loop) calls :meth:`begin_episode` once
+    per ``reset`` and :meth:`record_step` once per ``step``. The emitter
+    handles terminal-event dispatch, near-miss edge detection, sim-time
+    synthesis, and stream forwarding so callers stay simple.
+
+    Returned events are also pushed to ``stream`` (when one is set); the
+    return value is exposed mainly so tests can assert on emission without
+    needing a stream sink.
+    """
+
+    def __init__(
+        self,
+        stream: PolicyTraceEventStream | None = None,
+        config: PolicyTraceEmissionConfig | None = None,
+    ) -> None:
+        self._stream = stream
+        self._config = config or PolicyTraceEmissionConfig()
+        self._near_miss_below: bool = False
+        self._episode_open: bool = False
+        self._episode_id: str | None = None
+
+    @property
+    def config(self) -> PolicyTraceEmissionConfig:
+        return self._config
+
+    def begin_episode(self, *, scene_id: str, episode_index: int) -> str:
+        """Mark the start of a new episode and return its synthesized id."""
+
+        self._near_miss_below = False
+        self._episode_open = True
+        episode_id = self._config.episode_id_template.format(
+            scene_id=str(scene_id),
+            episode_index=int(episode_index),
+        )
+        self._episode_id = episode_id
+        return episode_id
+
+    def record_step(
+        self,
+        *,
+        scene_id: str,
+        episode_index: int,
+        step_index: int,
+        next_observation: Mapping[str, Any],
+        blocked: bool,
+        goal_reached: bool,
+        truncated: bool,
+        terminated: bool,
+        extra_tags: Sequence[str] = (),
+    ) -> tuple[PolicyTraceEvent, ...]:
+        """Emit any events for the just-completed step, return them in order."""
+
+        if not self._episode_open or self._episode_id is None:
+            raise RuntimeError(
+                "RoutePolicyTraceEmitter.record_step called without begin_episode"
+            )
+        events: list[PolicyTraceEvent] = []
+        config = self._config
+        timestamp = (
+            config.time_offset_seconds
+            + float(step_index + 1) * config.segment_duration_seconds
+        )
+        clearance_payload = next_observation.get(config.near_miss_feature_key)
+        clearance_numeric = _coerce_finite_float(clearance_payload)
+        threshold = config.near_miss_clearance_meters
+        is_below_now = (
+            threshold is not None
+            and clearance_numeric is not None
+            and clearance_numeric <= threshold
+        )
+        should_emit_near_miss = (
+            threshold is not None
+            and is_below_now
+            and (not config.near_miss_edge_only or not self._near_miss_below)
+        )
+        if should_emit_near_miss:
+            assert threshold is not None  # narrowed above
+            assert clearance_numeric is not None
+            events.append(
+                PolicyTraceEvent(
+                    event_name="near_miss",
+                    timestamp_seconds=timestamp,
+                    episode_id=self._episode_id,
+                    episode_index=int(episode_index),
+                    step_index=int(step_index),
+                    tags=(f"scene:{scene_id}", *extra_tags),
+                    metadata={
+                        "clearanceMeters": float(clearance_numeric),
+                        "thresholdMeters": float(threshold),
+                        "featureKey": config.near_miss_feature_key,
+                    },
+                )
+            )
+        self._near_miss_below = bool(is_below_now)
+
+        terminal_name = _live_terminal_event_name(
+            blocked=blocked,
+            goal_reached=goal_reached,
+            truncated=truncated,
+            terminated=terminated,
+        )
+        if terminal_name is not None:
+            events.append(
+                PolicyTraceEvent(
+                    event_name=terminal_name,
+                    timestamp_seconds=timestamp,
+                    episode_id=self._episode_id,
+                    episode_index=int(episode_index),
+                    step_index=int(step_index),
+                    tags=(f"scene:{scene_id}", *extra_tags),
+                    metadata={
+                        "terminationReason": _termination_reason_from_flags(
+                            blocked=blocked,
+                            goal_reached=goal_reached,
+                            truncated=truncated,
+                        ),
+                    },
+                )
+            )
+            self._episode_open = False
+
+        if self._stream is not None:
+            for event in events:
+                self._stream.emit(event)
+        return tuple(events)
+
+    def close(self) -> None:
+        """Close the underlying stream (idempotent)."""
+
+        if self._stream is not None:
+            self._stream.close()
+
+
+def _live_terminal_event_name(
+    *,
+    blocked: bool,
+    goal_reached: bool,
+    truncated: bool,
+    terminated: bool,
+) -> str | None:
+    if goal_reached:
+        return "goal_reached"
+    if blocked:
+        return "collision"
+    if truncated:
+        return "truncated"
+    if terminated:
+        return "terminated"
+    return None
+
+
+def _termination_reason_from_flags(
+    *,
+    blocked: bool,
+    goal_reached: bool,
+    truncated: bool,
+) -> str:
+    if goal_reached:
+        return "goal-reached"
+    if blocked:
+        return "blocked-route"
+    if truncated:
+        return "max-steps"
+    return "terminated"
+
+
+def _coerce_finite_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric):
+        return None
+    return numeric
+
+
 __all__ = [
     "ROUTE_POLICY_TRACE_EVENT_VERSION",
+    "JsonlPolicyTraceEventStream",
+    "PolicyTraceEmissionConfig",
     "PolicyTraceEvent",
+    "PolicyTraceEventStream",
+    "RoutePolicyTraceEmitter",
     "convert_policy_trace_events_to_event_windows",
     "extract_policy_trace_events_from_dataset",
     "load_policy_trace_jsonl",

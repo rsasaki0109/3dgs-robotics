@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 import base64
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .interfaces import ObservationRequest, PhysicalAIEnvironment, Pose3D
 from .policy_feedback import RoutePolicySample, RouteRewardWeights, build_route_policy_sample
@@ -17,6 +17,9 @@ from .policy_sensor_noise import (
 )
 from .route_execution import rollout_route
 from .route_planning import RouteCandidate
+
+if TYPE_CHECKING:
+    from .policy_trace import RoutePolicyTraceEmitter
 
 
 RoutePolicyAction = RouteCandidate | Pose3D | Mapping[str, Any] | Sequence[Pose3D] | Sequence[float]
@@ -77,13 +80,24 @@ class RoutePolicyGymAdapter:
 
     metadata = {"render_modes": ()}
 
-    def __init__(self, environment: PhysicalAIEnvironment, config: RoutePolicyEnvConfig):
+    def __init__(
+        self,
+        environment: PhysicalAIEnvironment,
+        config: RoutePolicyEnvConfig,
+        *,
+        trace_emitter: RoutePolicyTraceEmitter | None = None,
+    ):
         self.environment = environment
         self.config = config
         self._episode_index = -1
         self._state: RoutePolicyEnvState | None = None
         self._reset_seed: int | None = None
         self._previous_obstacle_positions: dict[str, tuple[float, float, float]] = {}
+        self._trace_emitter = trace_emitter
+
+    @property
+    def trace_emitter(self) -> RoutePolicyTraceEmitter | None:
+        return self._trace_emitter
 
     @property
     def state(self) -> RoutePolicyEnvState:
@@ -116,6 +130,11 @@ class RoutePolicyGymAdapter:
             pose=pose,
             goal=resolved_goal,
         )
+        if self._trace_emitter is not None:
+            self._trace_emitter.begin_episode(
+                scene_id=resolved_scene_id,
+                episode_index=self._episode_index,
+            )
         observation = self._observation_features(self.state)
         info = self._info(reset_payload=reset_payload)
         return observation, info
@@ -162,6 +181,17 @@ class RoutePolicyGymAdapter:
             done=terminated or truncated,
         )
         observation = self._observation_features(self.state, sample=sample)
+        if self._trace_emitter is not None:
+            self._trace_emitter.record_step(
+                scene_id=state.scene_id,
+                episode_index=state.episode_index,
+                step_index=state.step_index,
+                next_observation=observation,
+                blocked=blocked,
+                goal_reached=goal_reached,
+                truncated=truncated,
+                terminated=terminated,
+            )
         info = self._info(
             route=route,
             rollout=rollout.to_dict(),
@@ -385,6 +415,7 @@ def make_route_policy_env(
     environment: PhysicalAIEnvironment,
     *,
     scene_id: str,
+    trace_emitter: RoutePolicyTraceEmitter | None = None,
     **config_overrides: Any,
 ) -> RoutePolicyGymAdapter:
     """Build a route policy adapter with a concise factory call."""
@@ -392,6 +423,7 @@ def make_route_policy_env(
     return RoutePolicyGymAdapter(
         environment,
         RoutePolicyEnvConfig(scene_id=scene_id, **config_overrides),
+        trace_emitter=trace_emitter,
     )
 
 
