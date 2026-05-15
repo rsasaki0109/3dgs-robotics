@@ -98,3 +98,8 @@ Thumbs.db
 apps/**/dist/
 apps/**/.vite/
 apps/**/coverage/
+
+# Personal consultation / handoff scratchpads (point-in-time snapshots;
+# source of truth is docs/plan_outdoor_gs.md)
+/*_handoff.md
+
