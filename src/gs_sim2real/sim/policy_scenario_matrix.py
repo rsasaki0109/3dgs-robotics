@@ -13,6 +13,14 @@ from typing import Any
 
 from .contract import DEFAULT_SITE_URL
 from .policy_quality import RoutePolicyQualityThresholds
+from .policy_scenario_multi_agent import (
+    AgentRoleSpec,
+    InteractionMetricsSpec,
+    PopulationSpec,
+    agent_role_spec_from_dict,
+    interaction_metrics_spec_from_dict,
+    population_spec_from_dict,
+)
 from .policy_scenario_set import (
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
@@ -50,22 +58,52 @@ class RoutePolicyMatrixRegistrySpec:
 
 @dataclass(frozen=True, slots=True)
 class RoutePolicyMatrixSceneSpec:
-    """One scene axis value in a scenario matrix."""
+    """One scene axis value in a scenario matrix.
+
+    ``agents`` / ``population`` / ``interaction_metrics`` are optional
+    Sprint 4 (PR D / D2) extensions for multi-agent scenarios. Empty /
+    ``None`` means a legacy ego-only scenario, which keeps the matrix
+    expansion behaviour identical to pre-Sprint-4. ``agents`` and
+    ``population`` are mutually exclusive: the former declares peers
+    one-by-one, the latter samples them from a distribution.
+    """
 
     scene_key: str
     scene_catalog: str
     scene_id: str | None = None
     site_url: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    agents: tuple[AgentRoleSpec, ...] = ()
+    population: PopulationSpec | None = None
+    interaction_metrics: InteractionMetricsSpec | None = None
 
     def __post_init__(self) -> None:
         if not str(self.scene_key):
             raise ValueError("scene_key must not be empty")
         if not str(self.scene_catalog):
             raise ValueError("scene_catalog must not be empty")
+        if self.agents and self.population is not None:
+            raise ValueError(
+                "agents and population are mutually exclusive on a scene spec"
+            )
+        if self.agents:
+            agent_ids = tuple(spec.agent_id for spec in self.agents)
+            if len(set(agent_ids)) != len(agent_ids):
+                raise ValueError("agents must have unique agent_id values")
+            ego_count = sum(1 for spec in self.agents if spec.role == "ego")
+            if ego_count > 1:
+                raise ValueError("scene spec may declare at most one ego agent")
+
+    @property
+    def is_multi_agent(self) -> bool:
+        """True when the scene declares peers via agents or population."""
+
+        if self.population is not None:
+            return True
+        return any(spec.role != "ego" for spec in self.agents)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "recordType": "route-policy-matrix-scene",
             "sceneKey": self.scene_key,
             "sceneCatalog": self.scene_catalog,
@@ -73,6 +111,13 @@ class RoutePolicyMatrixSceneSpec:
             "siteUrl": self.site_url,
             "metadata": _json_mapping(self.metadata),
         }
+        if self.agents:
+            payload["agents"] = [spec.to_dict() for spec in self.agents]
+        if self.population is not None:
+            payload["population"] = self.population.to_dict()
+        if self.interaction_metrics is not None:
+            payload["interactionMetrics"] = self.interaction_metrics.to_dict()
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,7 +219,11 @@ class RoutePolicyScenarioMatrix:
 
     @property
     def scenario_count_per_set(self) -> int:
-        return len(self.scenes) * len(self.goal_suites) * len(self.configs)
+        suite_config = len(self.goal_suites) * len(self.configs)
+        scene_seed_total = sum(
+            len(_scene_population_seeds(scene)) for scene in self.scenes
+        )
+        return scene_seed_total * suite_config
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -249,13 +298,28 @@ class RoutePolicyScenarioMatrixExpansionReport:
 
 
 def expand_route_policy_scenario_matrix(matrix: RoutePolicyScenarioMatrix) -> tuple[RoutePolicyScenarioSet, ...]:
-    """Expand a compact matrix into one scenario set per policy registry."""
+    """Expand a compact matrix into one scenario set per policy registry.
+
+    When a scene carries a :class:`PopulationSpec`, the expander fans the
+    scene out across ``population.seed_count`` distinct seeds, producing
+    one scenario per ``(scene, goal_suite, config, seed)`` tuple. Each
+    fanned scenario id carries a ``-seed-<n>`` suffix; legacy ego-only
+    scenes (``population is None``) emit a single seedless id as before.
+    """
 
     scenario_sets: list[RoutePolicyScenarioSet] = []
     for registry in matrix.registries:
         scenarios = tuple(
-            _scenario_from_axes(matrix, scene=scene, goal_suite=goal_suite, config=config, registry=registry)
+            _scenario_from_axes(
+                matrix,
+                scene=scene,
+                goal_suite=goal_suite,
+                config=config,
+                registry=registry,
+                population_seed=seed,
+            )
             for scene, goal_suite, config in product(matrix.scenes, matrix.goal_suites, matrix.configs)
+            for seed in _scene_population_seeds(scene)
         )
         scenario_sets.append(
             RoutePolicyScenarioSet(
@@ -409,12 +473,31 @@ def route_policy_matrix_scene_spec_from_dict(payload: Mapping[str, Any]) -> Rout
     """Rebuild a matrix scene axis value from JSON."""
 
     _record_type(payload, "route-policy-matrix-scene")
+    agents_payload = payload.get("agents") or ()
+    if isinstance(agents_payload, (str, bytes, bytearray)) or not isinstance(
+        agents_payload, Sequence
+    ):
+        raise ValueError("scene 'agents' must be a list of agent role specs")
+    population_payload = payload.get("population")
+    interaction_metrics_payload = payload.get("interactionMetrics")
     return RoutePolicyMatrixSceneSpec(
         scene_key=str(payload["sceneKey"]),
         scene_catalog=str(payload["sceneCatalog"]),
         scene_id=None if payload.get("sceneId") is None else str(payload["sceneId"]),
         site_url=None if payload.get("siteUrl") is None else str(payload["siteUrl"]),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
+        agents=tuple(
+            agent_role_spec_from_dict(_mapping(item, "agents[i]"))
+            for item in agents_payload
+        ),
+        population=None
+        if population_payload is None
+        else population_spec_from_dict(_mapping(population_payload, "population")),
+        interaction_metrics=None
+        if interaction_metrics_payload is None
+        else interaction_metrics_spec_from_dict(
+            _mapping(interaction_metrics_payload, "interactionMetrics")
+        ),
     )
 
 
@@ -534,6 +617,14 @@ def run_cli(args: Any) -> None:
     print(f"Scenario matrix expansion saved to: {getattr(args, 'index_output')}")
 
 
+def _scene_population_seeds(scene: RoutePolicyMatrixSceneSpec) -> tuple[int | None, ...]:
+    """Return the seed dimension implied by a scene's optional population."""
+
+    if scene.population is None:
+        return (None,)
+    return scene.population.seeds()
+
+
 def _scenario_from_axes(
     matrix: RoutePolicyScenarioMatrix,
     *,
@@ -541,8 +632,30 @@ def _scenario_from_axes(
     goal_suite: RoutePolicyMatrixGoalSuiteSpec,
     config: RoutePolicyMatrixConfigSpec,
     registry: RoutePolicyMatrixRegistrySpec,
+    population_seed: int | None,
 ) -> RoutePolicyScenarioSpec:
-    scenario_id = "-".join((_slug(scene.scene_key), _slug(goal_suite.goal_suite_key), _slug(config.config_id)))
+    scenario_id_parts = [_slug(scene.scene_key), _slug(goal_suite.goal_suite_key), _slug(config.config_id)]
+    if population_seed is not None:
+        scenario_id_parts.append(f"seed-{population_seed}")
+    scenario_id = "-".join(scenario_id_parts)
+    metadata: dict[str, Any] = {
+        "matrixId": matrix.matrix_id,
+        "registryId": registry.registry_id,
+        "sceneKey": scene.scene_key,
+        "goalSuiteKey": goal_suite.goal_suite_key,
+        "configId": config.config_id,
+        "sceneMetadata": _json_mapping(scene.metadata),
+        "goalSuiteMetadata": _json_mapping(goal_suite.metadata),
+        "configMetadata": _json_mapping(config.metadata),
+    }
+    if scene.agents:
+        metadata["agents"] = [agent.to_dict() for agent in scene.agents]
+    if scene.population is not None:
+        metadata["population"] = scene.population.to_dict()
+    if scene.interaction_metrics is not None:
+        metadata["interactionMetrics"] = scene.interaction_metrics.to_dict()
+    if population_seed is not None:
+        metadata["populationSeed"] = int(population_seed)
     return RoutePolicyScenarioSpec(
         scenario_id=scenario_id,
         scene_catalog=scene.scene_catalog,
@@ -556,16 +669,7 @@ def _scenario_from_axes(
         sensor_noise_profile_path=config.sensor_noise_profile_path,
         raw_sensor_noise_profile_path=config.raw_sensor_noise_profile_path,
         dynamic_obstacles_path=config.dynamic_obstacles_path,
-        metadata={
-            "matrixId": matrix.matrix_id,
-            "registryId": registry.registry_id,
-            "sceneKey": scene.scene_key,
-            "goalSuiteKey": goal_suite.goal_suite_key,
-            "configId": config.config_id,
-            "sceneMetadata": _json_mapping(scene.metadata),
-            "goalSuiteMetadata": _json_mapping(goal_suite.metadata),
-            "configMetadata": _json_mapping(config.metadata),
-        },
+        metadata=metadata,
     )
 
 

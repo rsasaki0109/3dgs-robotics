@@ -118,6 +118,13 @@ class PopulationSpec:
     non-empty subset of :data:`BUILTIN_POLICIES`; values are mixture
     weights that must each lie in ``[0, 1]`` and sum to ``1.0``
     (within a small tolerance).
+
+    ``seed_count`` controls how many distinct seeds the matrix expander
+    fans this population out into. Each seed produces an independent
+    scenario instance with the seed sequence
+    ``[random_seed, random_seed + 1, ..., random_seed + seed_count - 1]``.
+    The default ``seed_count = 1`` keeps single-seed (deterministic)
+    populations as a no-op for the expander.
     """
 
     agent_count_per_scenario: int
@@ -125,6 +132,7 @@ class PopulationSpec:
     random_seed: int
     spawn_volume: AxisAlignedBounds
     homogeneous: bool = False
+    seed_count: int = 1
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -132,6 +140,8 @@ class PopulationSpec:
             raise ValueError("agent_count_per_scenario must be >= 1")
         if int(self.random_seed) < 0:
             raise ValueError("random_seed must be non-negative")
+        if int(self.seed_count) < 1:
+            raise ValueError("seed_count must be >= 1")
         if not self.peer_role_distribution:
             raise ValueError("peer_role_distribution must not be empty")
         unknown = sorted(set(self.peer_role_distribution) - BUILTIN_POLICIES)
@@ -160,8 +170,14 @@ class PopulationSpec:
         object.__setattr__(self, "agent_count_per_scenario", int(self.agent_count_per_scenario))
         object.__setattr__(self, "random_seed", int(self.random_seed))
         object.__setattr__(self, "homogeneous", bool(self.homogeneous))
+        object.__setattr__(self, "seed_count", int(self.seed_count))
         object.__setattr__(self, "peer_role_distribution", normalised)
         object.__setattr__(self, "metadata", _json_mapping(self.metadata))
+
+    def seeds(self) -> tuple[int, ...]:
+        """Return the per-scenario seed sequence implied by this spec."""
+
+        return tuple(int(self.random_seed) + offset for offset in range(int(self.seed_count)))
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -172,6 +188,7 @@ class PopulationSpec:
             "randomSeed": int(self.random_seed),
             "spawnVolume": self.spawn_volume.to_dict(),
             "homogeneous": bool(self.homogeneous),
+            "seedCount": int(self.seed_count),
         }
         if self.metadata:
             payload["metadata"] = dict(self.metadata)
@@ -295,6 +312,7 @@ def population_spec_from_dict(payload: Mapping[str, Any]) -> PopulationSpec:
         random_seed=int(payload["randomSeed"]),
         spawn_volume=_bounds_from_dict(spawn_volume_payload),
         homogeneous=bool(payload.get("homogeneous", False)),
+        seed_count=int(payload.get("seedCount", 1)),
         metadata=dict(metadata_payload),
     )
 
