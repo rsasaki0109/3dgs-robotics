@@ -12,6 +12,15 @@
 
 > Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; it proves the scenario-CI review bundle contract but is not a production benchmark run.
 
+## Run Provenance
+
+- Kind: synthetic
+- Generated at: 2026-05-15T00:00:00+00:00
+- Scene id: `smoke-route-policy-ci`
+- Asset source: `scripts/smoke_route_policy_scenario_ci.py`
+- runTrigger: `manual`
+- sampleBundle: `true`
+
 | Shard | Pass | Scenarios | Reports | Run |
 | --- | --- | ---: | ---: | --- |
 | smoke-route-policy-ci-matrix-direct-shard-001 | yes | 1 | 1 | sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-001.json |

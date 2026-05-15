@@ -19,6 +19,9 @@
     .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
     .pass { background: #dcefd8; color: #1e5a2b; }
     .fail { background: #f7d6d2; color: #8a1f16; }
+    .synthetic { background: #fff1c1; color: #6a4d00; }
+    .production { background: #dcefd8; color: #1e5a2b; }
+    .unknown { background: #e3e5df; color: #424940; }
     table { width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; overflow: hidden; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #e9ede5; text-align: left; vertical-align: top; }
     th { background: #eef2ea; font-size: 13px; color: #424940; }
@@ -43,6 +46,12 @@
       <div class="metric"><span>Scenarios</span><strong>2</strong></div>
       <div class="metric"><span>Reports</span><strong>2</strong></div>
     </section>
+    <section><h2>Run Provenance</h2><table><tbody><tr><th>Kind</th><td><span class="pill synthetic">SYNTHETIC</span></td></tr>
+<tr><th>Generated at</th><td><code>2026-05-15T00:00:00+00:00</code></td></tr>
+<tr><th>Scene id</th><td><code>smoke-route-policy-ci</code></td></tr>
+<tr><th>Asset source</th><td><code>scripts/smoke_route_policy_scenario_ci.py</code></td></tr>
+<tr><th>runTrigger</th><td><code>manual</code></td></tr>
+<tr><th>sampleBundle</th><td><code>true</code></td></tr></tbody></table></section>
     <section>
       <h2>Workflow Gate</h2>
       <p>Validation <span class="pill pass">PASS</span>

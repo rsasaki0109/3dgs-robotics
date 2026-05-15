@@ -1597,6 +1597,76 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     rpsrev.add_argument(
+        "--kind",
+        choices=("synthetic", "production"),
+        default=None,
+        help=(
+            "Mark the review as a synthetic smoke fixture or a production benchmark run. "
+            "Setting this populates the first-class provenance block on the review artifact "
+            "and is required when other --scene-id / --policy-version / etc. flags are set. "
+            "Omit to keep backwards-compatible v1 JSON without a provenance block."
+        ),
+    )
+    rpsrev.add_argument(
+        "--scene-id",
+        default=None,
+        help="Provenance: scene id (e.g. matches docs/scenes-list.json entry)",
+    )
+    rpsrev.add_argument(
+        "--scenario-set-id",
+        default=None,
+        help="Provenance: scenario set / shard plan id",
+    )
+    rpsrev.add_argument(
+        "--matrix-hash",
+        default=None,
+        help="Provenance: sha256 (or similar) hash of the scenario matrix expansion JSON",
+    )
+    rpsrev.add_argument(
+        "--policy-version",
+        default=None,
+        help="Provenance: route / imitation policy version (git tag or semver)",
+    )
+    rpsrev.add_argument(
+        "--env-contract-version",
+        default=None,
+        help="Provenance: env contract version (e.g. gs_sim2real.sim.contract module hash or git tag)",
+    )
+    rpsrev.add_argument(
+        "--correlation-threshold-profile",
+        default=None,
+        help="Provenance: name of the correlation threshold profile applied (separate from the threshold object itself)",
+    )
+    rpsrev.add_argument(
+        "--asset-source",
+        default=None,
+        help="Provenance: scene asset source (e.g. bag6, mcd-ntu-day02)",
+    )
+    rpsrev.add_argument(
+        "--git-commit",
+        default=None,
+        help=(
+            "Provenance: explicit git commit. When omitted, the CLI best-effort resolves it from "
+            "'git rev-parse HEAD' in the current working directory; leave unset and run outside a "
+            "repo to keep the field absent."
+        ),
+    )
+    rpsrev.add_argument(
+        "--generated-at",
+        default=None,
+        help="Provenance: explicit ISO 8601 timestamp. When omitted, the CLI uses datetime.now(UTC).",
+    )
+    rpsrev.add_argument(
+        "--provenance-extra",
+        action="append",
+        default=None,
+        metavar="KEY=VALUE",
+        help=(
+            "Provenance: add a key=value pair to the provenance.extra mapping. Repeat the flag "
+            "to add multiple keys (e.g. --provenance-extra runTrigger=nightly --provenance-extra ci=github)"
+        ),
+    )
+    rpsrev.add_argument(
         "--adoption-report",
         default=None,
         help="Optional scenario CI workflow adoption report JSON to embed in the review",

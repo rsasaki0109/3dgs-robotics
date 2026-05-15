@@ -42,6 +42,7 @@ def build_sample_review_bundle(
     bundle_id: str = DEFAULT_BUNDLE_ID,
     sample_notice: str = DEFAULT_SAMPLE_NOTICE,
     pages_base_url: str = DEFAULT_PAGES_BASE_URL,
+    generated_at: str | None = None,
 ) -> Path:
     """Run the smoke chain and publish a self-contained Pages sample bundle."""
 
@@ -54,6 +55,8 @@ def build_sample_review_bundle(
     if tmp_bundle_dir.exists():
         shutil.rmtree(tmp_bundle_dir)
     reviews_dir.mkdir(parents=True, exist_ok=True)
+
+    resolved_generated_at = generated_at or _resolve_generated_at_pin()
 
     with tempfile.TemporaryDirectory(prefix=f"{bundle_id}-") as raw_tmp:
         smoke_root = Path(raw_tmp)
@@ -70,6 +73,18 @@ def build_sample_review_bundle(
             }
         )
         payload["metadata"] = metadata
+        payload["provenance"] = {
+            "recordType": "route-policy-scenario-ci-review-provenance",
+            "version": "gs-mapper-route-policy-scenario-ci-review-provenance/v1",
+            "kind": "synthetic",
+            "generatedAt": resolved_generated_at,
+            "sceneId": "smoke-route-policy-ci",
+            "assetSource": "scripts/smoke_route_policy_scenario_ci.py",
+            "extra": {
+                "sampleBundle": "true",
+                "runTrigger": "manual",
+            },
+        }
         review = route_policy_scenario_ci_review_from_dict(payload)
         write_route_policy_scenario_ci_review_bundle(tmp_bundle_dir, review)
         _copy_smoke_artifacts(smoke_root, tmp_bundle_dir / SAMPLE_ARTIFACT_DIR)
@@ -80,6 +95,19 @@ def build_sample_review_bundle(
     tmp_bundle_dir.rename(bundle_dir)
     _write_reviews_index(reviews_dir)
     return bundle_dir
+
+
+def _resolve_generated_at_pin() -> str:
+    """Return a stable ISO 8601 timestamp for the synthetic sample.
+
+    The sample bundle is a Pages-committed artifact rather than a live run,
+    so it pins ``generatedAt`` to a fixed string instead of ``datetime.now``.
+    Without the pin, every regeneration would dirty the committed review.json
+    even when nothing else changed. Override via ``--generated-at`` when an
+    intentional refresh is needed.
+    """
+
+    return "2026-05-15T00:00:00+00:00"
 
 
 def _load_smoke_module() -> ModuleType:
@@ -165,6 +193,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--bundle-id", default=DEFAULT_BUNDLE_ID)
     parser.add_argument("--sample-notice", default=DEFAULT_SAMPLE_NOTICE)
     parser.add_argument("--pages-base-url", default=DEFAULT_PAGES_BASE_URL)
+    parser.add_argument(
+        "--generated-at",
+        default=None,
+        help="Override the pinned synthetic generatedAt timestamp (default: pinned for stable diffs)",
+    )
     return parser.parse_args()
 
 
@@ -175,6 +208,7 @@ def main() -> int:
         bundle_id=args.bundle_id,
         sample_notice=args.sample_notice,
         pages_base_url=args.pages_base_url,
+        generated_at=args.generated_at,
     )
     print(f"wrote {bundle_dir}")
     print(f"wrote {bundle_dir.parent / 'index.html'}")

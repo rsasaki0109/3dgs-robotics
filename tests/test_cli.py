@@ -2265,6 +2265,103 @@ class TestCLIHelp:
         assert args.bundle_dir == "pages/review"
         assert args.fail_on_review is True
 
+    def test_cli_route_policy_scenario_ci_review_provenance_flags(self) -> None:
+        """route-policy-scenario-ci-review accepts the new provenance flags."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-review",
+                "--shard-merge",
+                "shard-merge.json",
+                "--validation-report",
+                "validation.json",
+                "--activation-report",
+                "activation.json",
+                "--kind",
+                "production",
+                "--scene-id",
+                "outdoor-demo",
+                "--scenario-set-id",
+                "outdoor-demo-shard-merge",
+                "--matrix-hash",
+                "sha256:abc123",
+                "--policy-version",
+                "v0.2.0",
+                "--env-contract-version",
+                "contract-v3",
+                "--correlation-threshold-profile",
+                "outdoor-demo-default",
+                "--asset-source",
+                "bag6",
+                "--git-commit",
+                "d866f1e",
+                "--generated-at",
+                "2026-05-15T08:30:00+00:00",
+                "--provenance-extra",
+                "runTrigger=nightly",
+                "--provenance-extra",
+                "ci=github",
+            ]
+        )
+        assert args.kind == "production"
+        assert args.scene_id == "outdoor-demo"
+        assert args.scenario_set_id == "outdoor-demo-shard-merge"
+        assert args.matrix_hash == "sha256:abc123"
+        assert args.policy_version == "v0.2.0"
+        assert args.env_contract_version == "contract-v3"
+        assert args.correlation_threshold_profile == "outdoor-demo-default"
+        assert args.asset_source == "bag6"
+        assert args.git_commit == "d866f1e"
+        assert args.generated_at == "2026-05-15T08:30:00+00:00"
+        assert args.provenance_extra == ["runTrigger=nightly", "ci=github"]
+
+    def test_cli_route_policy_scenario_ci_review_kind_required_when_provenance_set(self) -> None:
+        """Setting --scene-id without --kind fails fast in the run helper."""
+        import argparse
+
+        from gs_sim2real.sim.policy_scenario_ci_review import (
+            _build_review_provenance_from_cli,
+        )
+
+        ns = argparse.Namespace(
+            kind=None,
+            scene_id="outdoor-demo",
+            scenario_set_id=None,
+            matrix_hash=None,
+            policy_version=None,
+            env_contract_version=None,
+            correlation_threshold_profile=None,
+            asset_source=None,
+            git_commit=None,
+            generated_at=None,
+            provenance_extra=None,
+        )
+        with pytest.raises(SystemExit) as excinfo:
+            _build_review_provenance_from_cli(ns)
+        assert excinfo.value.code == 2
+
+    def test_cli_route_policy_scenario_ci_review_no_provenance_flags_keeps_v1_shape(self) -> None:
+        """Omitting all provenance flags returns None so the v1 JSON shape is preserved."""
+        import argparse
+
+        from gs_sim2real.sim.policy_scenario_ci_review import (
+            _build_review_provenance_from_cli,
+        )
+
+        ns = argparse.Namespace(
+            kind=None,
+            scene_id=None,
+            scenario_set_id=None,
+            matrix_hash=None,
+            policy_version=None,
+            env_contract_version=None,
+            correlation_threshold_profile=None,
+            asset_source=None,
+            git_commit=None,
+            generated_at=None,
+            provenance_extra=None,
+        )
+        assert _build_review_provenance_from_cli(ns) is None
+
     def test_cli_route_policy_scenario_ci_workflow_promote_flags(self) -> None:
         """route-policy-scenario-ci-workflow-promote parser accepts promotion settings."""
         args = build_parser().parse_args(

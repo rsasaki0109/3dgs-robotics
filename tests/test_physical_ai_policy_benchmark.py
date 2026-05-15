@@ -27,6 +27,7 @@ from gs_sim2real.sim import (
     RoutePolicyRegistry,
     RoutePolicyRegistryEntry,
     RoutePolicyScenarioCIReviewArtifact,
+    RoutePolicyScenarioCIReviewProvenance,
     RoutePolicyScenarioCIManifest,
     RoutePolicyScenarioCIMergeJob,
     RoutePolicyScenarioCIShardJob,
@@ -2030,6 +2031,47 @@ def test_route_policy_scenario_ci_workflow_activation_cli_writes_report(tmp_path
     )
 
 
+def test_route_policy_scenario_ci_review_provenance_roundtrip() -> None:
+    """Provenance roundtrips through to_dict / from_dict cleanly."""
+
+    from gs_sim2real.sim import route_policy_scenario_ci_review_provenance_from_dict
+
+    original = RoutePolicyScenarioCIReviewProvenance(
+        kind="production",
+        generated_at="2026-05-15T08:30:00+00:00",
+        git_commit="d866f1e",
+        scene_id="outdoor-demo",
+        scenario_set_id="outdoor-demo-shard-merge",
+        matrix_hash="sha256:abc123",
+        policy_version="v0.2.0",
+        env_contract_version="contract-v3",
+        correlation_threshold_profile="outdoor-demo-default",
+        asset_source="bag6",
+        extra={"runTrigger": "nightly"},
+    )
+    payload = original.to_dict()
+    assert payload["recordType"] == "route-policy-scenario-ci-review-provenance"
+    assert payload["kind"] == "production"
+    assert payload["sceneId"] == "outdoor-demo"
+    assert payload["extra"] == {"runTrigger": "nightly"}
+
+    rebuilt = route_policy_scenario_ci_review_provenance_from_dict(payload)
+    assert rebuilt == original
+
+
+def test_route_policy_scenario_ci_review_provenance_rejects_bad_kind() -> None:
+    with pytest.raises(ValueError):
+        RoutePolicyScenarioCIReviewProvenance(
+            kind="dev",  # type: ignore[arg-type]
+            generated_at="2026-05-15T08:30:00+00:00",
+        )
+    with pytest.raises(ValueError):
+        RoutePolicyScenarioCIReviewProvenance(
+            kind="production",
+            generated_at="",
+        )
+
+
 def test_route_policy_scenario_ci_review_artifact_writes_pages_outputs(tmp_path: Path) -> None:
     manifest = build_unit_ci_workflow_manifest("unit-review-manifest")
     materialization = materialize_route_policy_scenario_ci_workflow(
@@ -2072,6 +2114,72 @@ def test_route_policy_scenario_ci_review_artifact_writes_pages_outputs(tmp_path:
     assert Path(bundle_paths["json"]).exists()
     assert Path(bundle_paths["markdown"]).exists()
     assert Path(bundle_paths["html"]).read_text(encoding="utf-8").startswith("<!doctype html>")
+    # No provenance flag set → the JSON stays in the v1 shape, with no
+    # ``provenance`` key. Renderers must not emit a Run Provenance section.
+    assert loaded.provenance is None
+    review_payload = json.loads(Path(bundle_paths["json"]).read_text(encoding="utf-8"))
+    assert "provenance" not in review_payload
+    assert "Run Provenance" not in render_route_policy_scenario_ci_review_markdown(loaded)
+    assert "Run Provenance" not in render_route_policy_scenario_ci_review_html(loaded)
+
+
+def test_route_policy_scenario_ci_review_artifact_carries_production_provenance(tmp_path: Path) -> None:
+    """When provenance is provided, it roundtrips and renders into the bundle."""
+
+    manifest = build_unit_ci_workflow_manifest("unit-review-prov-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-review-prov-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-review-prov-validation",
+        workflow_path=source_path,
+    )
+    active_path = tmp_path / ".github" / "workflows" / "unit-review-prov.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=active_path,
+        activation_id="unit-review-prov-activation",
+    )
+    provenance = RoutePolicyScenarioCIReviewProvenance(
+        kind="production",
+        generated_at="2026-05-15T08:30:00+00:00",
+        git_commit="d866f1e",
+        scene_id="outdoor-demo",
+        policy_version="v0.2.0",
+        asset_source="bag6",
+        extra={"runTrigger": "nightly"},
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-review-prov",
+        provenance=provenance,
+    )
+    review_path = write_route_policy_scenario_ci_review_json(tmp_path / "review.json", review)
+    loaded = load_route_policy_scenario_ci_review_json(review_path)
+
+    assert loaded.provenance == provenance
+    payload = json.loads(review_path.read_text(encoding="utf-8"))
+    assert payload["provenance"]["kind"] == "production"
+    assert payload["provenance"]["sceneId"] == "outdoor-demo"
+    assert payload["provenance"]["extra"]["runTrigger"] == "nightly"
+
+    markdown = render_route_policy_scenario_ci_review_markdown(loaded)
+    assert "## Run Provenance" in markdown
+    assert "Kind: production" in markdown
+    assert "Scene id: `outdoor-demo`" in markdown
+    assert "Generated at: 2026-05-15T08:30:00+00:00" in markdown
+
+    html = render_route_policy_scenario_ci_review_html(loaded)
+    assert "Run Provenance" in html
+    assert '<span class="pill production">PRODUCTION</span>' in html
 
 
 def test_route_policy_scenario_ci_review_cli_writes_bundle(tmp_path: Path) -> None:

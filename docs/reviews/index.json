@@ -5,15 +5,21 @@
       "adoptionTriggerMode": "pull-request",
       "bundleDir": "smoke-route-policy-ci",
       "bundleHtml": "smoke-route-policy-ci/index.html",
+      "generatedAt": "2026-05-15T00:00:00+00:00",
+      "kind": "synthetic",
       "passed": true,
       "reportCount": 2,
       "reviewId": "smoke-route-policy-ci-review",
       "scenarioCount": 2,
+      "sceneId": "smoke-route-policy-ci",
       "shardCount": 2
     }
   ],
   "failCount": 0,
   "passCount": 1,
+  "productionCount": 0,
   "recordType": "gs-mapper-route-policy-scenario-ci-reviews-index/v1",
-  "reviewCount": 1
+  "reviewCount": 1,
+  "syntheticCount": 1,
+  "unknownCount": 0
 }

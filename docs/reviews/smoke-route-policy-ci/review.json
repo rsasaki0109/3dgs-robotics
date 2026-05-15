@@ -32,6 +32,18 @@
     "validationFailedChecks": []
   },
   "passed": true,
+  "provenance": {
+    "assetSource": "scripts/smoke_route_policy_scenario_ci.py",
+    "extra": {
+      "runTrigger": "manual",
+      "sampleBundle": "true"
+    },
+    "generatedAt": "2026-05-15T00:00:00+00:00",
+    "kind": "synthetic",
+    "recordType": "route-policy-scenario-ci-review-provenance",
+    "sceneId": "smoke-route-policy-ci",
+    "version": "gs-mapper-route-policy-scenario-ci-review-provenance/v1"
+  },
   "recordType": "route-policy-scenario-ci-review",
   "reportCount": 2,
   "reviewId": "smoke-route-policy-ci-review",

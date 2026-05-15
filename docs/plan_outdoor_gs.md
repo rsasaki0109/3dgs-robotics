@@ -87,10 +87,13 @@
   - `python3 -m mypy src/gs_sim2real/sim/policy_scenario_ci_promotion.py` は pass。
   - `src/gs_sim2real/cli.py` を含む mypy は Waymo / MCD 周辺の既知型不整合で落ちる。Tier 2 chain は regression を入れていない。
 - Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 (`multi_3cam_300each_ba`) は手元 bag に `d455t` / `d435i` topics が無いので data-blocked。
-- Claude が次に触るときの推奨 starting point:
-  1. **event-aligned stratification** (#133 OOS): scenario phase boundary を外部 event timestamp 列で受け取る stratification mode。
-  2. **Pi3 / LoGeR production comparison asset** (§12.3): GPU run + asset bundle、external SLAM comparison surface を厚くする。
-  3. **`read_gsof_ins_pose_stream`** (#113 OOS): applanix custom msg schema の vendor が必要なので外部依存あり。
+- Claude が次に触るときの推奨 starting point（2026-05-15 GPT pro consultation 後の優先順位、詳細は §17 / `plan_review_bundle_provenance.md`）:
+  1. **Sprint 1 PR A — production-review-bundle-manifest** (§17.2): `RoutePolicyScenarioCIReviewProvenance` 追加で synthetic / production を first-class field 化。Pages index に kind 列。後方互換のため `provenance is None` 時は既存 v1 JSON 等価。
+  2. **Sprint 1 PR A2 — initial production review bundle 公開**: `outdoor-demo` 系 production scenario run の bundle を `docs/reviews/<run-id>/` に置き、README / Pages landing に導線追加。
+  3. **Sprint 2 PR B — event-aligned stratification** (§17.3、旧 #133 OOS): `CorrelationEventWindow` schema を Sprint 2 で固めることで Sprint 3 の policy trace event を後方互換で乗せられる。
+  4. **Sprint 3 PR C — policy trace events** (§17.4): real-vs-sim 比較を policy 行動レベルへ拡張する入り口。
+  5. **Sprint 4 — multi-agent Tier 3 production matrix** (§17.5): 2 → 4 → 16 → 32+ agent の段階拡張。
+  6. その後の backlog: LoGeR production comparison (§12.3)、MCD `ntu_day_02` `multi_3cam_300each_ba` (data-blocked)、Applanix `read_gsof_ins_pose_stream` (vendor 依存)。
 
 ## 4. System Map
 
@@ -652,10 +655,12 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 ### 12.1 A: Immediate next
 
+新しい優先順位は §17 Roadmap に集約済み。本セクションは status トラッキング用に残す。
+
 | Task | Why | Suggested slice |
 | --- | --- | --- |
 | Review bundle sample under docs | 完了。Pages `/reviews/` が空ではなく scenario CI review / adoption diff の形を見せられる | `docs/reviews/smoke-route-policy-ci/` を `scripts/build_pages_sample_review_bundle.py` で生成。synthetic smoke fixture であり production benchmark ではないことを bundle 内に明示。 |
-| Real review bundle from production scenario CI | sample は contract demo。次は実際の production scenario CI / benchmark run artifact を公開する | real run の shard merge / validation / activation / adoption report を `gs-mapper route-policy-scenario-ci-review --bundle-dir docs/reviews/<id>` に流し、`scripts/build_pages_reviews_index.py` で index 再生成。 |
+| Real review bundle from production scenario CI | **進行中 (Sprint 1 / §17.2)**。GPT pro consultation で synthetic vs production の区別を `RoutePolicyScenarioCIReviewProvenance` で first-class 化し、`docs/reviews/<run-id>/` に production bundle を公開する PR A + PR A2 に分割。 | PR A: contract / CLI / Pages index 骨格 (`plan_review_bundle_provenance.md §1`). PR A2: 実 production run の `gs-mapper route-policy-scenario-ci-review --kind production --bundle-dir docs/reviews/<id>` 実行と index 再生成。 |
 
 ### 12.2 B: Physical AI env hardening
 
@@ -749,4 +754,84 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | `docs/decisions.md` | Accepted/deferred design decisions |
 | `docs/interfaces.md` | Stable interfaces that production code may depend on |
 | `docs/launch-kit.md` | Public announcement / launch material |
+| `docs/plan_review_bundle_provenance.md` | PR A / PR B (production review bundle provenance + event-aligned stratification) の contract 差分メモ |
 | `docs/archive/plan_outdoor_gs_2026_04_full_handoff.md` | Full historical outdoor-GS handoff snapshot |
+
+## 17. Roadmap (2026-05〜, GPT pro consultation 後)
+
+2026-05-15 の GPT pro consultation の結論を 4 sprint に分解。優先順位の根拠は「実屋外 scene を使った Physical AI policy evaluation が CI artifact として継続的に出ること」が現状の最大の説得力ボトルネックである、という判断。詳細な contract 差分は [`plan_review_bundle_provenance.md`](plan_review_bundle_provenance.md)。
+
+### 17.1 優先順位
+
+| 優先 | Sprint | Task | 狙い | 状態 |
+| ---: | --- | --- | --- | --- |
+| 1 | Sprint 1 | Real production review bundle 公開 (PR A + PR A2) | 外向け説得力 | 未着手（本書 §17.2） |
+| 2 | Sprint 2 | Event-aligned stratification (PR B) | 評価品質 / policy 行動レベル correlation の土台 | 未着手（本書 §17.3） |
+| 3 | Sprint 3 | Policy trace events (PR C) | デバッグ・説明力、Sprint 4 viewer の入力 | 未着手（本書 §17.4） |
+| 4 | Sprint 4 | Multi-agent Tier 3 production matrix (PR D 系) | env hardening、Tier 3 候補の本丸 | 未着手（本書 §17.5） |
+| 5 | — | LoGeR production comparison asset | asset 比較の厚み | §12.3 既存 backlog |
+| 6 | — | MCD `ntu_day_02` `multi_3cam_300each_ba` 追加 download | asset 品質補完（data-blocked） | §12.3 既存 backlog |
+| 7 | — | Applanix `read_gsof_ins_pose_stream` | data input 拡張（vendor 依存） | §3.1 OOS |
+
+「splat を 1 個増やす」より「実屋外 scene を使った policy evaluation が CI artifact として継続的に出る」方が GS Mapper の現在地では効く、という判断。
+
+### 17.2 Sprint 1: production-review-bundle-manifest
+
+Goal: production benchmark run が `RoutePolicyScenarioCIReviewArtifact` として first-class に区別され、Pages `/reviews/` index で synthetic / production が一目で分かる。
+
+主な追加:
+
+- `RoutePolicyScenarioCIReviewProvenance` dataclass（`kind`, `generated_at`, `git_commit`, `scene_id`, `scenario_set_id`, `matrix_hash`, `policy_version`, `env_contract_version`, `correlation_threshold_profile`, `asset_source`, `extra`）。
+- `RoutePolicyScenarioCIReviewArtifact.provenance` optional field。`provenance is None` 時は既存 v1 JSON とバイト等価。
+- CLI に `--kind {synthetic,production}` 他 9 個のフラグ。`--kind production` は他 provenance フィールドの指定を warning で促す。
+- Pages index (`scripts/build_pages_reviews_index.py`) に `Kind` / `Scene` / `Generated` 列、schema v2 へ bump。
+
+PR 分割:
+
+- **PR A**: contract / CLI / Pages index 骨格 + sample bundle を `kind=synthetic` に更新。
+- **PR A2**: 実 production scenario run の bundle を `docs/reviews/<run-id>/` に置き、index 再生成。README / Pages landing に導線を追加。
+
+詳細フィールド一覧、後方互換ルール、テストケースは [`plan_review_bundle_provenance.md §1`](plan_review_bundle_provenance.md)。
+
+### 17.3 Sprint 2: event-aligned stratification
+
+Goal: correlation gate を「等間隔時間 window」「等 pair 数 window」に加え「外部 event timestamp window」で評価できる。
+
+主な追加:
+
+- `CorrelationEventWindow` dataclass（`name`, `start_time`, `end_time`, `tags`, `source ∈ {"external","policy_trace"}`）。**`source` を Sprint 2 で先に入れる**ことで Sprint 3 の policy trace event を後方互換で乗せられる。
+- `_PAIR_DISTRIBUTION_STRATA_MODES` に `"event-aligned"` 追加。
+- `RealVsSimCorrelationThresholds.event_windows_path` optional field。
+- fallback chain: event-aligned 指定で windows が読めない / 0 window のときは **explicit fallback** to `equal-pair-count`、review bundle metadata に `correlationStratificationFallback` を立て stderr warning を出す（silent fallback はしない）。
+- `RealVsSimCorrelationWindowStats` に optional `event_name` / `event_tags` / `event_source` を追加（未指定なら JSON 出力しない、v1 互換）。
+
+詳細は [`plan_review_bundle_provenance.md §2`](plan_review_bundle_provenance.md)。
+
+### 17.4 Sprint 3: policy trace events
+
+Goal: route / imitation policy が rollout 中に `goal_reached` / `near_obstacle_slowdown` / `collision` / `near_miss` / `route_deviation` 等の event を吐き、Sprint 2 の event-aligned correlation の `source = "policy_trace"` 経路にそのまま流す。
+
+Sprint 2 で schema を先に固めているので、Sprint 3 では event 検出ロジックと bag time 対応付けだけ実装すれば良い。Real-vs-sim 比較は GPT pro 提案の段階化（occurrence → order → timing → event-local pose → segment-level trajectory）で進める。
+
+### 17.5 Sprint 4: multi-agent Tier 3
+
+Goal: seeded multi-agent scenario を production matrix に載せる。既存 `DynamicObstacleTimeline` / `ObstaclePolicy` protocol / per-step peer cache の上に、scenario contract の追加 dimension として `agents` / `population` / `interaction_metrics` を載せる。
+
+scenario matrix の段階拡張:
+
+1. 2-agent deterministic crossing
+2. 4-agent route conflict
+3. 16-agent seeded population
+4. 32+ agent Pi3-style dense
+
+各段階で review bundle / shard merge gate が安定することを確認してから次の規模へ。最初の public scenario は 4〜8 agent 程度で良い（CI / shard / review contract が安定してから Pi3-style dense に拡張する方が安全）。
+
+### 17.6 Sprint 1 完了後に有効化する CI 自動化
+
+| CI | 頻度 | 目的 | 起点 |
+| --- | --- | --- | --- |
+| PR smoke | every PR | contract drift / unit regression 検出 | 既存 `pytest tests/ -q --ignore=tests/e2e` |
+| Nightly production review | scheduled | `outdoor-demo` 系 production scene で scenario CI を回し `docs/reviews/<run-id>-<date>/` を生成 (commit + push) | PR A2 後 |
+| Manual promotion | `workflow_dispatch` | Pages に載せたい review bundle を picker から選んで promote | PR A2 後 |
+
+Sprint 1 完了前に nightly を走らせると synthetic と production を区別する手段が無いので、**必ず PR A → PR A2 → CI 自動化** の順で進める。Sprint 1 の `provenance.extra["runTrigger"]` に `nightly` / `manual` / `pr` を入れれば、`kind=production` 内でも nightly / manual / pr を区別できる。

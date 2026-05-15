@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import difflib
 from html import escape
 import json
 from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 
 from .policy_scenario_ci_activation import (
@@ -39,6 +42,72 @@ from ..robotics.rosbag_correlation import (
 
 
 ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION = "gs-mapper-route-policy-scenario-ci-review/v1"
+ROUTE_POLICY_SCENARIO_CI_REVIEW_PROVENANCE_VERSION = "gs-mapper-route-policy-scenario-ci-review-provenance/v1"
+
+_REVIEW_PROVENANCE_KINDS: frozenset[str] = frozenset({"synthetic", "production"})
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePolicyScenarioCIReviewProvenance:
+    """First-class provenance attached to a scenario CI review artifact.
+
+    Distinguishes synthetic smoke fixture bundles (e.g. the public sample at
+    ``docs/reviews/smoke-route-policy-ci/``) from production benchmark runs
+    so the Pages reviews index can flag each entry. All non-required fields
+    default to ``None`` so callers can fill in only what they know — useful
+    when a CI generator does not yet have policy / env contract versions.
+    """
+
+    kind: str  # "synthetic" | "production"
+    generated_at: str  # ISO 8601, e.g. "2026-05-15T12:34:56+00:00"
+    git_commit: str | None = None
+    scene_id: str | None = None
+    scenario_set_id: str | None = None
+    matrix_hash: str | None = None
+    policy_version: str | None = None
+    env_contract_version: str | None = None
+    correlation_threshold_profile: str | None = None
+    asset_source: str | None = None
+    extra: Mapping[str, Any] = field(default_factory=dict)
+    version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_PROVENANCE_VERSION
+
+    def __post_init__(self) -> None:
+        kind = str(self.kind)
+        if kind not in _REVIEW_PROVENANCE_KINDS:
+            raise ValueError(f"kind must be one of {sorted(_REVIEW_PROVENANCE_KINDS)}; got {kind!r}")
+        object.__setattr__(self, "kind", kind)
+        generated_at = str(self.generated_at)
+        if not generated_at:
+            raise ValueError("generated_at must not be empty")
+        object.__setattr__(self, "generated_at", generated_at)
+        object.__setattr__(self, "extra", _json_mapping(self.extra))
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "recordType": "route-policy-scenario-ci-review-provenance",
+            "version": self.version,
+            "kind": self.kind,
+            "generatedAt": self.generated_at,
+        }
+        if self.git_commit is not None:
+            payload["gitCommit"] = self.git_commit
+        if self.scene_id is not None:
+            payload["sceneId"] = self.scene_id
+        if self.scenario_set_id is not None:
+            payload["scenarioSetId"] = self.scenario_set_id
+        if self.matrix_hash is not None:
+            payload["matrixHash"] = self.matrix_hash
+        if self.policy_version is not None:
+            payload["policyVersion"] = self.policy_version
+        if self.env_contract_version is not None:
+            payload["envContractVersion"] = self.env_contract_version
+        if self.correlation_threshold_profile is not None:
+            payload["correlationThresholdProfile"] = self.correlation_threshold_profile
+        if self.asset_source is not None:
+            payload["assetSource"] = self.asset_source
+        if self.extra:
+            payload["extra"] = dict(self.extra)
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +208,7 @@ class RoutePolicyScenarioCIReviewArtifact:
     shards: tuple[RoutePolicyScenarioCIReviewShard, ...]
     history_failed_checks: tuple[str, ...] = ()
     adoption: RoutePolicyScenarioCIReviewAdoption | None = None
+    provenance: RoutePolicyScenarioCIReviewProvenance | None = None
     correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
     correlation_report_paths: tuple[str, ...] = ()
     correlation_thresholds: RealVsSimCorrelationThresholds | None = None
@@ -251,6 +321,8 @@ class RoutePolicyScenarioCIReviewArtifact:
             "adoption": None if self.adoption is None else self.adoption.to_dict(),
             "metadata": _json_mapping(self.metadata),
         }
+        if self.provenance is not None:
+            payload["provenance"] = self.provenance.to_dict()
         if self.correlation_reports:
             payload["correlationReports"] = [report.to_dict() for report in self.correlation_reports]
             if self.correlation_report_paths:
@@ -299,6 +371,7 @@ def build_route_policy_scenario_ci_review_artifact(
     correlation_report_paths: Sequence[str | Path] = (),
     correlation_thresholds: RealVsSimCorrelationThresholds | None = None,
     correlation_threshold_overrides: Mapping[str, RealVsSimCorrelationThresholds] | None = None,
+    provenance: RoutePolicyScenarioCIReviewProvenance | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> RoutePolicyScenarioCIReviewArtifact:
     """Build a compact review artifact for a scenario CI workflow change.
@@ -369,6 +442,7 @@ def build_route_policy_scenario_ci_review_artifact(
         history_failed_checks=merge_report.history.failed_checks,
         shards=tuple(_review_shard_from_run(shard_run) for shard_run in merge_report.shard_runs),
         adoption=adoption,
+        provenance=provenance,
         correlation_reports=tuple(correlation_reports),
         correlation_report_paths=tuple(str(item) for item in correlation_report_paths),
         correlation_thresholds=correlation_thresholds,
@@ -546,6 +620,37 @@ def route_policy_scenario_ci_review_adoption_from_dict(
     )
 
 
+def route_policy_scenario_ci_review_provenance_from_dict(
+    payload: Mapping[str, Any],
+) -> RoutePolicyScenarioCIReviewProvenance:
+    """Rebuild a scenario CI review provenance block from JSON."""
+
+    _record_type(payload, "route-policy-scenario-ci-review-provenance")
+    version = str(payload.get("version", ROUTE_POLICY_SCENARIO_CI_REVIEW_PROVENANCE_VERSION))
+    if version != ROUTE_POLICY_SCENARIO_CI_REVIEW_PROVENANCE_VERSION:
+        raise ValueError(f"unsupported route policy scenario CI review provenance version: {version}")
+    extra_payload = payload.get("extra")
+    extra = _json_mapping(_mapping(extra_payload, "extra")) if isinstance(extra_payload, Mapping) else {}
+    return RoutePolicyScenarioCIReviewProvenance(
+        kind=str(payload["kind"]),
+        generated_at=str(payload["generatedAt"]),
+        git_commit=None if payload.get("gitCommit") is None else str(payload["gitCommit"]),
+        scene_id=None if payload.get("sceneId") is None else str(payload["sceneId"]),
+        scenario_set_id=None if payload.get("scenarioSetId") is None else str(payload["scenarioSetId"]),
+        matrix_hash=None if payload.get("matrixHash") is None else str(payload["matrixHash"]),
+        policy_version=None if payload.get("policyVersion") is None else str(payload["policyVersion"]),
+        env_contract_version=(
+            None if payload.get("envContractVersion") is None else str(payload["envContractVersion"])
+        ),
+        correlation_threshold_profile=(
+            None if payload.get("correlationThresholdProfile") is None else str(payload["correlationThresholdProfile"])
+        ),
+        asset_source=None if payload.get("assetSource") is None else str(payload["assetSource"]),
+        extra=extra,
+        version=version,
+    )
+
+
 def route_policy_scenario_ci_review_from_dict(
     payload: Mapping[str, Any],
 ) -> RoutePolicyScenarioCIReviewArtifact:
@@ -567,6 +672,12 @@ def route_policy_scenario_ci_review_from_dict(
         None
         if adoption_payload is None
         else route_policy_scenario_ci_review_adoption_from_dict(_mapping(adoption_payload, "adoption"))
+    )
+    provenance_payload = payload.get("provenance")
+    provenance = (
+        None
+        if provenance_payload is None
+        else route_policy_scenario_ci_review_provenance_from_dict(_mapping(provenance_payload, "provenance"))
     )
     correlation_reports = tuple(
         real_vs_sim_correlation_report_from_dict(_mapping(item, "correlationReport"))
@@ -626,6 +737,7 @@ def route_policy_scenario_ci_review_from_dict(
         ),
         shards=shards,
         adoption=adoption,
+        provenance=provenance,
         correlation_reports=correlation_reports,
         correlation_report_paths=correlation_report_paths,
         correlation_thresholds=correlation_thresholds,
@@ -657,6 +769,10 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
     ]
     if sample_notice:
         lines.extend([f"> {sample_notice}", ""])
+    provenance_lines = _provenance_markdown_lines(artifact.provenance)
+    if provenance_lines:
+        lines.extend(provenance_lines)
+        lines.append("")
     lines.extend(
         [
             "| Shard | Pass | Scenarios | Reports | Run |",
@@ -797,6 +913,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     )
     correlation_section = _render_correlation_section_html(artifact)
     adoption_section = _render_adoption_section_html(artifact.adoption)
+    provenance_section = _render_provenance_section_html(artifact.provenance)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -818,6 +935,9 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     .pill {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }}
     .pass {{ background: #dcefd8; color: #1e5a2b; }}
     .fail {{ background: #f7d6d2; color: #8a1f16; }}
+    .synthetic {{ background: #fff1c1; color: #6a4d00; }}
+    .production {{ background: #dcefd8; color: #1e5a2b; }}
+    .unknown {{ background: #e3e5df; color: #424940; }}
     table {{ width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; overflow: hidden; }}
     th, td {{ padding: 10px 12px; border-bottom: 1px solid #e9ede5; text-align: left; vertical-align: top; }}
     th {{ background: #eef2ea; font-size: 13px; color: #424940; }}
@@ -842,6 +962,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
       <div class="metric"><span>Scenarios</span><strong>{artifact.scenario_count}</strong></div>
       <div class="metric"><span>Reports</span><strong>{artifact.report_count}</strong></div>
     </section>
+    {provenance_section}
     <section>
       <h2>Workflow Gate</h2>
       <p>Validation <span class="pill {"pass" if artifact.validation_passed else "fail"}">{"PASS" if artifact.validation_passed else "FAIL"}</span>
@@ -904,6 +1025,7 @@ def run_review_cli(args: Any) -> None:
         from ..robotics.rosbag_correlation import load_correlation_threshold_overrides_json
 
         correlation_threshold_overrides = load_correlation_threshold_overrides_json(overrides_path)
+    provenance = _build_review_provenance_from_cli(args)
     artifact = build_route_policy_scenario_ci_review_artifact(
         merge_report,
         validation_report,
@@ -915,6 +1037,7 @@ def run_review_cli(args: Any) -> None:
         correlation_report_paths=correlation_report_paths,
         correlation_thresholds=correlation_thresholds,
         correlation_threshold_overrides=correlation_threshold_overrides,
+        provenance=provenance,
     )
     bundle_dir = getattr(args, "bundle_dir", None)
     if bundle_dir:
@@ -934,6 +1057,99 @@ def run_review_cli(args: Any) -> None:
     print(render_route_policy_scenario_ci_review_markdown(artifact), end="")
     if bool(getattr(args, "fail_on_review", False)) and not artifact.passed:
         raise SystemExit(2)
+
+
+_PROVENANCE_FLAG_LABELS: tuple[tuple[str, str], ...] = (
+    ("scene_id", "--scene-id"),
+    ("scenario_set_id", "--scenario-set-id"),
+    ("matrix_hash", "--matrix-hash"),
+    ("policy_version", "--policy-version"),
+    ("env_contract_version", "--env-contract-version"),
+    ("correlation_threshold_profile", "--correlation-threshold-profile"),
+    ("asset_source", "--asset-source"),
+    ("git_commit", "--git-commit"),
+    ("generated_at", "--generated-at"),
+    ("provenance_extra", "--provenance-extra"),
+)
+
+
+def _build_review_provenance_from_cli(args: Any) -> RoutePolicyScenarioCIReviewProvenance | None:
+    """Assemble a provenance block from the CLI namespace, or return None.
+
+    Returns None when ``--kind`` is not set AND no other provenance flag was
+    provided, preserving the v1 JSON shape for callers that haven't migrated.
+    Raises SystemExit(2) when a provenance flag is set without ``--kind``.
+    """
+
+    kind = getattr(args, "kind", None)
+    provenance_flag_values = {attr: getattr(args, attr, None) for attr, _flag in _PROVENANCE_FLAG_LABELS}
+    has_other_provenance = any(value not in (None, "", []) for value in provenance_flag_values.values())
+    if kind is None and not has_other_provenance:
+        return None
+    if kind is None:
+        offenders = [
+            flag for attr, flag in _PROVENANCE_FLAG_LABELS if provenance_flag_values[attr] not in (None, "", [])
+        ]
+        sys.stderr.write(
+            f"error: --kind {{synthetic,production}} is required when any of {', '.join(offenders)} is set\n"
+        )
+        raise SystemExit(2)
+    generated_at = provenance_flag_values["generated_at"] or _utc_now_iso()
+    git_commit = provenance_flag_values["git_commit"]
+    if git_commit is None:
+        git_commit = _resolve_git_commit_best_effort()
+    extras = _parse_provenance_extra(provenance_flag_values["provenance_extra"])
+    return RoutePolicyScenarioCIReviewProvenance(
+        kind=str(kind),
+        generated_at=str(generated_at),
+        git_commit=git_commit,
+        scene_id=provenance_flag_values["scene_id"],
+        scenario_set_id=provenance_flag_values["scenario_set_id"],
+        matrix_hash=provenance_flag_values["matrix_hash"],
+        policy_version=provenance_flag_values["policy_version"],
+        env_contract_version=provenance_flag_values["env_contract_version"],
+        correlation_threshold_profile=provenance_flag_values["correlation_threshold_profile"],
+        asset_source=provenance_flag_values["asset_source"],
+        extra=extras,
+    )
+
+
+def _parse_provenance_extra(raw_pairs: Sequence[str] | None) -> dict[str, str]:
+    if not raw_pairs:
+        return {}
+    result: dict[str, str] = {}
+    for pair in raw_pairs:
+        if "=" not in pair:
+            sys.stderr.write(f"error: --provenance-extra expects KEY=VALUE, got {pair!r}\n")
+            raise SystemExit(2)
+        key, value = pair.split("=", 1)
+        key = key.strip()
+        if not key:
+            sys.stderr.write(f"error: --provenance-extra key must not be empty, got {pair!r}\n")
+            raise SystemExit(2)
+        result[key] = value
+    return result
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _resolve_git_commit_best_effort() -> str | None:
+    """Try to read the current git commit hash, returning None on failure."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    commit = completed.stdout.strip()
+    return commit or None
 
 
 def _load_review_adoption(
@@ -1092,6 +1308,62 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
         f"{per_window_html}"
         "</section>"
     )
+
+
+def _provenance_markdown_lines(provenance: RoutePolicyScenarioCIReviewProvenance | None) -> list[str]:
+    """Render the provenance block as Markdown bullets, or an empty list if absent."""
+
+    if provenance is None:
+        return []
+    lines: list[str] = ["## Run Provenance", ""]
+    lines.append(f"- Kind: {provenance.kind}")
+    lines.append(f"- Generated at: {provenance.generated_at}")
+    optional_pairs: tuple[tuple[str, str | None], ...] = (
+        ("Scene id", provenance.scene_id),
+        ("Scenario set id", provenance.scenario_set_id),
+        ("Asset source", provenance.asset_source),
+        ("Policy version", provenance.policy_version),
+        ("Env contract version", provenance.env_contract_version),
+        ("Matrix hash", provenance.matrix_hash),
+        ("Correlation threshold profile", provenance.correlation_threshold_profile),
+        ("Git commit", provenance.git_commit),
+    )
+    for label, value in optional_pairs:
+        if value:
+            lines.append(f"- {label}: `{value}`")
+    if provenance.extra:
+        for key, value in sorted(provenance.extra.items()):
+            lines.append(f"- {key}: `{value}`")
+    return lines
+
+
+def _render_provenance_section_html(provenance: RoutePolicyScenarioCIReviewProvenance | None) -> str:
+    """Render a self-contained HTML section for the provenance block."""
+
+    if provenance is None:
+        return ""
+    kind_class = provenance.kind if provenance.kind in {"production", "synthetic"} else "unknown"
+    rows: list[str] = [
+        f'<tr><th>Kind</th><td><span class="pill {kind_class}">{escape(provenance.kind.upper())}</span></td></tr>',
+        f"<tr><th>Generated at</th><td><code>{escape(provenance.generated_at)}</code></td></tr>",
+    ]
+    optional_pairs: tuple[tuple[str, str | None], ...] = (
+        ("Scene id", provenance.scene_id),
+        ("Scenario set id", provenance.scenario_set_id),
+        ("Asset source", provenance.asset_source),
+        ("Policy version", provenance.policy_version),
+        ("Env contract version", provenance.env_contract_version),
+        ("Matrix hash", provenance.matrix_hash),
+        ("Correlation threshold profile", provenance.correlation_threshold_profile),
+        ("Git commit", provenance.git_commit),
+    )
+    for label, value in optional_pairs:
+        if value:
+            rows.append(f"<tr><th>{escape(label)}</th><td><code>{escape(value)}</code></td></tr>")
+    for key, value in sorted(provenance.extra.items()):
+        rows.append(f"<tr><th>{escape(str(key))}</th><td><code>{escape(str(value))}</code></td></tr>")
+    body = "\n".join(rows)
+    return f"<section><h2>Run Provenance</h2><table><tbody>{body}</tbody></table></section>"
 
 
 def _render_adoption_section_html(adoption: RoutePolicyScenarioCIReviewAdoption | None) -> str:

@@ -84,7 +84,7 @@
     "metadata": {
       "activationState": "activated",
       "contentByteLength": 4380,
-      "contentSha256": "7e8599681851c8702a23313f9334bc71a643c93c6e8573ea2b98d5dbf9b31b7a",
+      "contentSha256": "51b306ad73c4fccd96b0d54f7e8e03b2da4eca2eb82d383beaa3218074787e6e",
       "overwrite": false
     },
     "passed": true,
@@ -514,7 +514,7 @@
   "manualActiveWorkflowPath": "sample-artifacts/workflows/smoke-route-policy-ci.yml",
   "metadata": {
     "adoptedContentByteLength": 4380,
-    "adoptedContentSha256": "7e8599681851c8702a23313f9334bc71a643c93c6e8573ea2b98d5dbf9b31b7a",
+    "adoptedContentSha256": "51b306ad73c4fccd96b0d54f7e8e03b2da4eca2eb82d383beaa3218074787e6e",
     "overwrite": false
   },
   "passed": true,
