@@ -160,6 +160,8 @@ from .policy_scenario_multi_agent import (
     AGENT_ROLES,
     AgentRoleSpec,
     BUILTIN_POLICIES,
+    DEFAULT_PEER_RADIUS_METERS,
+    DEFAULT_PEER_SPEED_M_PER_STEP,
     INTERACTION_METRICS_SPEC_VERSION,
     InteractionMetricsSpec,
     POPULATION_SPEC_VERSION,
@@ -167,6 +169,7 @@ from .policy_scenario_multi_agent import (
     agent_role_spec_from_dict,
     interaction_metrics_spec_from_dict,
     population_spec_from_dict,
+    synthesize_peer_roster_from_scenario_metadata,
 )
 from .policy_scenario_ci_manifest import (
     ROUTE_POLICY_SCENARIO_CI_MANIFEST_VERSION,
@@ -401,6 +404,8 @@ from .route_replanning import (
 )
 
 __all__ = [
+    "DEFAULT_PEER_RADIUS_METERS",
+    "DEFAULT_PEER_SPEED_M_PER_STEP",
     "DEFAULT_SITE_URL",
     "AGENT_ROLES",
     "AGENT_ROLE_SPEC_VERSION",
@@ -662,6 +667,7 @@ __all__ = [
     "agent_role_spec_from_dict",
     "interaction_metrics_spec_from_dict",
     "population_spec_from_dict",
+    "synthesize_peer_roster_from_scenario_metadata",
     "route_policy_matrix_config_spec_from_dict",
     "route_policy_matrix_goal_suite_spec_from_dict",
     "route_policy_matrix_registry_spec_from_dict",

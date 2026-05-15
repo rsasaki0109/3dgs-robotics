@@ -31,6 +31,7 @@ from .policy_benchmark_history import (
     write_route_policy_benchmark_history_json,
 )
 from .policy_dynamic_obstacles import load_route_policy_dynamic_obstacle_timeline_json
+from .policy_scenario_multi_agent import synthesize_peer_roster_from_scenario_metadata
 from .policy_quality import RoutePolicyQualityThresholds
 from .policy_sensor_noise import load_route_policy_sensor_noise_profile_json
 from .raw_sensor_noise import load_raw_sensor_noise_profile_json
@@ -628,6 +629,17 @@ def _run_scenario(
         if dynamic_obstacles_path is None
         else load_route_policy_dynamic_obstacle_timeline_json(dynamic_obstacles_path)
     )
+    if dynamic_obstacles is None:
+        # Sprint 4 / PR D3: when a scenario carries multi-agent metadata
+        # (embedded by the matrix expander in PR D2 via agents /
+        # population / populationSeed), synthesize a peer roster on the
+        # fly so the headless env's existing dynamic_obstacles plumbing
+        # drives the peers. An explicit dynamic_obstacles_path still
+        # wins, so legacy scenario JSONs are untouched.
+        dynamic_obstacles = synthesize_peer_roster_from_scenario_metadata(
+            scenario.metadata,
+            timeline_id=f"{scenario.scenario_id}-peer-roster",
+        )
     adapter = RoutePolicyGymAdapter(
         HeadlessPhysicalAIEnvironment(
             catalog,

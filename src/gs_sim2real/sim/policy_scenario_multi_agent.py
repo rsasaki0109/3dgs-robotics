@@ -22,8 +22,21 @@ from dataclasses import dataclass, field
 import math
 from typing import Any
 
+import random
+
 from .contract import AxisAlignedBounds, Vec3
 from .interfaces import Pose3D
+from .policy_dynamic_obstacles import (
+    DynamicObstacle,
+    DynamicObstacleTimeline,
+    DynamicObstacleWaypoint,
+)
+from .policy_obstacle import (
+    ChaseAgentObstaclePolicy,
+    FleeAgentObstaclePolicy,
+    MaintainSeparationObstaclePolicy,
+    WaypointInterpolationObstaclePolicy,
+)
 
 
 AGENT_ROLE_SPEC_VERSION = "gs-mapper-route-policy-agent-role-spec/v1"
@@ -351,6 +364,180 @@ def interaction_metrics_spec_from_dict(
     )
 
 
+DEFAULT_PEER_RADIUS_METERS = 0.5
+DEFAULT_PEER_SPEED_M_PER_STEP = 0.1
+
+
+def synthesize_peer_roster_from_scenario_metadata(
+    metadata: Mapping[str, Any],
+    *,
+    timeline_id: str | None = None,
+    default_radius_meters: float = DEFAULT_PEER_RADIUS_METERS,
+    default_speed_m_per_step: float = DEFAULT_PEER_SPEED_M_PER_STEP,
+) -> DynamicObstacleTimeline | None:
+    """Build a :class:`DynamicObstacleTimeline` from D2 scenario metadata.
+
+    PR D2 embedded ``agents`` / ``population`` / ``populationSeed`` /
+    ``interactionMetrics`` into each expanded scenario's metadata. This
+    helper turns those declarations into a peer roster the existing
+    headless env can consume via its ``dynamic_obstacles`` plumbing.
+
+    Returns ``None`` when the scenario is legacy ego-only (no multi-agent
+    metadata), so the caller can keep its existing JSON-loaded path.
+    The synthesised roster is deterministic in ``populationSeed`` —
+    re-running the synthesizer with the same metadata produces the same
+    peer set.
+    """
+
+    agents_payload = metadata.get("agents") or ()
+    population_payload = metadata.get("population")
+    if not agents_payload and population_payload is None:
+        return None
+
+    obstacles: list[DynamicObstacle] = []
+    if agents_payload:
+        for index, agent_payload in enumerate(agents_payload):
+            if not isinstance(agent_payload, Mapping):
+                raise ValueError("scenario metadata 'agents' entries must be mappings")
+            obstacle = _agent_to_dynamic_obstacle(
+                agent_payload,
+                fallback_index=index,
+                default_radius_meters=default_radius_meters,
+                default_speed_m_per_step=default_speed_m_per_step,
+            )
+            if obstacle is not None:
+                obstacles.append(obstacle)
+    elif population_payload is not None:
+        if not isinstance(population_payload, Mapping):
+            raise ValueError("scenario metadata 'population' must be a mapping")
+        seed_value = metadata.get("populationSeed")
+        if seed_value is None:
+            raise ValueError(
+                "scenario metadata 'population' requires 'populationSeed' (set by the matrix expander)"
+            )
+        obstacles.extend(
+            _population_to_dynamic_obstacles(
+                population_payload,
+                seed=int(seed_value),
+                default_radius_meters=default_radius_meters,
+                default_speed_m_per_step=default_speed_m_per_step,
+            )
+        )
+
+    if not obstacles:
+        return None
+
+    resolved_timeline_id = timeline_id or "multi-agent-synthesized"
+    return DynamicObstacleTimeline(
+        timeline_id=resolved_timeline_id,
+        obstacles=tuple(obstacles),
+        metadata={"source": "policy_scenario_multi_agent.synthesize_peer_roster"},
+    )
+
+
+def _agent_to_dynamic_obstacle(
+    payload: Mapping[str, Any],
+    *,
+    fallback_index: int,
+    default_radius_meters: float,
+    default_speed_m_per_step: float,
+) -> DynamicObstacle | None:
+    role = str(payload.get("role", ""))
+    if role == "ego":
+        return None
+    agent_id = str(payload.get("agentId") or f"peer-{fallback_index}")
+    start_pose_payload = payload.get("startPose")
+    if not isinstance(start_pose_payload, Mapping):
+        raise ValueError(
+            f"agent {agent_id!r} requires startPose for peer-roster synthesis "
+            "(start_volume-only peers are deferred to a follow-up PR)"
+        )
+    start_position = _float_tuple(start_pose_payload.get("position"), 3, "agents.startPose.position")
+    start = (start_position[0], start_position[1], start_position[2])
+    builtin_policy = payload.get("builtinPolicy")
+    policy = _builtin_policy_instance(
+        builtin_policy,
+        start_position=start,
+        default_speed_m_per_step=default_speed_m_per_step,
+    )
+    return DynamicObstacle(
+        obstacle_id=agent_id,
+        waypoints=(DynamicObstacleWaypoint(step_index=0, position=start),),
+        radius_meters=default_radius_meters,
+        policy=policy,
+        metadata={"sourceRole": role, "builtinPolicy": str(builtin_policy or "waypoint")},
+    )
+
+
+def _population_to_dynamic_obstacles(
+    payload: Mapping[str, Any],
+    *,
+    seed: int,
+    default_radius_meters: float,
+    default_speed_m_per_step: float,
+) -> list[DynamicObstacle]:
+    spec = population_spec_from_dict(payload)
+    peer_count = max(0, spec.agent_count_per_scenario - 1)
+    if peer_count == 0:
+        return []
+    rng = random.Random(seed)
+    role_keys = tuple(spec.peer_role_distribution.keys())
+    role_weights = tuple(spec.peer_role_distribution.values())
+    bounds = spec.spawn_volume
+    obstacles: list[DynamicObstacle] = []
+    chosen_role = (
+        rng.choices(role_keys, weights=role_weights, k=1)[0] if spec.homogeneous else None
+    )
+    for index in range(peer_count):
+        role_choice = chosen_role or rng.choices(role_keys, weights=role_weights, k=1)[0]
+        start_x = rng.uniform(bounds.minimum.x, bounds.maximum.x)
+        start_y = rng.uniform(bounds.minimum.y, bounds.maximum.y)
+        start_z = rng.uniform(bounds.minimum.z, bounds.maximum.z)
+        start = (float(start_x), float(start_y), float(start_z))
+        policy = _builtin_policy_instance(
+            role_choice,
+            start_position=start,
+            default_speed_m_per_step=default_speed_m_per_step,
+        )
+        obstacles.append(
+            DynamicObstacle(
+                obstacle_id=f"population-peer-{index}",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=start),),
+                radius_meters=default_radius_meters,
+                policy=policy,
+                metadata={
+                    "sourceRole": "peer-obstacle",
+                    "builtinPolicy": role_choice,
+                    "populationIndex": index,
+                },
+            )
+        )
+    return obstacles
+
+
+def _builtin_policy_instance(
+    builtin_policy: Any,
+    *,
+    start_position: tuple[float, float, float],
+    default_speed_m_per_step: float,
+) -> "ChaseAgentObstaclePolicy | FleeAgentObstaclePolicy | MaintainSeparationObstaclePolicy | WaypointInterpolationObstaclePolicy | None":
+    if builtin_policy is None:
+        return None
+    name = str(builtin_policy)
+    if name == "waypoint":
+        return WaypointInterpolationObstaclePolicy(((0, start_position),))
+    if name == "chase":
+        return ChaseAgentObstaclePolicy(start_position, default_speed_m_per_step)
+    if name == "flee":
+        return FleeAgentObstaclePolicy(start_position, default_speed_m_per_step)
+    if name == "maintain_separation":
+        return MaintainSeparationObstaclePolicy(
+            WaypointInterpolationObstaclePolicy(((0, start_position),)),
+            min_separation_meters=default_speed_m_per_step,
+        )
+    raise ValueError(f"unsupported builtin_policy: {name!r}")
+
+
 def _pose_from_dict(payload: Mapping[str, Any]) -> Pose3D:
     position = _float_tuple(payload.get("position"), 3, "position")
     orientation = _float_tuple(payload.get("orientationXyzw"), 4, "orientationXyzw")
@@ -414,6 +601,8 @@ __all__ = [
     "AGENT_ROLE_SPEC_VERSION",
     "AgentRoleSpec",
     "BUILTIN_POLICIES",
+    "DEFAULT_PEER_RADIUS_METERS",
+    "DEFAULT_PEER_SPEED_M_PER_STEP",
     "INTERACTION_METRICS_SPEC_VERSION",
     "InteractionMetricsSpec",
     "POPULATION_SPEC_VERSION",
@@ -421,4 +610,5 @@ __all__ = [
     "agent_role_spec_from_dict",
     "interaction_metrics_spec_from_dict",
     "population_spec_from_dict",
+    "synthesize_peer_roster_from_scenario_metadata",
 ]
