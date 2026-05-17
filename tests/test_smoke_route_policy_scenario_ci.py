@@ -120,6 +120,16 @@ def test_run_smoke_produces_passing_chain(tmp_path: Path) -> None:
     aggregate = review_payload.get("interactionMetricsAggregate")
     assert aggregate is not None and "perKeyStats" in aggregate
     assert "peer-count" in aggregate["perKeyStats"]
+    # PR per-step interaction metric collection: the gym adapter surfaces
+    # the ego-to-nearest-peer clearance every step, so the scenario run loop
+    # rolls the worst observed value into the per-key stats alongside
+    # ``peer-count``. A finite, positive value confirms the chain wired
+    # real per-step data into the multi-agent surface (not just the
+    # structural ``peer-count`` placeholder).
+    assert "min-peer-separation-meters" in aggregate["perKeyStats"]
+    min_sep_stats = aggregate["perKeyStats"]["min-peer-separation-meters"]
+    assert min_sep_stats["sampleCount"] >= 1
+    assert min_sep_stats["max"] >= 0.0
     bundle_md = artifacts["review_bundle_markdown"].read_text(encoding="utf-8")
     assert "## Multi-agent interaction metrics" in bundle_md
     assert "Multi-agent" in bundle_html

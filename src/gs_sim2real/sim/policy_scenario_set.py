@@ -687,14 +687,13 @@ def _run_scenario(
         markdown_path.write_text(render_route_policy_benchmark_markdown(report), encoding="utf-8")
     result_metadata = _json_mapping(scenario.metadata)
     if dynamic_obstacles is not None:
-        # Sprint 4 / PR D6: write a minimal interaction-metrics mapping so
-        # the shard-merge aggregator (PR D4) has something to roll up for
-        # multi-agent runs. ``peer-count`` is a structural metric that
-        # does not need env-side per-step hooks; richer values
-        # (min-peer-separation etc.) will land alongside the env hook.
-        result_metadata[SCENARIO_INTERACTION_METRIC_VALUES_KEY] = {
+        interaction_values: dict[str, float] = {
             "peer-count": float(dynamic_obstacles.obstacle_count),
         }
+        min_peer_separation = _min_peer_separation_from_report(report)
+        if min_peer_separation is not None:
+            interaction_values["min-peer-separation-meters"] = min_peer_separation
+        result_metadata[SCENARIO_INTERACTION_METRIC_VALUES_KEY] = interaction_values
     return RoutePolicyScenarioRunResult(
         scenario_id=scenario.scenario_id,
         benchmark_id=benchmark_id,
@@ -710,6 +709,38 @@ def _run_scenario(
         max_steps=max_steps,
         metadata=result_metadata,
     )
+
+
+NEAREST_PEER_CLEARANCE_FEATURE_KEY = "nearest-dynamic-obstacle-distance-meters"
+
+
+def _min_peer_separation_from_report(report: Any) -> float | None:
+    """Return the worst ego-to-peer clearance observed across the run.
+
+    Walks every transition in every baseline result and tracks the
+    minimum of the ``nearest-dynamic-obstacle-distance-meters`` feature
+    surfaced by :class:`RoutePolicyGymAdapter`. Returns ``None`` when no
+    transition surfaced the metric (e.g. an ego-only run that slipped
+    through without any peers, or a rollout that terminated before the
+    obstacle block was populated).
+    """
+
+    worst: float | None = None
+    for result in report.evaluation.results:
+        for episode in result.dataset.episodes:
+            for transition in episode.transitions:
+                value = transition.observation.get(NEAREST_PEER_CLEARANCE_FEATURE_KEY)
+                if value is None:
+                    continue
+                try:
+                    numeric = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if numeric != numeric or numeric in (float("inf"), float("-inf")):
+                    continue
+                if worst is None or numeric < worst:
+                    worst = numeric
+    return worst
 
 
 def _resolve_scene_id(

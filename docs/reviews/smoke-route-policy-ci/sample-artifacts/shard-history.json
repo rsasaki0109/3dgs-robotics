@@ -281,7 +281,8 @@
         "includeDirectBaseline": false,
         "interactionMetrics": {
           "aggregateKeys": [
-            "peer-count"
+            "peer-count",
+            "min-peer-separation-meters"
           ],
           "recordType": "route-policy-interaction-metrics",
           "requireEgoSurvives": true,
@@ -381,7 +382,8 @@
         "includeDirectBaseline": false,
         "interactionMetrics": {
           "aggregateKeys": [
-            "peer-count"
+            "peer-count",
+            "min-peer-separation-meters"
           ],
           "recordType": "route-policy-interaction-metrics",
           "requireEgoSurvives": true,

@@ -158,7 +158,7 @@ def _seed_fixture(root: Path) -> tuple[Path, Path]:
             ),
         ),
         interaction_metrics=InteractionMetricsSpec(
-            aggregate_keys=("peer-count",),
+            aggregate_keys=("peer-count", "min-peer-separation-meters"),
         ),
     )
     matrix_path = write_route_policy_scenario_matrix_json(

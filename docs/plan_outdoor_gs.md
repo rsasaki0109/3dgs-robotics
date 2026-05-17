@@ -112,10 +112,10 @@ PR A2 だけは production benchmark データが届いていないため scaffo
   - touched 個別モジュール(policy_scenario_multi_agent.py、policy_scenario_sharding.py、policy_scenario_set.py、policy_scenario_ci_review.py の追加部)は pass。
   - `src/gs_sim2real/cli.py` を含む mypy は Waymo / MCD 周辺の既知型不整合で落ちる。今回 chain は regression を入れていない。
 - Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 (`multi_3cam_300each_ba`) は手元 bag に `d455t` / `d435i` topics が無いので data-blocked。
-- 2026-05-16 セッションで Sprint 1〜4 を完走。次回 Claude が触るときの starting point 候補:
-  1. **Sprint 4 follow-up — per-step interaction metric collection**: 現在 `_run_scenario` は `peer-count` だけを `interactionMetricsValues` に書く。env 側に hook を入れて min-peer-separation / pairwise clearance histogram を per-step 集計し、shard merge aggregate / review bundle に実値が出るようにする。
-  2. **PR A2 production data**: production benchmark run の review.json が届いたら `scripts/publish_production_review_bundle.py` で `docs/reviews/<id>/` 公開。Pages index で `productionCount: 1` になる。
-  3. **Sprint 4 staging extension**: smoke の 2-agent crossing を 4 → 16 → 32+ agent に段階的に拡張(§17.5 staging plan)。
+- 2026-05-16 セッションで Sprint 1〜4 を完走、続く 2026-05-17 セッションで Sprint 4 follow-up（per-step interaction metric collection）も完了。次回 Claude が触るときの starting point 候補:
+  1. **PR A2 production data**: production benchmark run の review.json が届いたら `scripts/publish_production_review_bundle.py` で `docs/reviews/<id>/` 公開。Pages index で `productionCount: 1` になる。
+  2. **Sprint 4 staging extension**: smoke の 2-agent crossing を 4 → 16 → 32+ agent に段階的に拡張(§17.5 staging plan)。`min-peer-separation-meters` が production-shaped traffic で意味のある分布を返すようになる。
+  3. **Pairwise clearance histogram**: `InteractionMetricsSpec.pairwise_clearance_histogram_bins` を実値化（現状は spec のみ）。3+ peer scenario で意味が出る。
   4. **Sprint 5 設計**: real-vs-sim correlation の policy 行動レベル拡張、または env-side noise / sensor profile の更なる充実、Waymo E2E 等。
   5. その後の backlog: LoGeR production comparison (§12.3)、MCD `ntu_day_02` `multi_3cam_300each_ba` (data-blocked)、Applanix `read_gsof_ins_pose_stream` (vendor 依存)。
 
@@ -803,7 +803,7 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | 2 | Sprint 2 | Event-aligned stratification (PR B) | 評価品質 / policy 行動レベル correlation の土台 | 完(`2b79b5d`) |
 | 3 | Sprint 3 | Policy trace events (PR C → C6) | デバッグ・説明力、Sprint 4 viewer の入力 | 完(`ace6143` → `db0cb56`、6 PR) |
 | 4 | Sprint 4 | Multi-agent Tier 3 production matrix (PR D 系) | env hardening、Tier 3 候補の本丸 | 完(`2e8e738` → `b3784be`、6 PR)、staging は smoke で 2-agent 通過。production 4+ agent は次フェーズ |
-| 5 | — | Sprint 4 follow-up: per-step interaction metric collection | aggregate を peer-count placeholder から実値に | 次回 starting point 候補 |
+| 5 | — | Sprint 4 follow-up: per-step interaction metric collection | aggregate を peer-count placeholder から実値に | 完(本セッション、`min-peer-separation-meters` を `nearest-dynamic-obstacle-distance-meters` から rollout 全 step 最悪値で集計し review bundle に流通) |
 | 6 | — | LoGeR production comparison asset | asset 比較の厚み | §12.3 既存 backlog |
 | 7 | — | MCD `ntu_day_02` `multi_3cam_300each_ba` 追加 download | asset 品質補完（data-blocked） | §12.3 既存 backlog |
 | 8 | — | Applanix `read_gsof_ins_pose_stream` | data input 拡張（vendor 依存） | §3.1 OOS |

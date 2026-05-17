@@ -21,6 +21,12 @@
   "historyPassed": true,
   "interactionMetricsAggregate": {
     "perKeyStats": {
+      "min-peer-separation-meters": {
+        "max": 1.9464857921141778,
+        "mean": 1.9464857921141778,
+        "p95": 1.946485792114178,
+        "sampleCount": 2
+      },
       "peer-count": {
         "max": 1.0,
         "mean": 1.0,

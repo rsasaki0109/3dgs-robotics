@@ -34,6 +34,7 @@
 
 | Key | Mean | p95 | Max | Sample count |
 | --- | ---: | ---: | ---: | ---: |
+| `min-peer-separation-meters` | 1.9465 | 1.9465 | 1.9465 | 2 |
 | `peer-count` | 1.0000 | 1.0000 | 1.0000 | 2 |
 
 ## Adopted Workflow

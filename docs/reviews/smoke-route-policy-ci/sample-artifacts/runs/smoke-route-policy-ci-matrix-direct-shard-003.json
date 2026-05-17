@@ -187,7 +187,8 @@
           "includeDirectBaseline": false,
           "interactionMetrics": {
             "aggregateKeys": [
-              "peer-count"
+              "peer-count",
+              "min-peer-separation-meters"
             ],
             "recordType": "route-policy-interaction-metrics",
             "requireEgoSurvives": true,
@@ -310,13 +311,15 @@
         "goalSuiteMetadata": {},
         "interactionMetrics": {
           "aggregateKeys": [
-            "peer-count"
+            "peer-count",
+            "min-peer-separation-meters"
           ],
           "recordType": "route-policy-interaction-metrics",
           "requireEgoSurvives": true,
           "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
         },
         "interactionMetricsValues": {
+          "min-peer-separation-meters": 1.9464857921141778,
           "peer-count": 1.0
         },
         "matrixId": "smoke-route-policy-ci-matrix",
