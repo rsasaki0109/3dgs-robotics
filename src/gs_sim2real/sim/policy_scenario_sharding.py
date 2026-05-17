@@ -22,6 +22,11 @@ from .policy_scenario_matrix import (
     RoutePolicyScenarioMatrixExpansionReport,
     load_route_policy_scenario_matrix_expansion_json,
 )
+from .policy_scenario_multi_agent import (
+    InteractionMetricsAggregate,
+    aggregate_interaction_metrics_across_scenarios,
+    interaction_metrics_aggregate_from_dict,
+)
 from .policy_scenario_set import (
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSetRunReport,
@@ -173,7 +178,15 @@ class RoutePolicyScenarioShardRunSummary:
 
 @dataclass(frozen=True, slots=True)
 class RoutePolicyScenarioShardMergeReport:
-    """Merged shard run report with a global benchmark history gate."""
+    """Merged shard run report with a global benchmark history gate.
+
+    Sprint 4 / PR D4 adds the optional
+    :class:`InteractionMetricsAggregate` attached after multi-agent
+    runs. The aggregate is computed from each scenario result's
+    ``interactionMetricsValues`` metadata mapping (populated by the run
+    loop when peers are present); legacy ego-only runs produce no
+    values and the aggregate stays ``None``.
+    """
 
     merge_id: str
     shard_runs: tuple[RoutePolicyScenarioShardRunSummary, ...]
@@ -181,6 +194,7 @@ class RoutePolicyScenarioShardMergeReport:
     history_path: str | None = None
     history_markdown_path: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    interaction_metrics_aggregate: InteractionMetricsAggregate | None = None
     version: str = ROUTE_POLICY_SCENARIO_SHARD_MERGE_VERSION
 
     def __post_init__(self) -> None:
@@ -206,7 +220,7 @@ class RoutePolicyScenarioShardMergeReport:
         return sum(shard_run.report_count for shard_run in self.shard_runs)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "recordType": "route-policy-scenario-shard-merge",
             "version": self.version,
             "mergeId": self.merge_id,
@@ -220,6 +234,9 @@ class RoutePolicyScenarioShardMergeReport:
             "history": self.history.to_dict(),
             "metadata": _json_mapping(self.metadata),
         }
+        if self.interaction_metrics_aggregate is not None:
+            payload["interactionMetricsAggregate"] = self.interaction_metrics_aggregate.to_dict()
+        return payload
 
 
 def split_route_policy_scenario_set_into_shards(
@@ -397,9 +414,11 @@ def merge_route_policy_scenario_shard_runs(
 
     summaries: list[RoutePolicyScenarioShardRunSummary] = []
     report_paths: list[str] = []
+    scenario_metadatas: list[Mapping[str, Any]] = []
     for run, run_path in zip(shard_runs, resolved_run_paths, strict=True):
         shard_report_paths = tuple(result.report_path for result in run.scenario_results)
         report_paths.extend(shard_report_paths)
+        scenario_metadatas.extend(result.metadata for result in run.scenario_results)
         summaries.append(
             RoutePolicyScenarioShardRunSummary(
                 shard_id=run.scenario_set_id,
@@ -412,6 +431,9 @@ def merge_route_policy_scenario_shard_runs(
                 metadata=run.metadata,
             )
         )
+    interaction_metrics_aggregate = aggregate_interaction_metrics_across_scenarios(
+        scenario_metadatas
+    )
 
     history = build_route_policy_benchmark_history(
         tuple(report_paths),
@@ -438,6 +460,7 @@ def merge_route_policy_scenario_shard_runs(
         history_path=None if history_output is None else str(history_output),
         history_markdown_path=None if history_markdown_output is None else str(history_markdown_output),
         metadata=_json_mapping(metadata or {}),
+        interaction_metrics_aggregate=interaction_metrics_aggregate,
     )
 
 
@@ -589,6 +612,7 @@ def route_policy_scenario_shard_merge_from_dict(
     version = str(payload.get("version", ROUTE_POLICY_SCENARIO_SHARD_MERGE_VERSION))
     if version != ROUTE_POLICY_SCENARIO_SHARD_MERGE_VERSION:
         raise ValueError(f"unsupported route policy scenario shard merge version: {version}")
+    aggregate_payload = payload.get("interactionMetricsAggregate")
     return RoutePolicyScenarioShardMergeReport(
         merge_id=str(payload["mergeId"]),
         shard_runs=tuple(
@@ -601,6 +625,11 @@ def route_policy_scenario_shard_merge_from_dict(
         if payload.get("historyMarkdownPath") is None
         else str(payload["historyMarkdownPath"]),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
+        interaction_metrics_aggregate=None
+        if aggregate_payload is None
+        else interaction_metrics_aggregate_from_dict(
+            _mapping(aggregate_payload, "interactionMetricsAggregate")
+        ),
         version=version,
     )
 

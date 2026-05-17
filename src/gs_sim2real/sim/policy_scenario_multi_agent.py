@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 import math
+from statistics import fmean, quantiles
 from typing import Any
 
 import random
@@ -42,6 +43,9 @@ from .policy_obstacle import (
 AGENT_ROLE_SPEC_VERSION = "gs-mapper-route-policy-agent-role-spec/v1"
 POPULATION_SPEC_VERSION = "gs-mapper-route-policy-population-spec/v1"
 INTERACTION_METRICS_SPEC_VERSION = "gs-mapper-route-policy-interaction-metrics-spec/v1"
+INTERACTION_METRICS_AGGREGATE_VERSION = "gs-mapper-route-policy-interaction-metrics-aggregate/v1"
+
+SCENARIO_INTERACTION_METRIC_VALUES_KEY = "interactionMetricsValues"
 
 AGENT_ROLES: frozenset[str] = frozenset({"ego", "peer-obstacle", "peer-coop"})
 BUILTIN_POLICIES: frozenset[str] = frozenset(
@@ -368,6 +372,159 @@ DEFAULT_PEER_RADIUS_METERS = 0.5
 DEFAULT_PEER_SPEED_M_PER_STEP = 0.1
 
 
+@dataclass(frozen=True, slots=True)
+class InteractionMetricKeyStats:
+    """Mean / p95 / max for one :class:`InteractionMetricsSpec` aggregate key."""
+
+    mean: float
+    p95: float
+    maximum: float
+    sample_count: int
+
+    def __post_init__(self) -> None:
+        for label, value in (("mean", self.mean), ("p95", self.p95), ("maximum", self.maximum)):
+            numeric = float(value)
+            if not math.isfinite(numeric):
+                raise ValueError(f"{label} must be finite")
+            object.__setattr__(self, label if label != "maximum" else "maximum", numeric)
+        if int(self.sample_count) < 1:
+            raise ValueError("sample_count must be >= 1")
+        object.__setattr__(self, "sample_count", int(self.sample_count))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mean": float(self.mean),
+            "p95": float(self.p95),
+            "max": float(self.maximum),
+            "sampleCount": int(self.sample_count),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class InteractionMetricsAggregate:
+    """Per-key roll-up of :class:`InteractionMetricsSpec` values across scenarios.
+
+    Produced by :func:`aggregate_interaction_metrics_across_scenarios`
+    from the ``interactionMetricsValues`` mapping written into each
+    scenario result's metadata by the run loop. ``sample_scenario_count``
+    counts how many scenarios contributed at least one numeric value.
+    """
+
+    per_key_stats: Mapping[str, InteractionMetricKeyStats]
+    sample_scenario_count: int
+
+    def __post_init__(self) -> None:
+        if not self.per_key_stats:
+            raise ValueError("per_key_stats must not be empty")
+        if int(self.sample_scenario_count) < 1:
+            raise ValueError("sample_scenario_count must be >= 1")
+        # Normalise key ordering so the JSON output is stable.
+        ordered = {
+            str(key): self.per_key_stats[key]
+            for key in sorted(self.per_key_stats)
+        }
+        object.__setattr__(self, "per_key_stats", ordered)
+        object.__setattr__(self, "sample_scenario_count", int(self.sample_scenario_count))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "recordType": "route-policy-interaction-metrics-aggregate",
+            "version": INTERACTION_METRICS_AGGREGATE_VERSION,
+            "perKeyStats": {
+                key: stats.to_dict() for key, stats in self.per_key_stats.items()
+            },
+            "sampleScenarioCount": int(self.sample_scenario_count),
+        }
+
+
+def interaction_metrics_aggregate_from_dict(
+    payload: Mapping[str, Any],
+) -> InteractionMetricsAggregate:
+    """Rebuild :class:`InteractionMetricsAggregate` from a JSON payload."""
+
+    _check_version(payload, INTERACTION_METRICS_AGGREGATE_VERSION)
+    stats_payload = payload.get("perKeyStats") or {}
+    if not isinstance(stats_payload, Mapping):
+        raise ValueError("InteractionMetricsAggregate perKeyStats must be a mapping")
+    per_key_stats: dict[str, InteractionMetricKeyStats] = {}
+    for raw_key, stats in stats_payload.items():
+        if not isinstance(stats, Mapping):
+            raise ValueError("InteractionMetricsAggregate perKeyStats entries must be mappings")
+        per_key_stats[str(raw_key)] = InteractionMetricKeyStats(
+            mean=float(stats["mean"]),
+            p95=float(stats["p95"]),
+            maximum=float(stats["max"]),
+            sample_count=int(stats["sampleCount"]),
+        )
+    return InteractionMetricsAggregate(
+        per_key_stats=per_key_stats,
+        sample_scenario_count=int(payload["sampleScenarioCount"]),
+    )
+
+
+def aggregate_interaction_metrics_across_scenarios(
+    scenario_metadata_iter: "Sequence[Mapping[str, Any]]",
+) -> InteractionMetricsAggregate | None:
+    """Aggregate ``interactionMetricsValues`` across scenario results.
+
+    The run loop is expected (in a follow-up PR) to write a
+    ``{"interactionMetricsValues": {key: float, ...}}`` mapping into each
+    multi-agent scenario result's metadata. This aggregator scans those
+    mappings across every scenario in every shard and produces
+    per-key mean / p95 / max / sampleCount statistics. Returns ``None``
+    when no scenario carries values so legacy ego-only runs stay
+    aggregate-free.
+    """
+
+    per_key: dict[str, list[float]] = {}
+    scenario_count_with_values = 0
+    for scenario_metadata in scenario_metadata_iter:
+        values = scenario_metadata.get(SCENARIO_INTERACTION_METRIC_VALUES_KEY)
+        if not isinstance(values, Mapping) or not values:
+            continue
+        contributed = False
+        for raw_key, raw_value in values.items():
+            numeric = _coerce_finite_float(raw_value)
+            if numeric is None:
+                continue
+            per_key.setdefault(str(raw_key), []).append(numeric)
+            contributed = True
+        if contributed:
+            scenario_count_with_values += 1
+    if not per_key:
+        return None
+    per_key_stats: dict[str, InteractionMetricKeyStats] = {}
+    for key, samples in per_key.items():
+        per_key_stats[key] = InteractionMetricKeyStats(
+            mean=fmean(samples),
+            p95=_p95(samples),
+            maximum=max(samples),
+            sample_count=len(samples),
+        )
+    return InteractionMetricsAggregate(
+        per_key_stats=per_key_stats,
+        sample_scenario_count=scenario_count_with_values,
+    )
+
+
+def _coerce_finite_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric):
+        return None
+    return numeric
+
+
+def _p95(samples: Sequence[float]) -> float:
+    if len(samples) == 1:
+        return float(samples[0])
+    return float(quantiles(samples, n=100, method="inclusive")[94])
+
+
 def synthesize_peer_roster_from_scenario_metadata(
     metadata: Mapping[str, Any],
     *,
@@ -603,11 +760,17 @@ __all__ = [
     "BUILTIN_POLICIES",
     "DEFAULT_PEER_RADIUS_METERS",
     "DEFAULT_PEER_SPEED_M_PER_STEP",
+    "INTERACTION_METRICS_AGGREGATE_VERSION",
     "INTERACTION_METRICS_SPEC_VERSION",
+    "InteractionMetricKeyStats",
+    "InteractionMetricsAggregate",
     "InteractionMetricsSpec",
     "POPULATION_SPEC_VERSION",
     "PopulationSpec",
+    "SCENARIO_INTERACTION_METRIC_VALUES_KEY",
     "agent_role_spec_from_dict",
+    "aggregate_interaction_metrics_across_scenarios",
+    "interaction_metrics_aggregate_from_dict",
     "interaction_metrics_spec_from_dict",
     "population_spec_from_dict",
     "synthesize_peer_roster_from_scenario_metadata",
