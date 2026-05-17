@@ -55,6 +55,7 @@ class ReviewIndexEntry:
     kind: str = "unknown"
     generated_at: str | None = None
     scene_id: str | None = None
+    multi_agent: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +71,7 @@ class ReviewIndexEntry:
             "kind": self.kind,
             "generatedAt": self.generated_at,
             "sceneId": self.scene_id,
+            "multiAgent": bool(self.multi_agent),
         }
 
 
@@ -112,6 +114,7 @@ def collect_review_entries(reviews_dir: Path) -> list[ReviewIndexEntry]:
                 kind=kind,
                 generated_at=_optional_str(provenance.get("generatedAt")) if provenance else None,
                 scene_id=_optional_str(provenance.get("sceneId")) if provenance else None,
+                multi_agent=bool(payload.get("multiAgent", False)),
             )
         )
     entries.sort(key=lambda entry: entry.review_id)
@@ -129,6 +132,7 @@ def render_reviews_index_json(entries: list[ReviewIndexEntry]) -> str:
         "productionCount": sum(1 for entry in entries if entry.kind == "production"),
         "syntheticCount": sum(1 for entry in entries if entry.kind == "synthetic"),
         "unknownCount": sum(1 for entry in entries if entry.kind == "unknown"),
+        "multiAgentCount": sum(1 for entry in entries if entry.multi_agent),
         "entries": [entry.to_dict() for entry in entries],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n"

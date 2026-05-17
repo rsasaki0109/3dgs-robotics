@@ -21,6 +21,10 @@ from .policy_scenario_ci_workflow import (
     RoutePolicyScenarioCIWorkflowValidationReport,
     load_route_policy_scenario_ci_workflow_validation_json,
 )
+from .policy_scenario_multi_agent import (
+    InteractionMetricsAggregate,
+    interaction_metrics_aggregate_from_dict,
+)
 from .policy_scenario_sharding import (
     RoutePolicyScenarioShardMergeReport,
     RoutePolicyScenarioShardRunSummary,
@@ -217,6 +221,7 @@ class RoutePolicyScenarioCIReviewArtifact:
     correlation_threshold_overrides: Mapping[str, RealVsSimCorrelationThresholds] = field(default_factory=dict)
     correlation_failed_reports: tuple[tuple[int, str, tuple[str, ...]], ...] = ()
     correlation_per_window_stats: tuple[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]], ...] = ()
+    interaction_metrics_aggregate: InteractionMetricsAggregate | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION
 
@@ -266,6 +271,12 @@ class RoutePolicyScenarioCIReviewArtifact:
     @property
     def correlation_passed(self) -> bool:
         return not self.correlation_failed_reports
+
+    @property
+    def multi_agent(self) -> bool:
+        """True when the merge contributed a multi-agent interaction aggregate."""
+
+        return self.interaction_metrics_aggregate is not None
 
     @property
     def passed(self) -> bool:
@@ -358,6 +369,9 @@ class RoutePolicyScenarioCIReviewArtifact:
                 }
                 for report_index, topic, stats in self.correlation_per_window_stats
             ]
+        if self.interaction_metrics_aggregate is not None:
+            payload["interactionMetricsAggregate"] = self.interaction_metrics_aggregate.to_dict()
+            payload["multiAgent"] = True
         return payload
 
 
@@ -460,6 +474,7 @@ def build_route_policy_scenario_ci_review_artifact(
         correlation_threshold_overrides=overrides_map,
         correlation_failed_reports=correlation_failed_reports,
         correlation_per_window_stats=correlation_per_window_stats,
+        interaction_metrics_aggregate=merge_report.interaction_metrics_aggregate,
         metadata={
             "pagesBaseUrl": pages_base_url,
             "historyPath": merge_report.history_path,
@@ -821,6 +836,12 @@ def route_policy_scenario_ci_review_from_dict(
         for item in _sequence(payload.get("correlationPerWindowStats", ()), "correlationPerWindowStats")
         if isinstance(item, Mapping)
     )
+    interaction_payload = payload.get("interactionMetricsAggregate")
+    interaction_metrics_aggregate = (
+        None
+        if interaction_payload is None
+        else interaction_metrics_aggregate_from_dict(_mapping(interaction_payload, "interactionMetricsAggregate"))
+    )
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=str(payload["reviewId"]),
         merge_id=str(payload["mergeId"]),
@@ -846,6 +867,7 @@ def route_policy_scenario_ci_review_from_dict(
         correlation_threshold_overrides=correlation_threshold_overrides,
         correlation_failed_reports=correlation_failed_reports,
         correlation_per_window_stats=correlation_per_window_stats,
+        interaction_metrics_aggregate=interaction_metrics_aggregate,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -893,6 +915,28 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
     if artifact.history_failed_checks:
         lines.extend(["", "## History Failed Checks", ""])
         lines.extend(f"- {check}" for check in artifact.history_failed_checks)
+    if artifact.interaction_metrics_aggregate is not None:
+        aggregate = artifact.interaction_metrics_aggregate
+        lines.extend(
+            [
+                "",
+                "## Multi-agent interaction metrics",
+                "",
+                f"- Contributing scenarios: {aggregate.sample_scenario_count}",
+                "",
+                "| Key | Mean | p95 | Max | Sample count |",
+                "| --- | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for key, stats in aggregate.per_key_stats.items():
+            lines.append(
+                "| "
+                f"`{key}` | "
+                f"{stats.mean:.4f} | "
+                f"{stats.p95:.4f} | "
+                f"{stats.maximum:.4f} | "
+                f"{stats.sample_count} |"
+            )
     if artifact.correlation_reports:
         lines.append("")
         lines.append("## Real-vs-sim correlation")
@@ -1043,6 +1087,10 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
         else ""
     )
     correlation_section = _render_correlation_section_html(artifact)
+    interaction_section = _render_interaction_metrics_section_html(artifact.interaction_metrics_aggregate)
+    multi_agent_badge = (
+        '<span class="pill multi-agent">Multi-agent</span>' if artifact.multi_agent else ""
+    )
     adoption_section = _render_adoption_section_html(artifact.adoption)
     provenance_section = _render_provenance_section_html(artifact.provenance)
     return f"""<!doctype html>
@@ -1069,6 +1117,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     .synthetic {{ background: #fff1c1; color: #6a4d00; }}
     .production {{ background: #dcefd8; color: #1e5a2b; }}
     .unknown {{ background: #e3e5df; color: #424940; }}
+    .multi-agent {{ background: #d8e6f7; color: #1f3f6e; margin-left: 6px; }}
     table {{ width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; overflow: hidden; }}
     th, td {{ padding: 10px 12px; border-bottom: 1px solid #e9ede5; text-align: left; vertical-align: top; }}
     th {{ background: #eef2ea; font-size: 13px; color: #424940; }}
@@ -1084,7 +1133,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
 <body>
   <main>
     <h1>Route Policy Scenario CI Review</h1>
-    <p class="subtitle"><span class="pill {status_class}">{"PASS" if artifact.passed else "FAIL"}</span> {escape(artifact.review_id)}</p>
+    <p class="subtitle"><span class="pill {status_class}">{"PASS" if artifact.passed else "FAIL"}</span> {multi_agent_badge} {escape(artifact.review_id)}</p>
     {notice_section}
     <section class="grid">
       <div class="metric"><span>Workflow</span><strong>{escape(artifact.workflow_id)}</strong></div>
@@ -1111,6 +1160,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
       </table>
     </section>
     {failed_section}
+    {interaction_section}
     {correlation_section}
     {adoption_section}
   </main>
@@ -1501,6 +1551,31 @@ def _provenance_markdown_lines(provenance: RoutePolicyScenarioCIReviewProvenance
         for key, value in sorted(provenance.extra.items()):
             lines.append(f"- {key}: `{value}`")
     return lines
+
+
+def _render_interaction_metrics_section_html(
+    aggregate: InteractionMetricsAggregate | None,
+) -> str:
+    """Render the multi-agent interaction-metrics HTML section, or empty."""
+
+    if aggregate is None:
+        return ""
+    rows = "\n".join(
+        "<tr>"
+        f"<td><code>{escape(key)}</code></td>"
+        f"<td>{stats.mean:.4f}</td>"
+        f"<td>{stats.p95:.4f}</td>"
+        f"<td>{stats.maximum:.4f}</td>"
+        f"<td>{stats.sample_count}</td>"
+        "</tr>"
+        for key, stats in aggregate.per_key_stats.items()
+    )
+    return (
+        '<section><h2>Multi-agent interaction metrics</h2>'
+        f"<p>Contributing scenarios: {aggregate.sample_scenario_count}</p>"
+        '<table><thead><tr><th>Key</th><th>Mean</th><th>p95</th><th>Max</th><th>Sample count</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table></section>"
+    )
 
 
 def _render_provenance_section_html(provenance: RoutePolicyScenarioCIReviewProvenance | None) -> str:
