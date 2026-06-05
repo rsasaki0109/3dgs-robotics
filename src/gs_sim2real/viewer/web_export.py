@@ -245,6 +245,7 @@ def ply_to_splat(
     normalize_target_extent: float | None = None,
     min_opacity: float = 0.0,
     max_scale: float | None = None,
+    max_scale_percentile: float | None = None,
 ) -> str:
     """Convert a gsplat PLY to the antimatter15/splat 32-byte-per-gaussian binary.
 
@@ -274,7 +275,7 @@ def ply_to_splat(
     positions = np.asarray(data.positions, dtype=np.float32)
     scales_log = np.asarray(data.scales, dtype=np.float32) if data.scales is not None else None
     rotations = np.asarray(data.rotations, dtype=np.float32) if data.rotations is not None else None
-    opacities = np.asarray(data.opacities, dtype=np.float32) if data.opacities is not None else None
+    opacities = np.asarray(data.opacities, dtype=np.float32).reshape(-1) if data.opacities is not None else None
     colors = np.asarray(data.colors, dtype=np.float32) if data.colors is not None else None
     if any(x is None for x in (scales_log, rotations, opacities, colors)):
         raise ValueError(
@@ -284,25 +285,38 @@ def ply_to_splat(
     n = len(positions)
     sigmoid_opacity = 1.0 / (1.0 + np.exp(-opacities))
     scales_world = np.exp(scales_log)
+    scale_max = scales_world.max(axis=1)
     keep = np.ones(n, dtype=bool)
     if min_opacity > 0.0:
         keep &= sigmoid_opacity >= float(min_opacity)
     if max_scale is not None and max_scale > 0.0:
-        keep &= scales_world.max(axis=1) <= float(max_scale)
+        keep &= scale_max <= float(max_scale)
+    adaptive_max_scale = None
+    if max_scale_percentile is not None:
+        percentile = float(max_scale_percentile)
+        if not 0.0 < percentile <= 100.0:
+            raise ValueError("max_scale_percentile must be in the range (0, 100]")
+        adaptive_max_scale = float(np.percentile(scale_max, percentile))
+        keep &= scale_max <= adaptive_max_scale
     kept_idx = np.nonzero(keep)[0]
     if kept_idx.size == 0:
-        raise ValueError(f"No gaussians survived filtering (min_opacity={min_opacity}, max_scale={max_scale})")
+        raise ValueError(
+            "No gaussians survived filtering "
+            f"(min_opacity={min_opacity}, max_scale={max_scale}, max_scale_percentile={max_scale_percentile})"
+        )
     score = np.exp(scales_log[kept_idx].sum(axis=1)) * sigmoid_opacity[kept_idx]
     order = kept_idx[np.argsort(-score)]
     if max_points is not None and max_points > 0 and order.size > max_points:
         order = order[:max_points]
     n_out = int(order.shape[0])
     logger.info(
-        "ply_to_splat: %d/%d gaussians after opacity>=%.2f / scale<=%s (written: %d)",
+        "ply_to_splat: %d/%d gaussians after opacity>=%.2f / scale<=%s / scale_percentile<=%s (%s) (written: %d)",
         int(kept_idx.size),
         n,
         float(min_opacity),
         max_scale,
+        max_scale_percentile,
+        f"{adaptive_max_scale:.4f}" if adaptive_max_scale is not None else "off",
         n_out,
     )
 

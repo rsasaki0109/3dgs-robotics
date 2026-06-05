@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from gs_sim2real.cli import build_parser, main
+from gs_sim2real.cli import _resolve_photos_to_splat_quality, build_parser, main
 
 
 class TestCLIHelp:
@@ -397,18 +397,22 @@ class TestCLIHelp:
                 "0.02",
                 "--splat-max-scale",
                 "2.0",
+                "--splat-max-scale-percentile",
+                "98",
             ]
         )
         assert args.format == "splat"
         assert args.splat_normalize_extent == 17.0
         assert args.splat_min_opacity == 0.02
         assert args.splat_max_scale == 2.0
+        assert args.splat_max_scale_percentile == 98.0
 
     def test_cli_photos_to_splat_defaults(self) -> None:
         """photos-to-splat parser accepts the minimal form and has sane defaults."""
         args = build_parser().parse_args(["photos-to-splat", "--images", "photos/"])
         assert args.command == "photos-to-splat"
         assert args.preprocess == "dust3r"
+        assert args.quality == "draft"
         assert args.num_frames == 20
         assert args.scene_graph == "complete"
         assert args.iterations == 3000
@@ -416,6 +420,40 @@ class TestCLIHelp:
         assert args.splat_normalize_extent == 17.0
         assert args.splat_min_opacity == 0.02
         assert args.splat_max_scale == 2.0
+        assert args.splat_max_scale_percentile is None
+
+    def test_cli_photos_to_splat_clean_quality_resolves_heavier_defaults(self) -> None:
+        """clean preset should spend more compute and filter browser-blurring gaussians."""
+        args = build_parser().parse_args(["photos-to-splat", "--images", "photos/", "--quality", "clean"])
+        resolved = _resolve_photos_to_splat_quality(args)
+        assert resolved.num_frames == 64
+        assert resolved.align_iters == 800
+        assert resolved.iterations == 30000
+        assert resolved.mast3r_subsample == 4
+        assert resolved.splat_max_points == 600000
+        assert resolved.splat_min_opacity == 0.035
+        assert resolved.splat_max_scale == 1.0
+        assert resolved.splat_max_scale_percentile == 98.0
+
+    def test_cli_photos_to_splat_quality_preserves_explicit_overrides(self) -> None:
+        """Quality presets should not clobber explicit user settings."""
+        args = build_parser().parse_args(
+            [
+                "photos-to-splat",
+                "--images",
+                "photos/",
+                "--quality",
+                "hero",
+                "--iterations",
+                "7000",
+                "--splat-max-scale-percentile",
+                "99.5",
+            ]
+        )
+        resolved = _resolve_photos_to_splat_quality(args)
+        assert resolved.num_frames == 0
+        assert resolved.iterations == 7000
+        assert resolved.splat_max_scale_percentile == 99.5
 
     def test_cli_photos_to_splat_mast3r(self) -> None:
         """photos-to-splat accepts mast3r as a pose-estimation backend."""
@@ -462,6 +500,8 @@ class TestCLIHelp:
                 "200000",
                 "--splat-normalize-extent",
                 "30.0",
+                "--splat-max-scale-percentile",
+                "97.0",
                 "--skip-data-check",
             ]
         )
@@ -474,6 +514,7 @@ class TestCLIHelp:
         assert args.iterations == 5000
         assert args.splat_max_points == 200000
         assert args.splat_normalize_extent == 30.0
+        assert args.splat_max_scale_percentile == 97.0
         assert args.skip_data_check is True
 
     def test_cli_export_scene_bundle_flags(self) -> None:
