@@ -246,7 +246,7 @@ Numbers below are the end-to-end wall-clock and quality figures for the producti
 | bag6 cam0 — VGGT-SLAM 2.0 | external run + artifact import | **20 / 20** unique poses | 3.23 m trajectory | 15 000 | 190 s | 222k | not tracked | 5.4 MB / 178k gauss |
 | bag6 cam0 — MASt3R-SLAM | external run + artifact import | **10 / 20** keyframes | 2.16 m trajectory | 15 000 | 460 s | 1.34M → 400k filter | ~0.24 | 12.8 MB / 400k gauss |
 | bag6 cam0 — Pi3X | 108 s Pi3X VO + 7 s artifact import | **20 / 20** poses | 74.4 m trajectory | 15 000 | 184 s | 328k | ~0.14 sampled final L1 | 9.8 MB / 321k gauss |
-| MCD tuhh_day_04 — DUSt3R | ~3 min | 19 / 20 | 1.78 m (unscaled) | 3 000 | 147 s | 3.23M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
+| MCD tuhh_day_04 — DUSt3R | ~3 min | 19 / 20 | 1.78 m (unscaled) | 3 000 | 147 s | 3.23M → 371k filter | ~0.18 | 11.9 MB / 371k gauss |
 | MCD tuhh_day_04 — MAST3R | ~5 min | **20 / 20** | **59.0 m (metric)** | 15 000 | 413 s | 1.15M | ~0.16 | 12.8 MB / 400k gauss |
 | MCD ntu_day_02 — supervised | GNSS + ATV calibration + LiDAR seed (400 cams after 35 s trim) | 400/400 | 250 m horizontal GNSS extent | 30 000 | 500 s | 906k → 400k filter | 0.195 | 12.8 MB / 400k gauss |
 
