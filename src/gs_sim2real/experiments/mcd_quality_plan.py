@@ -103,12 +103,13 @@ def default_mcd_quality_profiles() -> tuple[MCDQualityRunProfile, ...]:
             config_path="configs/training_ba.yaml",
         ),
         MCDQualityRunProfile(
-            name="ntu_day02_multi_3cam_300each_ba",
-            label="Three-Camera 300 Each BA",
-            intent="Use the official ATV calibration to compare multi-camera coverage against the single-camera baseline.",
+            # MCDVIRAL ATV ships only d455b + d435i color cameras (no d455t),
+            # so the official multi-camera plan caps at two cameras.
+            name="ntu_day02_multi_2cam_300each_ba",
+            label="Two-Camera 300 Each BA",
+            intent="Use the official ATV calibration to compare D455B + D435I coverage against the single-camera baseline.",
             image_topics=(
                 "/d455b/color/image_raw",
-                "/d455t/color/image_raw",
                 "/d435i/color/image_raw",
             ),
             max_frames=300,

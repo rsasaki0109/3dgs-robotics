@@ -31,7 +31,7 @@ def test_mcd_quality_plan_contains_baseline_and_quality_candidates() -> None:
     assert names == [
         "ntu_day02_single_400_depth_long",
         "ntu_day02_single_800_ba",
-        "ntu_day02_multi_3cam_300each_ba",
+        "ntu_day02_multi_2cam_300each_ba",
     ]
     assert plan.preflight_command[:3] == ("python3", "scripts/check_mcd_gnss.py", "data/mcd/ntu_day_02")
     assert "--flatten-altitude" in plan.preflight_command
@@ -59,9 +59,7 @@ def test_multicamera_profile_uses_topic_list_and_yaml_frames() -> None:
     command = list(multi.preprocess_command)
 
     assert multi.profile.requires_full_folder is True
-    assert command[command.index("--image-topic") + 1] == (
-        "/d455b/color/image_raw,/d455t/color/image_raw,/d435i/color/image_raw"
-    )
+    assert command[command.index("--image-topic") + 1] == ("/d455b/color/image_raw,/d435i/color/image_raw")
     assert "--mcd-camera-frame" not in command
     assert multi.train_command[multi.train_command.index("--config") + 1] == "configs/training_ba.yaml"
 
@@ -78,7 +76,7 @@ def test_mcd_quality_plan_renders_json_markdown_and_shell() -> None:
     assert payload["runs"][0]["preprocessDir"] == "outputs/q/ntu_day02_single_400_depth_long/preprocess"
     assert "MCD Quality Run Plan" in markdown
     assert "Single D455B 800 BA" in markdown
-    assert "Three-Camera 300 Each BA" in markdown
+    assert "Two-Camera 300 Each BA" in markdown
     assert "PYTHONPATH=src python3 -m gs_sim2real.cli preprocess" in shell
     assert "outputs/q/assets/ntu_day02_single_400_depth_long.splat" in shell
 
