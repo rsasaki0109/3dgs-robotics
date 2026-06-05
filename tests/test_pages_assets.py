@@ -378,13 +378,14 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Inside-map FPS render from actual shipped outdoor 3DGS splats" in readme
-    assert "FPS-style renders from the shipped `.splat` binaries" in readme
-    assert "top-down trace showing the camera inside the map" in readme
+    assert "GS Mapper outdoor 3DGS overview card" in readme
+    assert "docs/images/social-card.png" in readme
+    assert "Detailed geometry proof" in readme
+    assert "actual `.splat` FPS trace GIF" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
-    """README's main GIF should inspect real .splat coordinates, not browser screenshots."""
+    """The linked proof GIF should inspect real .splat coordinates, not browser screenshots."""
     module = _load_script_module(REPO_ROOT / "scripts" / "build_map_quality_gif.py")
     proof_gif = REPO_ROOT / "docs" / "images" / "demo-sweep" / "map-quality.gif"
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
