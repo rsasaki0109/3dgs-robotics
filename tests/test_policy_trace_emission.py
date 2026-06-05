@@ -251,16 +251,19 @@ def test_route_policy_trace_emitter_near_miss_edge_only_fires_once_per_crossing(
     )
     emitter.begin_episode(scene_id="unit-scene", episode_index=0)
     # Step 0: clearance above threshold — no event.
-    assert emitter.record_step(
-        scene_id="unit-scene",
-        episode_index=0,
-        step_index=0,
-        next_observation={"nearest-dynamic-obstacle-distance-meters": 1.0},
-        blocked=False,
-        goal_reached=False,
-        truncated=False,
-        terminated=False,
-    ) == ()
+    assert (
+        emitter.record_step(
+            scene_id="unit-scene",
+            episode_index=0,
+            step_index=0,
+            next_observation={"nearest-dynamic-obstacle-distance-meters": 1.0},
+            blocked=False,
+            goal_reached=False,
+            truncated=False,
+            terminated=False,
+        )
+        == ()
+    )
     # Step 1: crosses threshold — emit one near_miss.
     fired = emitter.record_step(
         scene_id="unit-scene",
@@ -276,27 +279,33 @@ def test_route_policy_trace_emitter_near_miss_edge_only_fires_once_per_crossing(
     assert fired[0].metadata["clearanceMeters"] == pytest.approx(0.4)
     assert fired[0].metadata["thresholdMeters"] == pytest.approx(0.5)
     # Step 2: still below threshold — suppressed by edge detector.
-    assert emitter.record_step(
-        scene_id="unit-scene",
-        episode_index=0,
-        step_index=2,
-        next_observation={"nearest-dynamic-obstacle-distance-meters": 0.3},
-        blocked=False,
-        goal_reached=False,
-        truncated=False,
-        terminated=False,
-    ) == ()
+    assert (
+        emitter.record_step(
+            scene_id="unit-scene",
+            episode_index=0,
+            step_index=2,
+            next_observation={"nearest-dynamic-obstacle-distance-meters": 0.3},
+            blocked=False,
+            goal_reached=False,
+            truncated=False,
+            terminated=False,
+        )
+        == ()
+    )
     # Step 3: clearance recovers above threshold — no event but state resets.
-    assert emitter.record_step(
-        scene_id="unit-scene",
-        episode_index=0,
-        step_index=3,
-        next_observation={"nearest-dynamic-obstacle-distance-meters": 0.9},
-        blocked=False,
-        goal_reached=False,
-        truncated=False,
-        terminated=False,
-    ) == ()
+    assert (
+        emitter.record_step(
+            scene_id="unit-scene",
+            episode_index=0,
+            step_index=3,
+            next_observation={"nearest-dynamic-obstacle-distance-meters": 0.9},
+            blocked=False,
+            goal_reached=False,
+            truncated=False,
+            terminated=False,
+        )
+        == ()
+    )
     # Step 4: crosses again — must fire a fresh event.
     refired = emitter.record_step(
         scene_id="unit-scene",

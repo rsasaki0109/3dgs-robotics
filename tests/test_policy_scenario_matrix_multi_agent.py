@@ -188,9 +188,7 @@ def test_expand_fans_population_across_seeds() -> None:
         assert scenario.metadata["populationSeed"] == expected_seed
         assert scenario.metadata["population"]["agentCountPerScenario"] == 4
         # interactionMetrics ride along on the expanded scenario.
-        assert scenario.metadata["interactionMetrics"]["aggregateKeys"] == [
-            "min-peer-separation"
-        ]
+        assert scenario.metadata["interactionMetrics"]["aggregateKeys"] == ["min-peer-separation"]
 
 
 def test_expand_keeps_legacy_scene_seedless_when_population_absent() -> None:

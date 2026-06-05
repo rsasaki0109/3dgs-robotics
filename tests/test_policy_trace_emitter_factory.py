@@ -112,9 +112,7 @@ def test_evaluate_route_policy_baselines_closes_emitter_on_collection_error() ->
     adapters = (_unit_adapter(),)
     closed: list[str] = []
 
-    def exploding_policy(
-        observation: Mapping[str, float], info: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def exploding_policy(observation: Mapping[str, float], info: Mapping[str, Any]) -> dict[str, Any]:
         del observation, info
         raise RuntimeError("boom")
 
@@ -210,9 +208,7 @@ def _unit_adapter() -> RoutePolicyGymAdapter:
     )
 
 
-def _direct_goal_policy(
-    observation: Mapping[str, float], info: Mapping[str, Any]
-) -> dict[str, Any]:
+def _direct_goal_policy(observation: Mapping[str, float], info: Mapping[str, Any]) -> dict[str, Any]:
     del observation
     return {
         "routeId": f"direct-{info.get('episodeIndex', 0)}-{info.get('stepIndex', 0)}",
@@ -225,9 +221,7 @@ def _goal(position: tuple[float, float, float]) -> Pose3D:
 
 
 def _unit_pose(position: tuple[float, float, float]) -> Pose3D:
-    return Pose3D(
-        position=position, orientation_xyzw=(0.0, 0.0, 0.0, 1.0), frame_id="generic_world"
-    )
+    return Pose3D(position=position, orientation_xyzw=(0.0, 0.0, 0.0, 1.0), frame_id="generic_world")
 
 
 def _build_unit_catalog():

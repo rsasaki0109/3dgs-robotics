@@ -64,8 +64,7 @@ def publish_production_review_bundle(
 
     if not _BUNDLE_ID_RE.match(bundle_id):
         raise PublishError(
-            f"bundle id {bundle_id!r} must be lowercase kebab-case "
-            "(a-z, 0-9, '-'; 1-64 chars; starting with a-z/0-9)"
+            f"bundle id {bundle_id!r} must be lowercase kebab-case (a-z, 0-9, '-'; 1-64 chars; starting with a-z/0-9)"
         )
     if not review_json.is_file():
         raise PublishError(f"review JSON not found: {review_json}")
