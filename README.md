@@ -390,6 +390,8 @@ If an existing browser `.splat` looks cloudy, clean it directly before
 publishing:
 
 ```bash
+gs-mapper splat-inspect --input outputs/my_scene.splat
+
 gs-mapper splat-filter \
     --input outputs/my_scene.splat \
     --output outputs/my_scene.clean.splat \

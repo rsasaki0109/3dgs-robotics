@@ -10,6 +10,7 @@ import numpy as np
 
 from gs_sim2real.viewer.web_export import (
     filter_splat_file,
+    inspect_splat_file,
     ply_to_splat,
     ply_to_binary,
     ply_to_json,
@@ -268,6 +269,43 @@ class TestFilterSplatFile:
         src.write_bytes(b"not a splat")
         with pytest.raises(ValueError, match="32-byte"):
             filter_splat_file(src, tmp_path / "out.splat")
+
+
+class TestInspectSplatFile:
+    """Tests for direct browser .splat health reports."""
+
+    def test_reports_opacity_and_scale_stats(self, tmp_path: Path) -> None:
+        src = tmp_path / "raw.splat"
+        src.write_bytes(
+            b"".join(
+                [
+                    _pack_splat_record((0, 0, 0), (0.1, 0.1, 0.1), 255),
+                    _pack_splat_record((1, 0, 0), (0.2, 0.2, 0.2), 4),
+                    _pack_splat_record((2, 0, 0), (5.0, 5.0, 5.0), 128),
+                    _pack_splat_record((3, 0, 0), (0.3, 0.3, 0.3), 64),
+                ]
+            )
+        )
+
+        report = inspect_splat_file(src, low_opacity_threshold=0.05)
+
+        assert report.input_count == 4
+        assert report.size_bytes == 4 * 32
+        assert report.low_opacity_count == 1
+        assert report.low_opacity_ratio == 0.25
+        assert report.opacity_min == 4 / 255
+        assert report.opacity_max == 1.0
+        assert report.scale_max == 5.0
+        assert report.scale_tail_ratio >= 1.0
+        assert report.as_dict()["input_count"] == 4
+
+    def test_rejects_empty_splat(self, tmp_path: Path) -> None:
+        import pytest
+
+        src = tmp_path / "empty.splat"
+        src.write_bytes(b"")
+        with pytest.raises(ValueError, match="does not contain any splats"):
+            inspect_splat_file(src)
 
 
 class TestPlyToSceneBundle:

@@ -12,6 +12,8 @@ from types import ModuleType
 import pytest
 from PIL import Image
 
+from gs_sim2real.viewer.web_export import inspect_splat_file
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -303,6 +305,20 @@ def test_shared_scene_picker_assets_present(assets_dir: Path) -> None:
         assert (REPO_ROOT / "docs" / url).is_file(), f"scenes-list.json points at missing asset {url}"
         assert preview, f"scenes-list.json scene {url} is missing preview"
         assert (REPO_ROOT / "docs" / preview).is_file(), f"scenes-list.json points at missing preview {preview}"
+
+
+def test_production_splats_have_bounded_blurry_gaussian_bulk() -> None:
+    """Production picker splats should not ship a large population of oversized low-opacity blur."""
+    for scene in _scene_picker_scenes():
+        report = inspect_splat_file(REPO_ROOT / "docs" / scene["url"])
+        assert report.scale_p98 <= 0.5, (
+            f"{scene['url']} has a large blurry-gaussian bulk; "
+            f"scale_p98={report.scale_p98:.3f}, scale_max={report.scale_max:.3f}"
+        )
+        assert report.opacity_p10 >= 0.02, (
+            f"{scene['url']} has too many near-transparent splats; "
+            f"opacity_p10={report.opacity_p10:.3f}, low_opacity_ratio={report.low_opacity_ratio:.1%}"
+        )
 
 
 def test_scene_count_matches_documented_production_bundle() -> None:
