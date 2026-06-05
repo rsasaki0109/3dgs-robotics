@@ -408,6 +408,31 @@ def test_index_scene_showcase_covers_every_production_scene() -> None:
     assert 'href="reviews/"' in html
 
 
+def test_index_surfaces_interactive_mission_control_proof() -> None:
+    """The landing page should connect splats to route-policy CI artifacts."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert 'id="mission-control-section"' in html
+    assert "Turn a splat scene into a robot mission" in html
+    assert "Physical AI mission proof" in html
+    assert "reviews/smoke-route-policy-ci/index.html" in html
+    assert "reviews/" in html
+    assert "images/demo-sweep/01_outdoor-demo.png" in html
+    assert "mission-route-path" in html
+    assert "mission-hazard" in html
+    assert len(re.findall(r'class="mission-step-button(?: active)?"', html)) == 5
+    assert len(re.findall(r'data-mission-step="', html)) == 5
+    assert len(re.findall(r'data-mission-node="', html)) == 5
+    assert "Scene catalog becomes simulator input." in html
+    assert "Noise and dynamic obstacles stress the policy." in html
+    assert "Peer-aware runs expose interaction risk." in html
+    assert "The result is a reviewable, adoptable workflow." in html
+    assert "missionSteps" in html
+    assert "textContent = step.title" in html
+    assert "classList.toggle('active'" in html
+    assert "PASS / ADOPTED" in html
+    assert "multi-agent" in html
+
+
 def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
     """The Pages landing page should read as an outdoor-GS demo, not a generic prototype."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")

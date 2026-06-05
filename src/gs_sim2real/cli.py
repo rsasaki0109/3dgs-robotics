@@ -1743,10 +1743,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--half-width-seconds",
         type=float,
         default=0.5,
-        help=(
-            "Half-width of the synthesized window around each point event "
-            "(window = [t - hw, t + hw]; default: 0.5)"
-        ),
+        help=("Half-width of the synthesized window around each point event (window = [t - hw, t + hw]; default: 0.5)"),
     )
     rpt2ew.add_argument(
         "--time-offset-seconds",

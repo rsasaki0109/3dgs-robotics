@@ -278,12 +278,8 @@ def test_legacy_ego_only_matrix_round_trips_without_multi_agent_fields() -> None
                 scene_catalog="scenes.json",
             ),
         ),
-        goal_suites=(
-            RoutePolicyMatrixGoalSuiteSpec(goal_suite_key="near-goals"),
-        ),
-        configs=(
-            RoutePolicyMatrixConfigSpec(config_id="default"),
-        ),
+        goal_suites=(RoutePolicyMatrixGoalSuiteSpec(goal_suite_key="near-goals"),),
+        configs=(RoutePolicyMatrixConfigSpec(config_id="default"),),
     )
     payload = matrix.to_dict()
     # PR D does not introduce any new top-level keys; pre-PR-D fixtures

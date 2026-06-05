@@ -24,9 +24,7 @@ SAMPLE_REVIEW_PATH = REPO_ROOT / "docs" / "reviews" / "smoke-route-policy-ci" / 
 
 
 def _load_script_module():
-    spec = importlib.util.spec_from_file_location(
-        "publish_production_review_bundle", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("publish_production_review_bundle", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

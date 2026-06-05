@@ -431,9 +431,7 @@ def merge_route_policy_scenario_shard_runs(
                 metadata=run.metadata,
             )
         )
-    interaction_metrics_aggregate = aggregate_interaction_metrics_across_scenarios(
-        scenario_metadatas
-    )
+    interaction_metrics_aggregate = aggregate_interaction_metrics_across_scenarios(scenario_metadatas)
 
     history = build_route_policy_benchmark_history(
         tuple(report_paths),
@@ -627,9 +625,7 @@ def route_policy_scenario_shard_merge_from_dict(
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         interaction_metrics_aggregate=None
         if aggregate_payload is None
-        else interaction_metrics_aggregate_from_dict(
-            _mapping(aggregate_payload, "interactionMetricsAggregate")
-        ),
+        else interaction_metrics_aggregate_from_dict(_mapping(aggregate_payload, "interactionMetricsAggregate")),
         version=version,
     )
 

@@ -54,9 +54,7 @@ def _load_index_module():
 def _sample_aggregate() -> InteractionMetricsAggregate:
     return InteractionMetricsAggregate(
         per_key_stats={
-            "min-peer-separation": InteractionMetricKeyStats(
-                mean=0.42, p95=0.5, maximum=0.8, sample_count=12
-            ),
+            "min-peer-separation": InteractionMetricKeyStats(mean=0.42, p95=0.5, maximum=0.8, sample_count=12),
         },
         sample_scenario_count=12,
     )

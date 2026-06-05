@@ -48,9 +48,7 @@ INTERACTION_METRICS_AGGREGATE_VERSION = "gs-mapper-route-policy-interaction-metr
 SCENARIO_INTERACTION_METRIC_VALUES_KEY = "interactionMetricsValues"
 
 AGENT_ROLES: frozenset[str] = frozenset({"ego", "peer-obstacle", "peer-coop"})
-BUILTIN_POLICIES: frozenset[str] = frozenset(
-    {"waypoint", "chase", "flee", "maintain_separation"}
-)
+BUILTIN_POLICIES: frozenset[str] = frozenset({"waypoint", "chase", "flee", "maintain_separation"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,26 +75,15 @@ class AgentRoleSpec:
         if not str(self.agent_id):
             raise ValueError("agent_id must not be empty")
         if self.role not in AGENT_ROLES:
-            raise ValueError(
-                f"role {self.role!r} must be one of {sorted(AGENT_ROLES)!r}"
-            )
+            raise ValueError(f"role {self.role!r} must be one of {sorted(AGENT_ROLES)!r}")
         if (self.start_pose is None) == (self.start_volume is None):
-            raise ValueError(
-                "exactly one of start_pose / start_volume must be set"
-            )
+            raise ValueError("exactly one of start_pose / start_volume must be set")
         if self.policy_ref is not None and self.builtin_policy is not None:
-            raise ValueError(
-                "policy_ref and builtin_policy are mutually exclusive"
-            )
+            raise ValueError("policy_ref and builtin_policy are mutually exclusive")
         if self.builtin_policy is not None and self.builtin_policy not in BUILTIN_POLICIES:
-            raise ValueError(
-                f"builtin_policy {self.builtin_policy!r} must be one of "
-                f"{sorted(BUILTIN_POLICIES)!r}"
-            )
+            raise ValueError(f"builtin_policy {self.builtin_policy!r} must be one of {sorted(BUILTIN_POLICIES)!r}")
         if self.role != "ego" and self.policy_ref is None and self.builtin_policy is None:
-            raise ValueError(
-                f"peer role {self.role!r} requires policy_ref or builtin_policy"
-            )
+            raise ValueError(f"peer role {self.role!r} requires policy_ref or builtin_policy")
         if int(self.seed_offset) < 0:
             raise ValueError("seed_offset must be non-negative")
         object.__setattr__(self, "seed_offset", int(self.seed_offset))
@@ -164,25 +151,18 @@ class PopulationSpec:
         unknown = sorted(set(self.peer_role_distribution) - BUILTIN_POLICIES)
         if unknown:
             raise ValueError(
-                f"peer_role_distribution keys must be a subset of "
-                f"{sorted(BUILTIN_POLICIES)!r}; got unknown {unknown!r}"
+                f"peer_role_distribution keys must be a subset of {sorted(BUILTIN_POLICIES)!r}; got unknown {unknown!r}"
             )
         weights = list(self.peer_role_distribution.values())
         for key, weight in self.peer_role_distribution.items():
             numeric = float(weight)
             if not math.isfinite(numeric):
-                raise ValueError(
-                    f"peer_role_distribution[{key!r}] must be finite"
-                )
+                raise ValueError(f"peer_role_distribution[{key!r}] must be finite")
             if numeric < 0.0 or numeric > 1.0:
-                raise ValueError(
-                    f"peer_role_distribution[{key!r}]={numeric} must lie in [0, 1]"
-                )
+                raise ValueError(f"peer_role_distribution[{key!r}]={numeric} must lie in [0, 1]")
         total = sum(float(weight) for weight in weights)
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-6):
-            raise ValueError(
-                f"peer_role_distribution weights must sum to 1.0 (got {total})"
-            )
+            raise ValueError(f"peer_role_distribution weights must sum to 1.0 (got {total})")
         normalised = {str(key): float(value) for key, value in sorted(self.peer_role_distribution.items())}
         object.__setattr__(self, "agent_count_per_scenario", int(self.agent_count_per_scenario))
         object.__setattr__(self, "random_seed", int(self.random_seed))
@@ -242,23 +222,17 @@ class InteractionMetricsSpec:
         if self.min_separation_meters is not None:
             value = float(self.min_separation_meters)
             if not math.isfinite(value) or value <= 0.0:
-                raise ValueError(
-                    "min_separation_meters must be positive and finite"
-                )
+                raise ValueError("min_separation_meters must be positive and finite")
             object.__setattr__(self, "min_separation_meters", value)
         if self.pairwise_clearance_histogram_bins is not None:
             bins = tuple(float(bin_value) for bin_value in self.pairwise_clearance_histogram_bins)
             if len(bins) < 2:
-                raise ValueError(
-                    "pairwise_clearance_histogram_bins must contain at least two edges"
-                )
+                raise ValueError("pairwise_clearance_histogram_bins must contain at least two edges")
             for left, right in zip(bins, bins[1:]):
                 if not math.isfinite(left) or not math.isfinite(right):
                     raise ValueError("pairwise_clearance_histogram_bins entries must be finite")
                 if right <= left:
-                    raise ValueError(
-                        "pairwise_clearance_histogram_bins must be strictly increasing"
-                    )
+                    raise ValueError("pairwise_clearance_histogram_bins must be strictly increasing")
             object.__setattr__(self, "pairwise_clearance_histogram_bins", bins)
         object.__setattr__(self, "require_ego_survives", bool(self.require_ego_survives))
         object.__setattr__(self, "metadata", _json_mapping(self.metadata))
@@ -273,9 +247,7 @@ class InteractionMetricsSpec:
         if self.min_separation_meters is not None:
             payload["minSeparationMeters"] = float(self.min_separation_meters)
         if self.pairwise_clearance_histogram_bins is not None:
-            payload["pairwiseClearanceHistogramBins"] = list(
-                self.pairwise_clearance_histogram_bins
-            )
+            payload["pairwiseClearanceHistogramBins"] = list(self.pairwise_clearance_histogram_bins)
         if self.metadata:
             payload["metadata"] = dict(self.metadata)
         return payload
@@ -295,14 +267,10 @@ def agent_role_spec_from_dict(payload: Mapping[str, Any]) -> AgentRoleSpec:
         agent_id=str(payload["agentId"]),
         role=str(payload["role"]),
         start_pose=None if start_pose_payload is None else _pose_from_dict(start_pose_payload),
-        start_volume=None
-        if start_volume_payload is None
-        else _bounds_from_dict(start_volume_payload),
+        start_volume=None if start_volume_payload is None else _bounds_from_dict(start_volume_payload),
         goal_pose=None if goal_pose_payload is None else _pose_from_dict(goal_pose_payload),
         policy_ref=None if payload.get("policyRef") is None else str(payload["policyRef"]),
-        builtin_policy=None
-        if payload.get("builtinPolicy") is None
-        else str(payload["builtinPolicy"]),
+        builtin_policy=None if payload.get("builtinPolicy") is None else str(payload["builtinPolicy"]),
         seed_offset=int(payload.get("seedOffset", 0)),
         metadata=dict(metadata_payload),
     )
@@ -323,9 +291,7 @@ def population_spec_from_dict(payload: Mapping[str, Any]) -> PopulationSpec:
         raise ValueError("PopulationSpec metadata must be a mapping")
     return PopulationSpec(
         agent_count_per_scenario=int(payload["agentCountPerScenario"]),
-        peer_role_distribution={
-            str(key): float(value) for key, value in distribution_payload.items()
-        },
+        peer_role_distribution={str(key): float(value) for key, value in distribution_payload.items()},
         random_seed=int(payload["randomSeed"]),
         spawn_volume=_bounds_from_dict(spawn_volume_payload),
         homogeneous=bool(payload.get("homogeneous", False)),
@@ -341,18 +307,13 @@ def interaction_metrics_spec_from_dict(
 
     _check_version(payload, INTERACTION_METRICS_SPEC_VERSION)
     aggregate_keys_payload = payload.get("aggregateKeys")
-    if not isinstance(aggregate_keys_payload, Sequence) or isinstance(
-        aggregate_keys_payload, (str, bytes, bytearray)
-    ):
+    if not isinstance(aggregate_keys_payload, Sequence) or isinstance(aggregate_keys_payload, (str, bytes, bytearray)):
         raise ValueError("InteractionMetricsSpec aggregateKeys must be a list of strings")
     bins_payload = payload.get("pairwiseClearanceHistogramBins")
     if bins_payload is not None and (
-        not isinstance(bins_payload, Sequence)
-        or isinstance(bins_payload, (str, bytes, bytearray))
+        not isinstance(bins_payload, Sequence) or isinstance(bins_payload, (str, bytes, bytearray))
     ):
-        raise ValueError(
-            "InteractionMetricsSpec pairwiseClearanceHistogramBins must be a list of floats"
-        )
+        raise ValueError("InteractionMetricsSpec pairwiseClearanceHistogramBins must be a list of floats")
     metadata_payload = payload.get("metadata") or {}
     if not isinstance(metadata_payload, Mapping):
         raise ValueError("InteractionMetricsSpec metadata must be a mapping")
@@ -419,10 +380,7 @@ class InteractionMetricsAggregate:
         if int(self.sample_scenario_count) < 1:
             raise ValueError("sample_scenario_count must be >= 1")
         # Normalise key ordering so the JSON output is stable.
-        ordered = {
-            str(key): self.per_key_stats[key]
-            for key in sorted(self.per_key_stats)
-        }
+        ordered = {str(key): self.per_key_stats[key] for key in sorted(self.per_key_stats)}
         object.__setattr__(self, "per_key_stats", ordered)
         object.__setattr__(self, "sample_scenario_count", int(self.sample_scenario_count))
 
@@ -430,9 +388,7 @@ class InteractionMetricsAggregate:
         return {
             "recordType": "route-policy-interaction-metrics-aggregate",
             "version": INTERACTION_METRICS_AGGREGATE_VERSION,
-            "perKeyStats": {
-                key: stats.to_dict() for key, stats in self.per_key_stats.items()
-            },
+            "perKeyStats": {key: stats.to_dict() for key, stats in self.per_key_stats.items()},
             "sampleScenarioCount": int(self.sample_scenario_count),
         }
 
@@ -569,9 +525,7 @@ def synthesize_peer_roster_from_scenario_metadata(
             raise ValueError("scenario metadata 'population' must be a mapping")
         seed_value = metadata.get("populationSeed")
         if seed_value is None:
-            raise ValueError(
-                "scenario metadata 'population' requires 'populationSeed' (set by the matrix expander)"
-            )
+            raise ValueError("scenario metadata 'population' requires 'populationSeed' (set by the matrix expander)")
         obstacles.extend(
             _population_to_dynamic_obstacles(
                 population_payload,
@@ -642,9 +596,7 @@ def _population_to_dynamic_obstacles(
     role_weights = tuple(spec.peer_role_distribution.values())
     bounds = spec.spawn_volume
     obstacles: list[DynamicObstacle] = []
-    chosen_role = (
-        rng.choices(role_keys, weights=role_weights, k=1)[0] if spec.homogeneous else None
-    )
+    chosen_role = rng.choices(role_keys, weights=role_weights, k=1)[0] if spec.homogeneous else None
     for index in range(peer_count):
         role_choice = chosen_role or rng.choices(role_keys, weights=role_weights, k=1)[0]
         start_x = rng.uniform(bounds.minimum.x, bounds.maximum.x)
@@ -702,9 +654,7 @@ def _pose_from_dict(payload: Mapping[str, Any]) -> Pose3D:
         position=(position[0], position[1], position[2]),
         orientation_xyzw=(orientation[0], orientation[1], orientation[2], orientation[3]),
         frame_id=str(payload.get("frameId", "world")),
-        timestamp_seconds=None
-        if payload.get("timestampSeconds") is None
-        else float(payload["timestampSeconds"]),
+        timestamp_seconds=None if payload.get("timestampSeconds") is None else float(payload["timestampSeconds"]),
     )
 
 
@@ -721,9 +671,7 @@ def _bounds_from_dict(payload: Mapping[str, Any]) -> AxisAlignedBounds:
 
 def _float_tuple(value: Any, expected_size: int, field_name: str) -> tuple[float, ...]:
     if not isinstance(value, (list, tuple)) or len(value) != expected_size:
-        raise ValueError(
-            f"{field_name} must be a list of {expected_size} numbers"
-        )
+        raise ValueError(f"{field_name} must be a list of {expected_size} numbers")
     return tuple(float(component) for component in value)
 
 

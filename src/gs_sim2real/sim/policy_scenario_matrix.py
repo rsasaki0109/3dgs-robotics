@@ -83,9 +83,7 @@ class RoutePolicyMatrixSceneSpec:
         if not str(self.scene_catalog):
             raise ValueError("scene_catalog must not be empty")
         if self.agents and self.population is not None:
-            raise ValueError(
-                "agents and population are mutually exclusive on a scene spec"
-            )
+            raise ValueError("agents and population are mutually exclusive on a scene spec")
         if self.agents:
             agent_ids = tuple(spec.agent_id for spec in self.agents)
             if len(set(agent_ids)) != len(agent_ids):
@@ -220,9 +218,7 @@ class RoutePolicyScenarioMatrix:
     @property
     def scenario_count_per_set(self) -> int:
         suite_config = len(self.goal_suites) * len(self.configs)
-        scene_seed_total = sum(
-            len(_scene_population_seeds(scene)) for scene in self.scenes
-        )
+        scene_seed_total = sum(len(_scene_population_seeds(scene)) for scene in self.scenes)
         return scene_seed_total * suite_config
 
     def to_dict(self) -> dict[str, Any]:
@@ -474,9 +470,7 @@ def route_policy_matrix_scene_spec_from_dict(payload: Mapping[str, Any]) -> Rout
 
     _record_type(payload, "route-policy-matrix-scene")
     agents_payload = payload.get("agents") or ()
-    if isinstance(agents_payload, (str, bytes, bytearray)) or not isinstance(
-        agents_payload, Sequence
-    ):
+    if isinstance(agents_payload, (str, bytes, bytearray)) or not isinstance(agents_payload, Sequence):
         raise ValueError("scene 'agents' must be a list of agent role specs")
     population_payload = payload.get("population")
     interaction_metrics_payload = payload.get("interactionMetrics")
@@ -486,18 +480,13 @@ def route_policy_matrix_scene_spec_from_dict(payload: Mapping[str, Any]) -> Rout
         scene_id=None if payload.get("sceneId") is None else str(payload["sceneId"]),
         site_url=None if payload.get("siteUrl") is None else str(payload["siteUrl"]),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
-        agents=tuple(
-            agent_role_spec_from_dict(_mapping(item, "agents[i]"))
-            for item in agents_payload
-        ),
+        agents=tuple(agent_role_spec_from_dict(_mapping(item, "agents[i]")) for item in agents_payload),
         population=None
         if population_payload is None
         else population_spec_from_dict(_mapping(population_payload, "population")),
         interaction_metrics=None
         if interaction_metrics_payload is None
-        else interaction_metrics_spec_from_dict(
-            _mapping(interaction_metrics_payload, "interactionMetrics")
-        ),
+        else interaction_metrics_spec_from_dict(_mapping(interaction_metrics_payload, "interactionMetrics")),
     )
 
 

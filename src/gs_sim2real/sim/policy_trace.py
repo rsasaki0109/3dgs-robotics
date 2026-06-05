@@ -123,14 +123,12 @@ def policy_trace_event_from_dict(payload: Mapping[str, Any]) -> PolicyTraceEvent
     record_type = payload.get("recordType")
     if record_type is not None and record_type != "route-policy-trace-event":
         raise ValueError(
-            f"unexpected policy trace event recordType: {record_type!r} "
-            "(expected 'route-policy-trace-event')"
+            f"unexpected policy trace event recordType: {record_type!r} (expected 'route-policy-trace-event')"
         )
     version = payload.get("version")
     if version is not None and version != ROUTE_POLICY_TRACE_EVENT_VERSION:
         raise ValueError(
-            f"unsupported policy trace event version: {version!r} "
-            f"(expected {ROUTE_POLICY_TRACE_EVENT_VERSION!r})"
+            f"unsupported policy trace event version: {version!r} (expected {ROUTE_POLICY_TRACE_EVENT_VERSION!r})"
         )
     tags_payload = payload.get("tags") or ()
     if isinstance(tags_payload, (str, bytes, bytearray)):
@@ -161,9 +159,7 @@ def write_policy_trace_jsonl(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     for event in events:
-        lines.append(
-            json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
-        )
+        lines.append(json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False))
     output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     return output_path
 
@@ -220,11 +216,8 @@ def extract_policy_trace_events_from_dataset(
     for episode in dataset.episodes:
         episode_offset = float(offsets.get(episode.episode_id, 0.0))
         for transition in episode.transitions:
-            if (
-                near_miss_clearance_meters is not None
-                and _maybe_below_threshold(
-                    transition.next_observation, near_miss_feature_key, near_miss_clearance_meters
-                )
+            if near_miss_clearance_meters is not None and _maybe_below_threshold(
+                transition.next_observation, near_miss_feature_key, near_miss_clearance_meters
             ):
                 events.append(
                     _build_event(
@@ -234,9 +227,7 @@ def extract_policy_trace_events_from_dataset(
                         segment_duration_seconds=segment_duration_seconds,
                         time_offset_seconds=time_offset_seconds + episode_offset,
                         metadata={
-                            "clearanceMeters": float(
-                                transition.next_observation[near_miss_feature_key]
-                            ),
+                            "clearanceMeters": float(transition.next_observation[near_miss_feature_key]),
                             "thresholdMeters": float(near_miss_clearance_meters),
                             "featureKey": near_miss_feature_key,
                         },
@@ -500,10 +491,7 @@ class JsonlPolicyTraceEventStream(AbstractContextManager["JsonlPolicyTraceEventS
     def emit(self, event: PolicyTraceEvent) -> None:
         if self._closed or self._handle is None:
             raise RuntimeError("JsonlPolicyTraceEventStream is closed")
-        self._handle.write(
-            json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
-            + "\n"
-        )
+        self._handle.write(json.dumps(event.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
         self._handle.flush()
 
     def close(self) -> None:
@@ -543,9 +531,7 @@ class PolicyTraceEmissionConfig:
     episode_id_template: str = "{scene_id}-episode-{episode_index}"
 
     def __post_init__(self) -> None:
-        if self.segment_duration_seconds <= 0.0 or not math.isfinite(
-            self.segment_duration_seconds
-        ):
+        if self.segment_duration_seconds <= 0.0 or not math.isfinite(self.segment_duration_seconds):
             raise ValueError("segment_duration_seconds must be positive and finite")
         if self.near_miss_clearance_meters is not None:
             threshold = float(self.near_miss_clearance_meters)
@@ -555,9 +541,7 @@ class PolicyTraceEmissionConfig:
         if not str(self.near_miss_feature_key):
             raise ValueError("near_miss_feature_key must not be empty")
         if "{episode_index}" not in self.episode_id_template:
-            raise ValueError(
-                "episode_id_template must reference {episode_index} to stay unique per episode"
-            )
+            raise ValueError("episode_id_template must reference {episode_index} to stay unique per episode")
 
 
 class RoutePolicyTraceEmitter:
@@ -617,27 +601,16 @@ class RoutePolicyTraceEmitter:
         """Emit any events for the just-completed step, return them in order."""
 
         if not self._episode_open or self._episode_id is None:
-            raise RuntimeError(
-                "RoutePolicyTraceEmitter.record_step called without begin_episode"
-            )
+            raise RuntimeError("RoutePolicyTraceEmitter.record_step called without begin_episode")
         events: list[PolicyTraceEvent] = []
         config = self._config
-        timestamp = (
-            config.time_offset_seconds
-            + float(step_index + 1) * config.segment_duration_seconds
-        )
+        timestamp = config.time_offset_seconds + float(step_index + 1) * config.segment_duration_seconds
         clearance_payload = next_observation.get(config.near_miss_feature_key)
         clearance_numeric = _coerce_finite_float(clearance_payload)
         threshold = config.near_miss_clearance_meters
-        is_below_now = (
-            threshold is not None
-            and clearance_numeric is not None
-            and clearance_numeric <= threshold
-        )
+        is_below_now = threshold is not None and clearance_numeric is not None and clearance_numeric <= threshold
         should_emit_near_miss = (
-            threshold is not None
-            and is_below_now
-            and (not config.near_miss_edge_only or not self._near_miss_below)
+            threshold is not None and is_below_now and (not config.near_miss_edge_only or not self._near_miss_below)
         )
         if should_emit_near_miss:
             assert threshold is not None  # narrowed above

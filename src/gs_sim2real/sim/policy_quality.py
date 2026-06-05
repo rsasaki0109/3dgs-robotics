@@ -322,8 +322,7 @@ def _fresh_route_policy_adapters(
     emitter: RoutePolicyTraceEmitter | None = None,
 ) -> tuple[RoutePolicyGymAdapter, ...]:
     return tuple(
-        RoutePolicyGymAdapter(adapter.environment, adapter.config, trace_emitter=emitter)
-        for adapter in adapters
+        RoutePolicyGymAdapter(adapter.environment, adapter.config, trace_emitter=emitter) for adapter in adapters
     )
 
 

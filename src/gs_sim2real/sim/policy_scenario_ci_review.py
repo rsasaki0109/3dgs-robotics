@@ -930,12 +930,7 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
         )
         for key, stats in aggregate.per_key_stats.items():
             lines.append(
-                "| "
-                f"`{key}` | "
-                f"{stats.mean:.4f} | "
-                f"{stats.p95:.4f} | "
-                f"{stats.maximum:.4f} | "
-                f"{stats.sample_count} |"
+                f"| `{key}` | {stats.mean:.4f} | {stats.p95:.4f} | {stats.maximum:.4f} | {stats.sample_count} |"
             )
     if artifact.correlation_reports:
         lines.append("")
@@ -1088,9 +1083,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     )
     correlation_section = _render_correlation_section_html(artifact)
     interaction_section = _render_interaction_metrics_section_html(artifact.interaction_metrics_aggregate)
-    multi_agent_badge = (
-        '<span class="pill multi-agent">Multi-agent</span>' if artifact.multi_agent else ""
-    )
+    multi_agent_badge = '<span class="pill multi-agent">Multi-agent</span>' if artifact.multi_agent else ""
     adoption_section = _render_adoption_section_html(artifact.adoption)
     provenance_section = _render_provenance_section_html(artifact.provenance)
     return f"""<!doctype html>
@@ -1571,9 +1564,9 @@ def _render_interaction_metrics_section_html(
         for key, stats in aggregate.per_key_stats.items()
     )
     return (
-        '<section><h2>Multi-agent interaction metrics</h2>'
+        "<section><h2>Multi-agent interaction metrics</h2>"
         f"<p>Contributing scenarios: {aggregate.sample_scenario_count}</p>"
-        '<table><thead><tr><th>Key</th><th>Mean</th><th>p95</th><th>Max</th><th>Sample count</th></tr></thead>'
+        "<table><thead><tr><th>Key</th><th>Mean</th><th>p95</th><th>Max</th><th>Sample count</th></tr></thead>"
         f"<tbody>{rows}</tbody></table></section>"
     )
 

@@ -36,9 +36,7 @@ def test_replan_after_blocked_rollout_forwards_emitter_to_recovery_rollout(
     env.reset("unit-scene")
     start = env.state.pose
     outside = _pose_like(start, position=(2.0, 0.0, 0.0))
-    rollout = rollout_route(
-        env, RouteCandidate("blocked", (start, outside)), action_type="teleport"
-    )
+    rollout = rollout_route(env, RouteCandidate("blocked", (start, outside)), action_type="teleport")
     goal = _pose_like(start, position=(0.5, 0.0, 0.0))
 
     sink = tmp_path / "trace.jsonl"
@@ -70,9 +68,7 @@ def test_replan_after_blocked_rollout_skips_emitter_when_not_executing() -> None
     env.reset("unit-scene")
     start = env.state.pose
     outside = _pose_like(start, position=(2.0, 0.0, 0.0))
-    rollout = rollout_route(
-        env, RouteCandidate("blocked", (start, outside)), action_type="teleport"
-    )
+    rollout = rollout_route(env, RouteCandidate("blocked", (start, outside)), action_type="teleport")
     goal = _pose_like(start, position=(0.5, 0.0, 0.0))
 
     begin_calls: list[tuple[str, int]] = []

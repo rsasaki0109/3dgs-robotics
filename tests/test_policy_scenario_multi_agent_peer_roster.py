@@ -48,12 +48,7 @@ from gs_sim2real.sim import (
 
 
 def test_synthesizer_returns_none_for_legacy_metadata() -> None:
-    assert (
-        synthesize_peer_roster_from_scenario_metadata(
-            {"matrixId": "legacy", "sceneKey": "ego-only"}
-        )
-        is None
-    )
+    assert synthesize_peer_roster_from_scenario_metadata({"matrixId": "legacy", "sceneKey": "ego-only"}) is None
 
 
 def test_synthesizer_drops_ego_and_keeps_peers() -> None:
@@ -86,10 +81,7 @@ def test_synthesizer_drops_ego_and_keeps_peers() -> None:
     assert timeline is not None
     obstacle_ids = tuple(obstacle.obstacle_id for obstacle in timeline.obstacles)
     assert obstacle_ids == ("peer-a", "peer-b"), "ego must not appear as an obstacle"
-    assert all(
-        obstacle.radius_meters == pytest.approx(DEFAULT_PEER_RADIUS_METERS)
-        for obstacle in timeline.obstacles
-    )
+    assert all(obstacle.radius_meters == pytest.approx(DEFAULT_PEER_RADIUS_METERS) for obstacle in timeline.obstacles)
 
 
 def test_synthesizer_maps_builtin_policy_to_obstacle_policy_class() -> None:
@@ -150,19 +142,13 @@ def test_synthesizer_population_is_deterministic_in_seed() -> None:
     first = synthesize_peer_roster_from_scenario_metadata(scenario.metadata)
     second = synthesize_peer_roster_from_scenario_metadata(scenario.metadata)
     assert first is not None and second is not None
-    first_positions = [
-        obstacle.waypoints[0].position for obstacle in first.obstacles
-    ]
-    second_positions = [
-        obstacle.waypoints[0].position for obstacle in second.obstacles
-    ]
+    first_positions = [obstacle.waypoints[0].position for obstacle in first.obstacles]
+    second_positions = [obstacle.waypoints[0].position for obstacle in second.obstacles]
     assert first_positions == second_positions
 
 
 def test_synthesizer_population_differs_across_seeds() -> None:
-    matrix = _matrix_with_population(
-        _unit_population(agent_count_per_scenario=3, random_seed=1, seed_count=2)
-    )
+    matrix = _matrix_with_population(_unit_population(agent_count_per_scenario=3, random_seed=1, seed_count=2))
     scenarios = expand_route_policy_scenario_matrix(matrix)[0].scenarios
     assert len(scenarios) == 2
     first = synthesize_peer_roster_from_scenario_metadata(scenarios[0].metadata)
