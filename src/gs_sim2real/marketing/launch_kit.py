@@ -15,7 +15,7 @@ DEFAULT_SPARK_VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat_spark.
 DEFAULT_WEBGPU_VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html"
 DEFAULT_PHYSICAL_AI_DOC_URL = "https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md"
 DEFAULT_HERO_IMAGE = "images/demo-sweep/hero.gif"
-DEFAULT_SOCIAL_IMAGE_URL = "https://rsasaki0109.github.io/gs-mapper/images/demo-sweep/01_outdoor-demo.png"
+DEFAULT_SOCIAL_IMAGE_URL = "https://rsasaki0109.github.io/gs-mapper/images/social-card.png"
 
 
 @dataclass(frozen=True, slots=True)

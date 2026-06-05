@@ -355,6 +355,26 @@ def test_demo_sweep_enhancement_script_and_hero_gif_cover_production_scenes() ->
         assert getattr(image, "n_frames", 1) >= len(_scene_picker_scenes())
 
 
+def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
+    """The README first screen should quickly answer what to click and why to star."""
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI." in readme
+    assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
+    assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
+    assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
+    assert "Kinetic 3DGS sweep from real outdoor robot logs" in readme
+
+
+def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
+    """The share image should be a real 1200x630 card, not an arbitrary scene thumbnail."""
+    card = REPO_ROOT / "docs" / "images" / "social-card.png"
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert card.stat().st_size > 100_000
+    with Image.open(card) as image:
+        assert image.size == (1200, 630)
+    assert "https://rsasaki0109.github.io/gs-mapper/images/social-card.png" in html
+
+
 def test_splat_html_supports_embed_mode() -> None:
     """splat.html must honor ?embed=1 so index.html can inline the viewer as a hero."""
     html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
