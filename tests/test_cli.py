@@ -455,6 +455,33 @@ class TestCLIHelp:
         assert resolved.iterations == 7000
         assert resolved.splat_max_scale_percentile == 99.5
 
+    def test_cli_splat_filter_flags(self) -> None:
+        """splat-filter parser accepts cleanup thresholds for existing browser splats."""
+        args = build_parser().parse_args(
+            [
+                "splat-filter",
+                "--input",
+                "scene.splat",
+                "--output",
+                "scene.clean.splat",
+                "--min-opacity",
+                "0.08",
+                "--max-scale",
+                "1.0",
+                "--max-scale-percentile",
+                "98",
+                "--max-points",
+                "250000",
+            ]
+        )
+        assert args.command == "splat-filter"
+        assert args.input == "scene.splat"
+        assert args.output == "scene.clean.splat"
+        assert args.min_opacity == 0.08
+        assert args.max_scale == 1.0
+        assert args.max_scale_percentile == 98.0
+        assert args.max_points == 250000
+
     def test_cli_photos_to_splat_mast3r(self) -> None:
         """photos-to-splat accepts mast3r as a pose-estimation backend."""
         args = build_parser().parse_args(

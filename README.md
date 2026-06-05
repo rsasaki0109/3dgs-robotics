@@ -386,6 +386,17 @@ gs-mapper export \
     --splat-max-scale-percentile 98
 ```
 
+If an existing browser `.splat` looks cloudy, clean it directly before
+publishing:
+
+```bash
+gs-mapper splat-filter \
+    --input outputs/my_scene.splat \
+    --output outputs/my_scene.clean.splat \
+    --min-opacity 0.08 \
+    --max-scale-percentile 98
+```
+
 Preview locally with `python -m http.server` from the repo root and open
 `http://localhost:8000/docs/splat.html?url=<path-to-splat>`.
 

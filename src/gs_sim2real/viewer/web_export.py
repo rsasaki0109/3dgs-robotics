@@ -10,11 +10,109 @@ from __future__ import annotations
 import json
 import logging
 import struct
+from dataclasses import dataclass
 from pathlib import Path
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
+SPLAT_RECORD_BYTES = 32
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+@dataclass(frozen=True, slots=True)
+class SplatFilterReport:
+    """Summary of a direct .splat cleanup pass."""
+
+    input_count: int
+    output_count: int
+    min_opacity: float
+    max_scale: float | None
+    max_scale_percentile: float | None
+    adaptive_max_scale: float | None
+    max_points: int | None
+
+    @property
+    def kept_ratio(self) -> float:
+        if self.input_count == 0:
+            return 0.0
+        return self.output_count / self.input_count
+
+
+def _percentile(sorted_values: list[float], percentile: float) -> float:
+    if not sorted_values:
+        raise ValueError("cannot compute percentile for an empty sequence")
+    if not 0.0 < percentile <= 100.0:
+        raise ValueError("max_scale_percentile must be in the range (0, 100]")
+    index = round((len(sorted_values) - 1) * (percentile / 100.0))
+    return sorted_values[min(len(sorted_values) - 1, max(0, index))]
+
+
+def filter_splat_file(
+    input_path: str | Path,
+    output_path: str | Path,
+    *,
+    min_opacity: float = 0.0,
+    max_scale: float | None = None,
+    max_scale_percentile: float | None = None,
+    max_points: int | None = None,
+) -> SplatFilterReport:
+    """Filter an existing antimatter15 .splat binary without requiring the source PLY.
+
+    This is useful when a browser export looks cloudy: oversized or nearly
+    transparent gaussians can dominate the WebGL blend even though they carry
+    little map structure. Records are kept in their original order so exports
+    that were already sorted by importance remain stable.
+    """
+
+    src = Path(input_path)
+    dst = Path(output_path)
+    data = src.read_bytes()
+    if len(data) % SPLAT_RECORD_BYTES:
+        raise ValueError(f"{src} is not a 32-byte-per-gaussian .splat file")
+
+    count = len(data) // SPLAT_RECORD_BYTES
+    scale_max_values: list[float] = []
+    for index in range(count):
+        offset = index * SPLAT_RECORD_BYTES + 12
+        scale_max_values.append(max(struct.unpack_from("<fff", data, offset)))
+    adaptive_max_scale = None
+    if max_scale_percentile is not None:
+        adaptive_max_scale = _percentile(sorted(scale_max_values), float(max_scale_percentile))
+
+    kept = bytearray()
+    written = 0
+    for index, scale_max in enumerate(scale_max_values):
+        offset = index * SPLAT_RECORD_BYTES
+        opacity = data[offset + 27] / 255.0
+        if opacity < min_opacity:
+            continue
+        if max_scale is not None and max_scale > 0.0 and scale_max > max_scale:
+            continue
+        if adaptive_max_scale is not None and scale_max > adaptive_max_scale:
+            continue
+        kept.extend(data[offset : offset + SPLAT_RECORD_BYTES])
+        written += 1
+        if max_points is not None and max_points > 0 and written >= max_points:
+            break
+
+    if written == 0:
+        raise ValueError(
+            "No splats survived filtering "
+            f"(min_opacity={min_opacity}, max_scale={max_scale}, max_scale_percentile={max_scale_percentile})"
+        )
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_bytes(kept)
+    return SplatFilterReport(
+        input_count=count,
+        output_count=written,
+        min_opacity=float(min_opacity),
+        max_scale=max_scale,
+        max_scale_percentile=max_scale_percentile,
+        adaptive_max_scale=adaptive_max_scale,
+        max_points=max_points,
+    )
 
 
 def _sanitize_scene_id(value: str) -> str:
@@ -33,6 +131,8 @@ def _sanitize_scene_id(value: str) -> str:
 
 
 def _load_web_point_data(ply_path: str, max_points: int) -> tuple[np.ndarray, np.ndarray]:
+    import numpy as np
+
     from gs_sim2real.viewer.web_viewer import load_ply
 
     ply_data = load_ply(ply_path)
@@ -57,6 +157,8 @@ def _compute_bounds(positions: np.ndarray) -> dict[str, list[float]]:
 
 
 def _estimate_camera(bounds: dict[str, list[float]]) -> dict[str, list[float]]:
+    import numpy as np
+
     minimum = np.asarray(bounds["min"], dtype=np.float32)
     maximum = np.asarray(bounds["max"], dtype=np.float32)
     center = (minimum + maximum) * 0.5
@@ -82,6 +184,8 @@ def points_to_scene_bundle(
     camera: dict[str, list[float]] | None = None,
 ) -> str:
     """Write positions/colors directly as a static web scene bundle."""
+    import numpy as np
+
     normalized_asset_format = str(asset_format or "binary").strip().lower()
     if normalized_asset_format not in {"json", "binary"}:
         raise ValueError("asset_format must be one of: json, binary")
@@ -148,6 +252,8 @@ def _write_json_asset(output_path: str | Path, positions: np.ndarray, colors: np
 
 
 def _write_binary_asset(output_path: str | Path, positions: np.ndarray, colors: np.ndarray) -> str:
+    import numpy as np
+
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     bounds = np.concatenate([positions.min(axis=0), positions.max(axis=0)]).astype(np.float32)
@@ -265,6 +371,8 @@ def ply_to_splat(
     visual shape). This lets world-metric scenes render inside viewers that
     assume unit-ish scale.
     """
+    import numpy as np
+
     from gs_sim2real.viewer.web_viewer import load_ply
 
     src = Path(ply_path)

@@ -483,6 +483,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p2s.add_argument("--skip-data-check", action="store_true", help="Skip COLMAP sparse preflight before training")
 
+    # splat-filter
+    sf = subparsers.add_parser(
+        "splat-filter",
+        help="Clean an existing antimatter15 .splat by removing blurry low-opacity / oversized gaussians",
+    )
+    sf.add_argument("--input", required=True, help="Input .splat file")
+    sf.add_argument("--output", required=True, help="Output .splat file")
+    sf.add_argument("--min-opacity", type=float, default=0.0, help="Drop splats below this alpha/255 opacity")
+    sf.add_argument("--max-scale", type=float, default=None, help="Drop splats whose max scale exceeds this value")
+    sf.add_argument(
+        "--max-scale-percentile",
+        type=float,
+        default=None,
+        help="Drop splats above this adaptive max-scale percentile, e.g. 98",
+    )
+    sf.add_argument("--max-points", type=int, default=None, help="Cap output splat count after filtering")
+
     # benchmark
     bm = subparsers.add_parser("benchmark", help="Benchmark training backends")
     bm.add_argument("--data", required=True, help="Data directory for training")
@@ -2391,6 +2408,26 @@ def cmd_photos_to_splat(args: argparse.Namespace) -> None:
     print(f"Splat file: {splat_path}")
 
 
+def cmd_splat_filter(args: argparse.Namespace) -> None:
+    """Handle the splat-filter subcommand."""
+    from gs_sim2real.viewer.web_export import filter_splat_file
+
+    report = filter_splat_file(
+        args.input,
+        args.output,
+        min_opacity=args.min_opacity,
+        max_scale=args.max_scale,
+        max_scale_percentile=args.max_scale_percentile,
+        max_points=args.max_points,
+    )
+    print(f"Filtered splat: {args.output}")
+    adaptive = f"{report.adaptive_max_scale:.4f}" if report.adaptive_max_scale is not None else "off"
+    print(
+        f"Kept {report.output_count:,}/{report.input_count:,} splats "
+        f"({report.kept_ratio:.1%}); adaptive_max_scale={adaptive}"
+    )
+
+
 def cmd_benchmark(args: argparse.Namespace) -> None:
     """Handle the benchmark subcommand."""
     from gs_sim2real.benchmark import Benchmark
@@ -3084,6 +3121,7 @@ def main(argv: list[str] | None = None) -> None:
         "view": cmd_view,
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,
+        "splat-filter": cmd_splat_filter,
         "benchmark": cmd_benchmark,
         "run": cmd_run,
         "demo": cmd_demo,
