@@ -11,6 +11,7 @@ Provides subcommands for the full 3DGS pipeline:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -499,6 +500,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Drop splats above this adaptive max-scale percentile, e.g. 98",
     )
     sf.add_argument("--max-points", type=int, default=None, help="Cap output splat count after filtering")
+
+    # splat-inspect
+    si = subparsers.add_parser(
+        "splat-inspect",
+        help="Report opacity and scale stats for an existing antimatter15 .splat",
+    )
+    si.add_argument("--input", required=True, help="Input .splat file")
+    si.add_argument(
+        "--low-opacity-threshold",
+        type=float,
+        default=0.08,
+        help="Opacity threshold used for the low-opacity summary",
+    )
+    si.add_argument("--json", action="store_true", help="Print machine-readable JSON")
 
     # benchmark
     bm = subparsers.add_parser("benchmark", help="Benchmark training backends")
@@ -2428,6 +2443,47 @@ def cmd_splat_filter(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_splat_inspect(args: argparse.Namespace) -> None:
+    """Handle the splat-inspect subcommand."""
+    from gs_sim2real.viewer.web_export import inspect_splat_file
+
+    report = inspect_splat_file(args.input, low_opacity_threshold=args.low_opacity_threshold)
+    if args.json:
+        print(json.dumps(report.as_dict(), indent=2))
+        return
+
+    print(f"Splat: {args.input}")
+    print(f"Gaussians: {report.input_count:,} ({report.size_mb:.2f} MB)")
+    print(
+        "Opacity: "
+        f"min={report.opacity_min:.3f} "
+        f"p10={report.opacity_p10:.3f} "
+        f"p50={report.opacity_p50:.3f} "
+        f"p90={report.opacity_p90:.3f} "
+        f"max={report.opacity_max:.3f}"
+    )
+    print(
+        "Scale max: "
+        f"p50={report.scale_p50:.4f} "
+        f"p95={report.scale_p95:.4f} "
+        f"p98={report.scale_p98:.4f} "
+        f"p99={report.scale_p99:.4f} "
+        f"max={report.scale_max:.4f} "
+        f"tail={report.scale_tail_ratio:.1f}x"
+    )
+    print(
+        f"Low-opacity splats (<{report.low_opacity_threshold:g}): "
+        f"{report.low_opacity_count:,} ({report.low_opacity_ratio:.1%})"
+    )
+    if report.low_opacity_ratio >= 0.05 or report.scale_tail_ratio >= 4.0:
+        print("Suggested cleanup:")
+        print(
+            "  gs-mapper splat-filter "
+            f"--input {args.input} --output <clean.splat> "
+            f"--min-opacity {report.low_opacity_threshold:g} --max-scale-percentile 98"
+        )
+
+
 def cmd_benchmark(args: argparse.Namespace) -> None:
     """Handle the benchmark subcommand."""
     from gs_sim2real.benchmark import Benchmark
@@ -3122,6 +3178,7 @@ def main(argv: list[str] | None = None) -> None:
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,
         "splat-filter": cmd_splat_filter,
+        "splat-inspect": cmd_splat_inspect,
         "benchmark": cmd_benchmark,
         "run": cmd_run,
         "demo": cmd_demo,

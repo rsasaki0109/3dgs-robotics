@@ -40,6 +40,65 @@ class SplatFilterReport:
         return self.output_count / self.input_count
 
 
+@dataclass(frozen=True, slots=True)
+class SplatStatsReport:
+    """Opacity and scale summary for an antimatter15 .splat binary."""
+
+    input_count: int
+    size_bytes: int
+    low_opacity_threshold: float
+    low_opacity_count: int
+    opacity_min: float
+    opacity_p10: float
+    opacity_p50: float
+    opacity_p90: float
+    opacity_max: float
+    scale_min: float
+    scale_p50: float
+    scale_p95: float
+    scale_p98: float
+    scale_p99: float
+    scale_max: float
+
+    @property
+    def low_opacity_ratio(self) -> float:
+        if self.input_count == 0:
+            return 0.0
+        return self.low_opacity_count / self.input_count
+
+    @property
+    def size_mb(self) -> float:
+        return self.size_bytes / 1_000_000
+
+    @property
+    def scale_tail_ratio(self) -> float:
+        if self.scale_p98 <= 0.0:
+            return 0.0
+        return self.scale_max / self.scale_p98
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "input_count": self.input_count,
+            "size_bytes": self.size_bytes,
+            "size_mb": self.size_mb,
+            "low_opacity_threshold": self.low_opacity_threshold,
+            "low_opacity_count": self.low_opacity_count,
+            "low_opacity_ratio": self.low_opacity_ratio,
+            "opacity_min": self.opacity_min,
+            "opacity_p10": self.opacity_p10,
+            "opacity_p50": self.opacity_p50,
+            "opacity_p90": self.opacity_p90,
+            "opacity_max": self.opacity_max,
+            "scale_min": self.scale_min,
+            "scale_p50": self.scale_p50,
+            "scale_p95": self.scale_p95,
+            "scale_p98": self.scale_p98,
+            "scale_p99": self.scale_p99,
+            "scale_max": self.scale_max,
+            "scale_tail_ratio": self.scale_tail_ratio,
+        }
+
+
 def _percentile(sorted_values: list[float], percentile: float) -> float:
     if not sorted_values:
         raise ValueError("cannot compute percentile for an empty sequence")
@@ -112,6 +171,55 @@ def filter_splat_file(
         max_scale_percentile=max_scale_percentile,
         adaptive_max_scale=adaptive_max_scale,
         max_points=max_points,
+    )
+
+
+def inspect_splat_file(
+    input_path: str | Path,
+    *,
+    low_opacity_threshold: float = 0.08,
+) -> SplatStatsReport:
+    """Inspect an existing antimatter15 .splat binary for cleanup decisions."""
+
+    src = Path(input_path)
+    data = src.read_bytes()
+    if len(data) % SPLAT_RECORD_BYTES:
+        raise ValueError(f"{src} is not a 32-byte-per-gaussian .splat file")
+
+    count = len(data) // SPLAT_RECORD_BYTES
+    if count == 0:
+        raise ValueError(f"{src} does not contain any splats")
+
+    opacities: list[float] = []
+    scale_max_values: list[float] = []
+    low_opacity_count = 0
+    for index in range(count):
+        offset = index * SPLAT_RECORD_BYTES
+        opacity = data[offset + 27] / 255.0
+        scale_max = max(struct.unpack_from("<fff", data, offset + 12))
+        opacities.append(opacity)
+        scale_max_values.append(scale_max)
+        if opacity < low_opacity_threshold:
+            low_opacity_count += 1
+
+    opacities.sort()
+    scale_max_values.sort()
+    return SplatStatsReport(
+        input_count=count,
+        size_bytes=len(data),
+        low_opacity_threshold=float(low_opacity_threshold),
+        low_opacity_count=low_opacity_count,
+        opacity_min=opacities[0],
+        opacity_p10=_percentile(opacities, 10.0),
+        opacity_p50=_percentile(opacities, 50.0),
+        opacity_p90=_percentile(opacities, 90.0),
+        opacity_max=opacities[-1],
+        scale_min=scale_max_values[0],
+        scale_p50=_percentile(scale_max_values, 50.0),
+        scale_p95=_percentile(scale_max_values, 95.0),
+        scale_p98=_percentile(scale_max_values, 98.0),
+        scale_p99=_percentile(scale_max_values, 99.0),
+        scale_max=scale_max_values[-1],
     )
 
 

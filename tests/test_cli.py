@@ -482,6 +482,23 @@ class TestCLIHelp:
         assert args.max_scale_percentile == 98.0
         assert args.max_points == 250000
 
+    def test_cli_splat_inspect_flags(self) -> None:
+        """splat-inspect parser accepts reporting flags for existing browser splats."""
+        args = build_parser().parse_args(
+            [
+                "splat-inspect",
+                "--input",
+                "scene.splat",
+                "--low-opacity-threshold",
+                "0.05",
+                "--json",
+            ]
+        )
+        assert args.command == "splat-inspect"
+        assert args.input == "scene.splat"
+        assert args.low_opacity_threshold == 0.05
+        assert args.json is True
+
     def test_cli_photos_to_splat_mast3r(self) -> None:
         """photos-to-splat accepts mast3r as a pose-estimation backend."""
         args = build_parser().parse_args(
