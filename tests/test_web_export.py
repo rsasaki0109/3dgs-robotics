@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from gs_sim2real.viewer.web_export import (
+    filter_splat_file,
     ply_to_splat,
     ply_to_binary,
     ply_to_json,
@@ -38,6 +39,14 @@ def _write_ascii_ply(path: Path, positions: list[list[float]], colors: list[list
 
     path.write_text(header + "\n".join(lines) + "\n")
     return path
+
+
+def _pack_splat_record(
+    xyz: tuple[float, float, float],
+    scale: tuple[float, float, float],
+    alpha: int,
+) -> bytes:
+    return struct.pack("<ffffffBBBBBBBB", *xyz, *scale, 255, 255, 255, alpha, 128, 128, 128, 128)
 
 
 class _GaussianPly:
@@ -226,6 +235,39 @@ class TestPlyToSplat:
         monkeypatch.setattr(web_viewer, "load_ply", lambda _: _GaussianPly())
         with pytest.raises(ValueError, match="max_scale_percentile"):
             ply_to_splat("ignored.ply", tmp_path / "scene.splat", max_scale_percentile=0.0)
+
+
+class TestFilterSplatFile:
+    """Tests for direct browser .splat cleanup."""
+
+    def test_filters_low_opacity_and_large_scales(self, tmp_path: Path) -> None:
+        src = tmp_path / "raw.splat"
+        src.write_bytes(
+            b"".join(
+                [
+                    _pack_splat_record((0, 0, 0), (0.1, 0.1, 0.1), 255),
+                    _pack_splat_record((1, 0, 0), (0.2, 0.2, 0.2), 8),
+                    _pack_splat_record((2, 0, 0), (5.0, 5.0, 5.0), 255),
+                    _pack_splat_record((3, 0, 0), (0.3, 0.3, 0.3), 255),
+                ]
+            )
+        )
+        out = tmp_path / "clean.splat"
+
+        report = filter_splat_file(src, out, min_opacity=0.05, max_scale_percentile=75.0)
+
+        assert report.input_count == 4
+        assert report.output_count == 2
+        assert report.kept_ratio == 0.5
+        assert out.stat().st_size == 2 * 32
+
+    def test_rejects_non_splat_size(self, tmp_path: Path) -> None:
+        import pytest
+
+        src = tmp_path / "bad.splat"
+        src.write_bytes(b"not a splat")
+        with pytest.raises(ValueError, match="32-byte"):
+            filter_splat_file(src, tmp_path / "out.splat")
 
 
 class TestPlyToSceneBundle:
