@@ -362,7 +362,22 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Kinetic 3DGS sweep from real outdoor robot logs" in readme
+    assert "Actual .splat map-quality render from shipped outdoor 3DGS scenes" in readme
+    assert "orthographic XYZ renders from the shipped `.splat` binaries, not screenshots" in readme
+
+
+def test_map_quality_gif_proves_actual_splat_geometry() -> None:
+    """README's main GIF should inspect real .splat coordinates, not browser screenshots."""
+    module = _load_script_module(REPO_ROOT / "scripts" / "build_map_quality_gif.py")
+    proof_gif = REPO_ROOT / "docs" / "images" / "demo-sweep" / "map-quality.gif"
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "docs/images/demo-sweep/map-quality.gif" in readme
+    assert module.FRAME_SIZE == (960, 540)
+    assert module.FRAMES_PER_SCENE == 5
+    assert proof_gif.stat().st_size > 100_000
+    with Image.open(proof_gif) as image:
+        assert image.size == module.FRAME_SIZE
+        assert image.n_frames == len(module.MAP_PROOF_SCENES) * module.FRAMES_PER_SCENE
 
 
 def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
