@@ -243,7 +243,7 @@ Numbers below are the end-to-end wall-clock and quality figures for the producti
 | Autoware 6-bag (supervised) | GNSS + `/tf_static` + LiDAR seed (6120 cams across 6 bags) | 6120/6120 | metric (bag-fused ENU) | 30 000 | ~hours | 1.48M → 80k filter | ~0.06 | 2.56 MB / 80k gauss |
 | bag6 cam0 — DUSt3R | ~3 min | 19 / 20 | 1.02 m (unscaled) | 3 000 | 276 s | 5.57M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
 | bag6 cam0 — MAST3R | ~3 min | **20 / 20** | **28.1 m (metric)** | 15 000 | 285 s | 923k | ~0.16 | 12.8 MB / 400k gauss |
-| bag6 cam0 — VGGT-SLAM 2.0 | external run + artifact import | **20 / 20** unique poses | 3.23 m trajectory | 15 000 | 190 s | 222k | not tracked | 6.6 MB / 214k gauss |
+| bag6 cam0 — VGGT-SLAM 2.0 | external run + artifact import | **20 / 20** unique poses | 3.23 m trajectory | 15 000 | 190 s | 222k | not tracked | 5.4 MB / 178k gauss |
 | bag6 cam0 — MASt3R-SLAM | external run + artifact import | **10 / 20** keyframes | 2.16 m trajectory | 15 000 | 460 s | 1.34M → 400k filter | ~0.24 | 12.8 MB / 400k gauss |
 | bag6 cam0 — Pi3X | 108 s Pi3X VO + 7 s artifact import | **20 / 20** poses | 74.4 m trajectory | 15 000 | 184 s | 328k | ~0.14 sampled final L1 | 9.8 MB / 321k gauss |
 | MCD tuhh_day_04 — DUSt3R | ~3 min | 19 / 20 | 1.78 m (unscaled) | 3 000 | 147 s | 3.23M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
