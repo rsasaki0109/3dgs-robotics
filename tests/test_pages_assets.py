@@ -378,10 +378,9 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "GS Mapper outdoor 3DGS overview card" in readme
-    assert "docs/images/social-card.png" in readme
-    assert "Detailed geometry proof" in readme
-    assert "actual `.splat` FPS trace GIF" in readme
+    assert "Slow FPS course through an actual shipped outdoor 3DGS splat" in readme
+    assert "Lead GIF: slow FPS movement along one route through an actual shipped `.splat`" in readme
+    assert "top-down course shown in the corner" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
@@ -391,7 +390,7 @@ def test_map_quality_gif_proves_actual_splat_geometry() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "docs/images/demo-sweep/map-quality.gif" in readme
     assert module.FRAME_SIZE == (960, 540)
-    assert module.FRAMES_PER_SCENE == 5
+    assert module.FRAMES_PER_SCENE == 12
     assert proof_gif.stat().st_size > 100_000
     for scene in module.MAP_PROOF_SCENES:
         assert (module.ASSET_DIR / scene.asset).is_file()

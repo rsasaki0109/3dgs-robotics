@@ -18,11 +18,11 @@ ASSET_DIR = DOCS / "assets" / "outdoor-demo"
 OUTPUT = DOCS / "images" / "demo-sweep" / "map-quality.gif"
 FRAME_SIZE = (960, 540)
 SPLAT_RECORD_BYTES = 32
-FRAMES_PER_SCENE = 5
-FRAME_DURATION_MS = 170
+FRAMES_PER_SCENE = 12
+FRAME_DURATION_MS = 260
 MAX_POINTS_PER_SCENE = 170_000
-FOV_DEGREES = 58.0
-MINIMAP_SIZE = (244, 138)
+FOV_DEGREES = 64.0
+MINIMAP_SIZE = (314, 176)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,22 +47,7 @@ class SplatPoint:
 MAP_PROOF_SCENES = (
     MapProofScene(
         asset="bag6-pi3x-20-15k.splat",
-        label="bag6 Pi3X external-SLAM",
-        axes=(0, 2),
-    ),
-    MapProofScene(
-        asset="bag6-mast3r-slam-20-15k.splat",
-        label="bag6 MASt3R-SLAM external-SLAM",
-        axes=(0, 2),
-    ),
-    MapProofScene(
-        asset="bag6-vggt-slam-20-15k.splat",
-        label="bag6 VGGT-SLAM external-SLAM",
-        axes=(0, 2),
-    ),
-    MapProofScene(
-        asset="bag6-mast3r.splat",
-        label="bag6 MASt3R pose-free",
+        label="slow FPS course through shipped bag6 Pi3X splat",
         axes=(0, 2),
     ),
 )
@@ -83,15 +68,16 @@ def build_map_quality_gif(
         points = _read_splat_points(path, max_points=MAX_POINTS_PER_SCENE)
         bounds = _projection_bounds(points, scene.axes, size)
         cameras = _camera_path(points, axes=scene.axes, bounds=bounds, frame_count=frames_per_scene)
-        for camera in cameras:
+        for frame_index, camera in enumerate(cameras, start=1):
             frame = _render_scene_frame(
                 points,
                 scene=scene,
-                scene_index=scene_index,
-                scene_count=len(MAP_PROOF_SCENES),
+                scene_index=frame_index,
+                scene_count=len(cameras),
                 axes=scene.axes,
                 bounds=bounds,
                 camera=camera,
+                route=cameras,
                 size=size,
                 gaussian_count=_gaussian_count(path),
             )
@@ -245,10 +231,10 @@ def _camera_path(
     side = (-direction[1], direction[0])
     center = _plane_median(points, axes)
     projections = sorted(_plane_projection(point.xyz, axes, center, direction) for point in points)
-    low = _percentile(projections, 0.08)
-    high = _percentile(projections, 0.48)
-    target_low = _percentile(projections, 0.42)
-    target_high = _percentile(projections, 0.72)
+    low = _percentile(projections, 0.04)
+    high = _percentile(projections, 0.34)
+    target_low = _percentile(projections, 0.30)
+    target_high = _percentile(projections, 0.58)
     travel = max(0.3, high - low)
     target_travel = max(0.3, target_high - target_low)
     side_span = max(0.2, min(bounds[1] - bounds[0], bounds[3] - bounds[2]))
@@ -257,8 +243,9 @@ def _camera_path(
     height_low = _percentile(heights, 0.20)
     height_mid = _percentile(heights, 0.54)
     height_high = _percentile(heights, 0.92)
-    eye_height = height_mid + max(0.16, (height_high - height_low) * 0.24)
-    target_height = height_mid + max(0.02, (height_high - height_low) * 0.04)
+    height_span = height_high - height_low
+    eye_height = height_mid + max(0.24, height_span * 0.34)
+    target_height = height_mid + max(0.04, height_span * 0.08)
 
     cameras: list[CameraPose] = []
     for index in range(frame_count):
@@ -266,7 +253,7 @@ def _camera_path(
         eased = _ease_in_out(progress)
         current = low + travel * eased
         lookahead = max(current + 0.25, target_low + target_travel * eased)
-        lateral = math.sin(progress * math.pi) * side_span * 0.06
+        lateral = math.sin(progress * math.pi) * side_span * 0.035
         eye_plane = (
             center[0] + direction[0] * current + side[0] * lateral,
             center[1] + direction[1] * current + side[1] * lateral,
@@ -340,6 +327,7 @@ def _render_scene_frame(
     axes: tuple[int, int],
     bounds: tuple[float, float, float, float],
     camera: CameraPose,
+    route: list[CameraPose],
     size: tuple[int, int],
     gaussian_count: int,
 ) -> Image.Image:
@@ -371,7 +359,7 @@ def _render_scene_frame(
     overlay = Image.new("RGBA", size, (0, 0, 0, 0))
     overlay_draw = ImageDraw.Draw(overlay)
     _draw_viewer_grid(overlay_draw, size)
-    _draw_minimap(overlay_draw, points, axes=axes, bounds=bounds, camera=camera, size=size)
+    _draw_minimap(overlay_draw, points, axes=axes, bounds=bounds, camera=camera, route=route, size=size)
     _draw_frame_label(
         overlay_draw,
         scene=scene,
@@ -480,6 +468,7 @@ def _draw_minimap(
     axes: tuple[int, int],
     bounds: tuple[float, float, float, float],
     camera: CameraPose,
+    route: list[CameraPose],
     size: tuple[int, int],
 ) -> None:
     width, height = size
@@ -495,16 +484,19 @@ def _draw_minimap(
         y = y0 + mini_height * index / 4
         draw.line((x, y0, x, y1), fill=(255, 255, 255, 16), width=1)
         draw.line((x0, y, x1, y), fill=(255, 255, 255, 16), width=1)
-    step = max(1, len(points) // 4500)
+    step = max(1, len(points) // 6500)
     for point in points[::step]:
         x, y = _minimap_xy(point.xyz, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
         draw.point((x, y), fill=(*_point_color(point.rgba), 96))
+    route_xy = [_minimap_xy(pose.eye, axes=axes, bounds=bounds, box=(x0, y0, x1, y1)) for pose in route]
+    if len(route_xy) > 1:
+        draw.line(route_xy, fill=(72, 154, 255, 190), width=4)
     eye_x, eye_y = _minimap_xy(camera.eye, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
     target_x, target_y = _minimap_xy(camera.target, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
-    draw.line((eye_x, eye_y, target_x, target_y), fill=(88, 236, 130, 255), width=3)
-    draw.ellipse((eye_x - 5, eye_y - 5, eye_x + 5, eye_y + 5), fill=(88, 236, 130, 255))
+    draw.line((eye_x, eye_y, target_x, target_y), fill=(88, 236, 130, 255), width=4)
+    draw.ellipse((eye_x - 6, eye_y - 6, eye_x + 6, eye_y + 6), fill=(88, 236, 130, 255))
     label_font = _load_font(13)
-    draw.text((x0 + 10, y0 + 8), "top-down trace + camera", font=label_font, fill=(213, 230, 244, 230))
+    draw.text((x0 + 10, y0 + 8), "top-down route + current camera", font=label_font, fill=(213, 230, 244, 230))
     draw.text(
         (x0 + 10, y1 - 24),
         f"x=[{left:.1f},{right:.1f}]  y=[{bottom:.1f},{top:.1f}]",
@@ -544,12 +536,12 @@ def _draw_frame_label(
     title_font = _load_font(28)
     meta_font = _load_font(17)
     chip_font = _load_font(15)
-    draw.rounded_rectangle((18, 16, 718, 92), radius=6, fill=(4, 9, 15, 205), outline=(255, 255, 255, 36))
+    draw.rounded_rectangle((18, 16, 760, 96), radius=6, fill=(4, 9, 15, 215), outline=(255, 255, 255, 36))
     draw.text((34, 29), scene.label, font=title_font, fill=(244, 249, 255, 255))
     draw.text(
         (36, 65),
         (
-            "actual .splat FPS render / "
+            "actual .splat slow FPS route / "
             f"{gaussian_count // 1000}k gaussians / {sampled_count // 1000}k sampled / {rendered_count // 1000}k visible"
         ),
         font=meta_font,
@@ -560,7 +552,7 @@ def _draw_frame_label(
     )
     draw.text(
         (width - 158, 29),
-        f"INSIDE {scene_index:02d}/{scene_count:02d}",
+        f"COURSE {scene_index:02d}/{scene_count:02d}",
         font=chip_font,
         fill=(91, 232, 120, 255),
     )
