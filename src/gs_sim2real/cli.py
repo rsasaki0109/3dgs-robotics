@@ -37,6 +37,48 @@ _PIPELINE_PREPROCESS_METHOD_CHOICES = [
     "external-slam",
 ]
 _EXTERNAL_SLAM_SYSTEM_CHOICES = ["generic", "mast3r-slam", "vggt-slam", "loger", "pi3"]
+_PHOTOS_TO_SPLAT_DEFAULTS = {
+    "num_frames": 20,
+    "align_iters": 300,
+    "iterations": 3000,
+    "mast3r_subsample": 8,
+    "splat_max_points": 400000,
+    "splat_min_opacity": 0.02,
+    "splat_max_scale": 2.0,
+    "splat_max_scale_percentile": None,
+}
+_PHOTOS_TO_SPLAT_QUALITY_PRESETS = {
+    "draft": {},
+    "balanced": {
+        "num_frames": 32,
+        "align_iters": 500,
+        "iterations": 10000,
+        "mast3r_subsample": 6,
+        "splat_min_opacity": 0.025,
+        "splat_max_scale": 1.25,
+        "splat_max_scale_percentile": 99.0,
+    },
+    "clean": {
+        "num_frames": 64,
+        "align_iters": 800,
+        "iterations": 30000,
+        "mast3r_subsample": 4,
+        "splat_max_points": 600000,
+        "splat_min_opacity": 0.035,
+        "splat_max_scale": 1.0,
+        "splat_max_scale_percentile": 98.0,
+    },
+    "hero": {
+        "num_frames": 0,
+        "align_iters": 1200,
+        "iterations": 50000,
+        "mast3r_subsample": 2,
+        "splat_max_points": 800000,
+        "splat_min_opacity": 0.04,
+        "splat_max_scale": 0.8,
+        "splat_max_scale_percentile": 96.0,
+    },
+}
 
 
 def _add_external_slam_args(parser: argparse.ArgumentParser, *, context: str) -> None:
@@ -369,6 +411,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="For --format splat: drop gaussians whose max exp(log_scale) exceeds this (meters).",
     )
+    ex.add_argument(
+        "--splat-max-scale-percentile",
+        type=float,
+        default=None,
+        help=(
+            "For --format splat: adaptively drop gaussians above this max-scale percentile. "
+            "Useful for removing giant blurry splats from browser exports."
+        ),
+    )
 
     # photos-to-splat (one-shot: image dir -> DUSt3R -> gsplat -> .splat)
     p2s = subparsers.add_parser(
@@ -385,6 +436,15 @@ def build_parser() -> argparse.ArgumentParser:
         default="dust3r",
         help="Pose-estimation backend. 'mast3r' uses naver/mast3r (newer, metric-aware). "
         "'simple' is a non-metric circular fallback for smoke tests.",
+    )
+    p2s.add_argument(
+        "--quality",
+        choices=list(_PHOTOS_TO_SPLAT_QUALITY_PRESETS),
+        default="draft",
+        help=(
+            "Quality preset. draft preserves the fast legacy defaults; clean/hero use more frames, "
+            "more alignment/training iterations, and stricter export filtering for cleaner maps."
+        ),
     )
     p2s.add_argument(
         "--num-frames", type=int, default=20, help="DUSt3R/MAST3R frame cap (0 = all). Default 20 fits a 16 GB GPU."
@@ -415,6 +475,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p2s.add_argument("--splat-min-opacity", type=float, default=0.02, help="Drop gaussians below this opacity")
     p2s.add_argument("--splat-max-scale", type=float, default=2.0, help="Drop gaussians above this scale (meters)")
+    p2s.add_argument(
+        "--splat-max-scale-percentile",
+        type=float,
+        default=None,
+        help="Drop gaussians above this adaptive max-scale percentile during .splat export.",
+    )
     p2s.add_argument("--skip-data-check", action="store_true", help="Skip COLMAP sparse preflight before training")
 
     # benchmark
@@ -2146,6 +2212,17 @@ def _preflight_gsplat_train_data(data_dir: Path, skip: bool) -> None:
     require_colmap_sparse_model(data_dir)
 
 
+def _resolve_photos_to_splat_quality(args: argparse.Namespace) -> argparse.Namespace:
+    """Apply photos-to-splat quality presets while preserving explicit overrides."""
+    values = vars(args).copy()
+    preset_name = values.get("quality", "draft")
+    preset = _PHOTOS_TO_SPLAT_QUALITY_PRESETS[preset_name]
+    for key, value in preset.items():
+        if values.get(key) == _PHOTOS_TO_SPLAT_DEFAULTS[key]:
+            values[key] = value
+    return argparse.Namespace(**values)
+
+
 def cmd_train(args: argparse.Namespace) -> None:
     """Handle the train subcommand."""
     data_dir = Path(args.data)
@@ -2212,6 +2289,7 @@ def cmd_export(args: argparse.Namespace) -> None:
             normalize_target_extent=args.splat_normalize_extent,
             min_opacity=args.splat_min_opacity,
             max_scale=args.splat_max_scale,
+            max_scale_percentile=args.splat_max_scale_percentile,
         )
     else:
         from gs_sim2real.viewer.web_export import ply_to_scene_bundle
@@ -2247,47 +2325,53 @@ def cmd_photos_to_splat(args: argparse.Namespace) -> None:
         sys.exit(2)
 
     output_dir = Path(args.output)
+    quality_args = _resolve_photos_to_splat_quality(args)
     sparse_dir = output_dir / "sparse_input"
     train_dir = output_dir / "train"
     splat_path = output_dir / f"{images_dir.name}.splat"
 
     print("=" * 60)
-    print(f"Step 1/3: Pose-free preprocess ({args.preprocess})")
+    print(f"Step 1/3: Pose-free preprocess ({quality_args.preprocess}, quality={quality_args.quality})")
     print("=" * 60)
+    if quality_args.quality in {"clean", "hero"} and quality_args.preprocess == "dust3r":
+        print(
+            "Tip: --preprocess mast3r usually produces cleaner pose-free outdoor maps "
+            "than DUSt3R when the checkpoint is available."
+        )
     processor_kwargs: dict = {
-        "method": args.preprocess,
-        "num_frames": args.num_frames,
-        "scene_graph": args.scene_graph,
-        "align_iters": args.align_iters,
-        "mast3r_subsample": args.mast3r_subsample,
+        "method": quality_args.preprocess,
+        "num_frames": quality_args.num_frames,
+        "scene_graph": quality_args.scene_graph,
+        "align_iters": quality_args.align_iters,
+        "mast3r_subsample": quality_args.mast3r_subsample,
     }
-    if args.preprocess == "mast3r":
-        if args.mast3r_checkpoint:
-            processor_kwargs["checkpoint"] = Path(args.mast3r_checkpoint)
-        if args.mast3r_root:
-            processor_kwargs["mast3r_root"] = Path(args.mast3r_root)
+    if quality_args.preprocess == "mast3r":
+        if quality_args.mast3r_checkpoint:
+            processor_kwargs["checkpoint"] = Path(quality_args.mast3r_checkpoint)
+        if quality_args.mast3r_root:
+            processor_kwargs["mast3r_root"] = Path(quality_args.mast3r_root)
     else:
-        if args.dust3r_checkpoint:
-            processor_kwargs["checkpoint"] = Path(args.dust3r_checkpoint)
-        if args.dust3r_root:
-            processor_kwargs["dust3r_root"] = Path(args.dust3r_root)
+        if quality_args.dust3r_checkpoint:
+            processor_kwargs["checkpoint"] = Path(quality_args.dust3r_checkpoint)
+        if quality_args.dust3r_root:
+            processor_kwargs["dust3r_root"] = Path(quality_args.dust3r_root)
     processor = PoseFreeProcessor(**processor_kwargs)
     processor.estimate_poses(images_dir, sparse_dir)
 
     print("\n" + "=" * 60)
-    print(f"Step 2/3: gsplat training ({args.iterations} iterations)")
+    print(f"Step 2/3: gsplat training ({quality_args.iterations} iterations)")
     print("=" * 60)
     config = None
-    if args.config:
+    if quality_args.config:
         from gs_sim2real.common.config import load_config
 
-        config = load_config(args.config)
-    _preflight_gsplat_train_data(sparse_dir, getattr(args, "skip_data_check", False))
+        config = load_config(quality_args.config)
+    _preflight_gsplat_train_data(sparse_dir, getattr(quality_args, "skip_data_check", False))
     ply_path = train_gsplat(
         data_dir=sparse_dir,
         output_dir=train_dir,
         config=config,
-        num_iterations=args.iterations,
+        num_iterations=quality_args.iterations,
     )
 
     print("\n" + "=" * 60)
@@ -2297,10 +2381,11 @@ def cmd_photos_to_splat(args: argparse.Namespace) -> None:
     ply_to_splat(
         ply_path,
         splat_path,
-        max_points=args.splat_max_points,
-        normalize_target_extent=args.splat_normalize_extent,
-        min_opacity=args.splat_min_opacity,
-        max_scale=args.splat_max_scale,
+        max_points=quality_args.splat_max_points,
+        normalize_target_extent=quality_args.splat_normalize_extent,
+        min_opacity=quality_args.splat_min_opacity,
+        max_scale=quality_args.splat_max_scale,
+        max_scale_percentile=quality_args.splat_max_scale_percentile,
     )
     print(f"\nDone. Open locally: docs/splat.html?url={splat_path}")
     print(f"Splat file: {splat_path}")

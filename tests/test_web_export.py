@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from gs_sim2real.viewer.web_export import (
+    ply_to_splat,
     ply_to_binary,
     ply_to_json,
     ply_to_scene_bundle,
@@ -37,6 +38,41 @@ def _write_ascii_ply(path: Path, positions: list[list[float]], colors: list[list
 
     path.write_text(header + "\n".join(lines) + "\n")
     return path
+
+
+class _GaussianPly:
+    def __init__(self) -> None:
+        self.positions = np.asarray(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [3.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        )
+        self.scales = np.log(
+            np.asarray(
+                [
+                    [0.1, 0.1, 0.1],
+                    [0.2, 0.2, 0.2],
+                    [10.0, 10.0, 10.0],
+                    [20.0, 20.0, 20.0],
+                ],
+                dtype=np.float32,
+            )
+        )
+        self.rotations = np.asarray([[1.0, 0.0, 0.0, 0.0]] * 4, dtype=np.float32)
+        self.opacities = np.asarray([4.0, 4.0, 4.0, 4.0], dtype=np.float32)
+        self.colors = np.asarray(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [1.0, 1.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
 
 
 class TestPlyToJson:
@@ -166,6 +202,30 @@ class TestPlyToBinary:
 
         expected_size = 4 + 24 + 5 * 24
         assert Path(result).stat().st_size == expected_size
+
+
+class TestPlyToSplat:
+    """Tests for antimatter15 .splat export."""
+
+    def test_adaptive_scale_percentile_filters_giant_gaussians(self, tmp_path: Path, monkeypatch) -> None:
+        """Scale percentile filtering should remove giant blurry gaussians without fixed metric assumptions."""
+        import gs_sim2real.viewer.web_viewer as web_viewer
+
+        monkeypatch.setattr(web_viewer, "load_ply", lambda _: _GaussianPly())
+        out = tmp_path / "scene.splat"
+
+        result = ply_to_splat("ignored.ply", out, max_scale_percentile=50.0)
+
+        assert result == str(out)
+        assert out.stat().st_size == 2 * 32
+
+    def test_adaptive_scale_percentile_rejects_invalid_range(self, tmp_path: Path, monkeypatch) -> None:
+        import pytest
+        import gs_sim2real.viewer.web_viewer as web_viewer
+
+        monkeypatch.setattr(web_viewer, "load_ply", lambda _: _GaussianPly())
+        with pytest.raises(ValueError, match="max_scale_percentile"):
+            ply_to_splat("ignored.ply", tmp_path / "scene.splat", max_scale_percentile=0.0)
 
 
 class TestPlyToSceneBundle:

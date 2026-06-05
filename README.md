@@ -356,13 +356,20 @@ cd /tmp/dust3r && mkdir -p checkpoints && \
   wget -P checkpoints https://download.europe.naverlabs.com/ComputerVision/DUSt3R/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth
 cd -
 
-# One-shot: photos -> .splat (DUSt3R + gsplat + export all in one)
+# One-shot draft: photos -> .splat (DUSt3R + gsplat + export all in one)
 gs-mapper photos-to-splat \
     --images ./my_photos \
     --output outputs/my_photos_splat \
     --num-frames 20 \
     --iterations 3000
 # writes outputs/my_photos_splat/my_photos.splat
+
+# Cleaner map run: more frames, longer alignment/training, stricter export filtering
+gs-mapper photos-to-splat \
+    --images ./my_photos \
+    --output outputs/my_photos_splat_clean \
+    --quality clean \
+    --preprocess mast3r
 ```
 
 Or if you already have a trained PLY and just need the splat format:
@@ -375,7 +382,8 @@ gs-mapper export \
     --max-points 400000 \
     --splat-normalize-extent 17.0 \
     --splat-min-opacity 0.02 \
-    --splat-max-scale 2.0
+    --splat-max-scale 2.0 \
+    --splat-max-scale-percentile 98
 ```
 
 Preview locally with `python -m http.server` from the repo root and open
