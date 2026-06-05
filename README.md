@@ -17,9 +17,9 @@ review-bundle inputs.
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) ·
 [Physical AI docs](docs/physical-ai-sim.md)
 
-[![Actual .splat map-quality render from shipped outdoor 3DGS scenes](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+[![Inside-map FPS render from actual shipped outdoor 3DGS splats](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-_Proof view: orthographic XYZ renders from the shipped `.splat` binaries, not screenshots._
+_Proof view: FPS-style renders from the shipped `.splat` binaries, with a top-down trace showing the camera inside the map._
 
 Star/watch this repo if you want updates on real-world robotics logs becoming
 browser-viewable 3DGS scenes, route-policy benchmark artifacts, and reviewable
