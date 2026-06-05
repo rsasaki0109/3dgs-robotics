@@ -346,6 +346,323 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   line-height: 1.45;
 }
 
+/* Mission Control */
+.mission-band {
+  max-width: none;
+  padding: 4rem 2rem;
+  background: #172018;
+  color: #f2f5ef;
+  border-top: 1px solid #2b392d;
+  border-bottom: 1px solid #2b392d;
+}
+
+.mission-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.mission-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(280px, 0.46fr);
+  gap: 2rem;
+  align-items: end;
+  margin-bottom: 1.5rem;
+}
+
+.mission-heading h2 {
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  line-height: 1;
+  margin-bottom: 0.75rem;
+}
+
+.mission-heading p {
+  color: rgba(242,245,239,0.78);
+  max-width: 760px;
+}
+
+.mission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.mission-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid rgba(242,245,239,0.26);
+  border-radius: 6px;
+  color: #f2f5ef;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 700;
+  background: rgba(13,17,23,0.28);
+}
+
+.mission-action.primary {
+  color: #0b130c;
+  background: #9fd18d;
+  border-color: #9fd18d;
+}
+
+.mission-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.22fr) minmax(320px, 0.64fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.mission-map {
+  position: relative;
+  min-height: 460px;
+  overflow: hidden;
+  border: 1px solid #38503b;
+  border-radius: 8px;
+  background: #0d1117;
+}
+
+.mission-map img {
+  width: 100%;
+  height: 100%;
+  min-height: 460px;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05) brightness(0.75);
+}
+
+.mission-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(13,17,23,0.08), rgba(13,17,23,0.62));
+  pointer-events: none;
+}
+
+.mission-route-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+.mission-route-path {
+  fill: none;
+  stroke: #9fd18d;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16 14;
+  filter: drop-shadow(0 0 8px rgba(159,209,141,0.65));
+}
+
+.mission-route-shadow {
+  fill: none;
+  stroke: rgba(5,10,7,0.78);
+  stroke-width: 16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mission-zone {
+  fill: rgba(88,166,255,0.2);
+  stroke: rgba(88,166,255,0.72);
+  stroke-width: 2;
+}
+
+.mission-hazard {
+  fill: rgba(248,81,73,0.22);
+  stroke: rgba(248,81,73,0.72);
+  stroke-width: 2;
+}
+
+.mission-robot {
+  fill: #ffffff;
+  stroke: #0d1117;
+  stroke-width: 5;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.7));
+}
+
+.mission-node {
+  opacity: 0.64;
+  transition: opacity 0.2s, transform 0.2s;
+  transform-origin: center;
+}
+
+.mission-node.active {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.mission-node circle {
+  fill: #d29922;
+  stroke: #0d1117;
+  stroke-width: 4;
+}
+
+.mission-node text {
+  fill: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0,0,0,0.75);
+  stroke-width: 4px;
+}
+
+.mission-map-caption {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid rgba(242,245,239,0.22);
+  border-radius: 8px;
+  background: rgba(10,17,11,0.72);
+  backdrop-filter: blur(10px);
+}
+
+.mission-map-caption span {
+  color: rgba(242,245,239,0.72);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+.mission-map-caption strong {
+  color: #9fd18d;
+}
+
+.mission-panel {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 14px;
+}
+
+.mission-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mission-stat {
+  padding: 14px;
+  border: 1px solid #38503b;
+  border-radius: 8px;
+  background: #101711;
+}
+
+.mission-stat span {
+  display: block;
+  color: rgba(242,245,239,0.62);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.mission-stat strong {
+  display: block;
+  color: #f2f5ef;
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+
+.mission-step-card {
+  padding: 18px;
+  border: 1px solid #38503b;
+  border-radius: 8px;
+  background: #101711;
+  min-height: 178px;
+}
+
+.mission-step-card span {
+  color: #9fd18d;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.mission-step-card h3 {
+  margin: 0.55rem 0 0.45rem;
+  font-size: 1.16rem;
+}
+
+.mission-step-card p {
+  color: rgba(242,245,239,0.76);
+  font-size: 0.9rem;
+}
+
+.mission-step-buttons {
+  display: grid;
+  gap: 8px;
+}
+
+.mission-step-button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #38503b;
+  border-radius: 8px;
+  color: rgba(242,245,239,0.78);
+  background: #101711;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mission-step-button:hover,
+.mission-step-button.active {
+  color: #f2f5ef;
+  border-color: #9fd18d;
+  background: #162617;
+}
+
+.mission-step-button span {
+  color: #9fd18d;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.mission-step-button strong {
+  font-size: 0.88rem;
+}
+
+.mission-step-button em {
+  color: rgba(242,245,239,0.56);
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.mission-review-link {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(159,209,141,0.55);
+  border-radius: 8px;
+  color: #f2f5ef;
+  text-decoration: none;
+  background: rgba(159,209,141,0.12);
+}
+
+.mission-review-link span {
+  color: rgba(242,245,239,0.7);
+  font-size: 0.82rem;
+}
+
 /* Outdoor Proof */
 .outdoor-proof-band {
   max-width: none;
@@ -866,6 +1183,16 @@ footer a:hover { text-decoration: underline; }
   .showcase-heading { grid-template-columns: 1fr; gap: 1rem; }
   .showcase-heading h2 { font-size: 1.45rem; }
   .scene-showcase-grid { grid-template-columns: 1fr; }
+  .mission-band { padding: 2.5rem 1rem; }
+  .mission-heading { grid-template-columns: 1fr; gap: 1rem; }
+  .mission-actions { justify-content: stretch; }
+  .mission-action { flex: 1 1 150px; }
+  .mission-grid { grid-template-columns: 1fr; }
+  .mission-map { min-height: 340px; }
+  .mission-map img { min-height: 340px; }
+  .mission-stats { grid-template-columns: 1fr 1fr; }
+  .mission-step-button { grid-template-columns: auto minmax(0, 1fr); }
+  .mission-step-button em { display: none; }
   .outdoor-proof-band { padding: 2.5rem 1rem; }
   .outdoor-proof-heading { grid-template-columns: 1fr; gap: 1rem; }
   .proof-grid { grid-template-columns: 1fr; }
@@ -901,6 +1228,7 @@ footer a:hover { text-decoration: underline; }
     <nav>
       <a href="splat.html">Live Demo</a>
       <a href="#scene-showcase-section">Scenes</a>
+      <a href="#mission-control-section">Mission</a>
       <a href="reviews/">Reviews</a>
       <a href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI</a>
       <a href="#pipeline-section">Pipeline</a>
@@ -923,6 +1251,7 @@ footer a:hover { text-decoration: underline; }
     <div class="hero-actions">
       <a class="hero-action primary" href="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat">Open large outdoor demo &rarr;</a>
       <a class="hero-action" href="#scene-showcase-section">Compare all scenes &rarr;</a>
+      <a class="hero-action" href="#mission-control-section">Open mission proof &rarr;</a>
       <a class="hero-action" href="reviews/">Scenario CI reviews &rarr;</a>
       <a class="hero-action" href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI docs &rarr;</a>
     </div>
@@ -1019,6 +1348,113 @@ footer a:hover { text-decoration: underline; }
           <p>GNSS, ATV calibration, and LiDAR-seeded depth supervision for the production MCD demo.</p>
         </div>
       </a>
+    </div>
+  </div>
+</section>
+
+<!-- Mission Control -->
+<section id="mission-control-section" class="mission-band">
+  <div class="mission-inner">
+    <div class="mission-heading">
+      <div>
+        <div class="hero-kicker">Physical AI mission proof</div>
+        <h2>Turn a splat scene into a robot mission, then into a reviewable CI artifact.</h2>
+        <p>GS Mapper does not stop at a pretty reconstruction. The same public scene catalog feeds route planning, semantic-zone cost checks, multi-agent scenarios, sensor noise, dynamic obstacles, and a Pages review bundle that a maintainer can inspect before adopting a workflow.</p>
+      </div>
+      <div class="mission-actions">
+        <a class="mission-action primary" href="reviews/smoke-route-policy-ci/index.html">Open CI review &rarr;</a>
+        <a class="mission-action" href="splat.html?url=assets/outdoor-demo/outdoor-demo.splat">Open scene &rarr;</a>
+        <a class="mission-action" href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Read contract &rarr;</a>
+      </div>
+    </div>
+
+    <div class="mission-grid">
+      <div class="mission-map" aria-label="Robot mission route over an outdoor Gaussian splat preview">
+        <img src="images/demo-sweep/01_outdoor-demo.png" alt="Autoware outdoor Gaussian splat used as the robot mission scene">
+        <svg class="mission-route-svg" viewBox="0 0 640 360" role="img" aria-label="Route, semantic zones, dynamic hazard, and active mission nodes">
+          <rect class="mission-zone" x="66" y="74" width="170" height="92" rx="10"></rect>
+          <rect class="mission-zone" x="408" y="72" width="128" height="96" rx="10"></rect>
+          <circle class="mission-hazard" cx="386" cy="214" r="42"></circle>
+          <path class="mission-route-shadow" d="M94 258 C158 214 186 152 256 148 C332 144 326 232 410 236 C482 240 508 194 548 118"></path>
+          <path class="mission-route-path" d="M94 258 C158 214 186 152 256 148 C332 144 326 232 410 236 C482 240 508 194 548 118"></path>
+          <circle class="mission-robot" cx="94" cy="258" r="13"></circle>
+          <g class="mission-node active" data-mission-node="scene">
+            <circle cx="256" cy="148" r="17"></circle>
+            <text x="256" y="153" text-anchor="middle">1</text>
+          </g>
+          <g class="mission-node" data-mission-node="route">
+            <circle cx="410" cy="236" r="17"></circle>
+            <text x="410" y="241" text-anchor="middle">2</text>
+          </g>
+          <g class="mission-node" data-mission-node="noise">
+            <circle cx="386" cy="214" r="17"></circle>
+            <text x="386" y="219" text-anchor="middle">3</text>
+          </g>
+          <g class="mission-node" data-mission-node="agents">
+            <circle cx="492" cy="192" r="17"></circle>
+            <text x="492" y="197" text-anchor="middle">4</text>
+          </g>
+          <g class="mission-node" data-mission-node="ci">
+            <circle cx="548" cy="118" r="17"></circle>
+            <text x="548" y="123" text-anchor="middle">5</text>
+          </g>
+        </svg>
+        <div class="mission-map-caption">
+          <span>scene <strong>outdoor-demo</strong></span>
+          <span>route <strong>window loop</strong></span>
+          <span>status <strong>PASS / ADOPTED</strong></span>
+        </div>
+      </div>
+
+      <div class="mission-panel">
+        <div class="mission-stats">
+          <div class="mission-stat">
+            <span>Review bundle</span>
+            <strong>PASS</strong>
+          </div>
+          <div class="mission-stat">
+            <span>Scenarios</span>
+            <strong>4</strong>
+          </div>
+          <div class="mission-stat">
+            <span>Shards</span>
+            <strong>4</strong>
+          </div>
+          <div class="mission-stat">
+            <span>Mode</span>
+            <strong>multi-agent</strong>
+          </div>
+        </div>
+
+        <div class="mission-step-card">
+          <span id="mission-step-metric">1 / scene contract</span>
+          <h3 id="mission-step-title">Scene catalog becomes simulator input.</h3>
+          <p id="mission-step-body">The public splat picker is converted into a Physical AI scene catalog with bounds, frames, sensor rigs, and route-policy benchmark inputs.</p>
+        </div>
+
+        <div class="mission-step-buttons" aria-label="Mission proof steps">
+          <button class="mission-step-button active" type="button" data-mission-step="scene">
+            <span>01</span><strong>Scene contract</strong><em>splat to sim</em>
+          </button>
+          <button class="mission-step-button" type="button" data-mission-step="route">
+            <span>02</span><strong>Route policy</strong><em>goal suite</em>
+          </button>
+          <button class="mission-step-button" type="button" data-mission-step="noise">
+            <span>03</span><strong>Noise + obstacles</strong><em>partial info</em>
+          </button>
+          <button class="mission-step-button" type="button" data-mission-step="agents">
+            <span>04</span><strong>Multi-agent run</strong><em>peer metrics</em>
+          </button>
+          <button class="mission-step-button" type="button" data-mission-step="ci">
+            <span>05</span><strong>Scenario CI review</strong><em>adoptable</em>
+          </button>
+        </div>
+
+        <a class="mission-review-link" href="reviews/">
+          <strong>Published review index</strong>
+          <span>One synthetic smoke bundle is already published so visitors can inspect the artifact contract without running CI locally.</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -2155,6 +2591,60 @@ footer a:hover { text-decoration: underline; }
       setViewerStatus(`Published scene load failed: ${error.message || error}`, 'error');
       return loadScene('street');
     });
+})();
+
+
+// ===== MISSION CONTROL =====
+(function() {
+  const missionSteps = {
+    scene: {
+      metric: '1 / scene contract',
+      title: 'Scene catalog becomes simulator input.',
+      body: 'The public splat picker is converted into a Physical AI scene catalog with bounds, frames, sensor rigs, and route-policy benchmark inputs.'
+    },
+    route: {
+      metric: '2 / route policy',
+      title: 'Routes become reproducible policy episodes.',
+      body: 'Goal suites and route presets replay against the same scene contract, so direct-goal, imitation, and future learned policies compare on identical geometry.'
+    },
+    noise: {
+      metric: '3 / partial information',
+      title: 'Noise and dynamic obstacles stress the policy.',
+      body: 'Seeded pose and goal noise, moving obstacle timelines, and semantic-zone costs make a benchmark more realistic than a clean shortest-path toy.'
+    },
+    agents: {
+      metric: '4 / multi-agent evidence',
+      title: 'Peer-aware runs expose interaction risk.',
+      body: 'The sample bundle includes multi-agent crossing scenarios with peer-count and minimum-separation metrics surfaced in the review payload.'
+    },
+    ci: {
+      metric: '5 / scenario CI',
+      title: 'The result is a reviewable, adoptable workflow.',
+      body: 'Scenario matrices shard into CI-sized jobs, merge into a history gate, and publish a Pages review bundle before the generated workflow is adopted.'
+    }
+  };
+
+  const metricEl = document.getElementById('mission-step-metric');
+  const titleEl = document.getElementById('mission-step-title');
+  const bodyEl = document.getElementById('mission-step-body');
+  if (!metricEl || !titleEl || !bodyEl) return;
+
+  function activateMissionStep(stepId) {
+    const step = missionSteps[stepId] || missionSteps.scene;
+    metricEl.textContent = step.metric;
+    titleEl.textContent = step.title;
+    bodyEl.textContent = step.body;
+    document.querySelectorAll('[data-mission-step]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.missionStep === stepId);
+    });
+    document.querySelectorAll('[data-mission-node]').forEach((node) => {
+      node.classList.toggle('active', node.dataset.missionNode === stepId);
+    });
+  }
+
+  document.querySelectorAll('[data-mission-step]').forEach((button) => {
+    button.addEventListener('click', () => activateMissionStep(button.dataset.missionStep));
+  });
 })();
 
 
