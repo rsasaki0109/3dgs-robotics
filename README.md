@@ -17,9 +17,9 @@ reviewable scenario CI artifacts.
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
 [Physical AI docs](docs/physical-ai-sim.md)
 
-[![Inside-map FPS render from actual shipped outdoor 3DGS splats](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+[![GS Mapper outdoor 3DGS overview card](docs/images/social-card.png)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-_Proof view: FPS-style renders from the shipped `.splat` binaries, with a top-down trace showing the camera inside the map._
+Detailed geometry proof: [actual `.splat` FPS trace GIF](docs/images/demo-sweep/map-quality.gif).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
