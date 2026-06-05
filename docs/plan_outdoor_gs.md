@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-29（Pi3X production comparison asset / MCD Profile 3 2-camera redefine 反映）
+更新日: 2026-06-05（README first-view / shipped splat proof GIF / splat cleanup CLI / production splat health gate 反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -30,6 +30,32 @@
 - 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
 - MCD Profile 3 が参照していた `/d455t/color/image_raw` topic は MCDVIRAL 全 18 session に存在しないと判明 (Download page + calibration_atv.yaml で交差確認)。「data-blocked」と思われていた状態は実は spec ミスであり、2-camera (d455b + d435i) の `multi_2cam_300each_ba` に redefine 済み。詳細は §3.2 に recipe 化。
 - 同時に env-hardening 側も IMU finite-diff renderer (#111) → ObstaclePolicy protocol (#112) → IMU + peer-aware features を gym adapter feature dict へ surface (#122/#123) → query_collision / score_trajectory に per-step peer cache を threading (#124/#127) で multi-agent サポートが整った。
+
+### 1.1 2026-06-05: star 獲得に向けた 3DGS 見栄え改善フェーズ
+
+2026-06-05 の作業方針は、単に機能を増やすのではなく、初見のユーザーが README と Pages を開いた瞬間に「これは実データの 3DGS プロジェクトだ」と判断できる状態へ寄せること。これまでの GS Mapper は、Physical AI scenario CI、route-policy benchmark、external SLAM import、MCD/Autoware preprocessing などの技術要素が多く、repo の深さはある一方で、GitHub の first view では価値が見えにくかった。star を伸ばすには、最初に見えるものを「実際の屋外 splat」「比較できる SLAM 由来の地図」「自分の写真や外部 SLAM artifact から同じ流れに入れる CLI」に寄せる必要がある。
+
+このため、6 月フェーズでは README first-view と public `.splat` 品質を優先した。README 冒頭は live 3DGS demo、Mission Control proof、Scenario CI reviews への導線を前面に出し、hero GIF も単なる装飾ではなく、shipped `.splat` binary から座標を読んで FPS-style に描く proof view へ切り替えた。最初の GIF は外側から点群を眺めるだけで「地図として使えるのか」が伝わりにくかったため、カメラを map 内側へ置き、top-down trace を重ねる形へ変更した。これにより README の main visual は「3DGS がある」ではなく「この地図の中を移動できる」に近い表現になった。
+
+public asset 側では、既存の `.splat` が見栄えを壊す要因を分けて扱うことにした。新しく追加した `photos-to-splat --quality draft|balanced|clean|hero` は、新規に写真から splat を作るユーザーの入口を整えるための preset で、`--splat-max-scale-percentile` による adaptive scale gate を export 時に使えるようにした。さらに、すでに `.splat` になっている公開 asset やユーザーの手元 asset も後から直せるように、`gs-mapper splat-filter` を追加した。これは antimatter15 32-byte `.splat` binary を直接読み、opacity と scale の閾値で cloudy な gaussian を取り除く軽量な cleanup command で、source PLY や torch / numpy / gsplat を要求しない。
+
+その後、cleanup を感覚だけで運用しないため `gs-mapper splat-inspect` を追加した。`splat-inspect` は opacity min/p10/p50/p90/max、scale max の p50/p95/p98/p99/max、low-opacity ratio、scale tail ratio を text または JSON で出す。これにより、「この splat は曇っている気がする」という主観を、`scale_p98` と `scale_max` の乖離、低 opacity gaussian の割合、ファイルサイズと gauss count の変化として説明できる。production picker に出る 9 scene については CI で `scale_p98 <= 0.5` と `opacity_p10 >= 0.02` を見る gate も入れた。これは全ての外れ値を禁止する強い gate ではなく、「大量の巨大・半透明 gaussian bulk を production として出さない」ための下限品質チェックとして設計している。
+
+実 asset cleanup の最初の対象は `bag6-vggt-slam-20-15k.splat`。この scene は comparison-quality の外部 SLAM artifact で、元々 214,570 gauss / 約 6.9 MB だったが、scale tail と低 opacity の散り方が README proof GIF で目立ちやすかった。`splat-filter --min-opacity 0.08 --max-scale-percentile 95` 相当の p95 clean を採用し、178,073 gauss / 5.7 MB まで落とした。結果として `scale_p98=0.0751`、`scale_max=0.1568`、low-opacity 0% になり、README benchmark table も `5.4 MB / 178k gauss` に更新した。これは「VGGT-SLAM の品質を過剰に良く見せる」ためではなく、巨大で薄い gaussian が browser blend を汚す問題を落とし、比較 scene として正直に見せるための cleanup である。
+
+次の cleanup 対象は `mcd-tuhh-day04.splat`。この scene は production picker に入っている MCD DUSt3R pose-free で、元の `scale_p98` は 0.0899 と bulk は健全だったが、`scale_max=3.5842`、`scale_tail_ratio=39.9x` という極端な外れ scale を持っていた。また opacity `<0.08` の gaussian が 25,668 / 400,000 点あり、`splat-inspect` は cleanup suggestion を出す状態だった。ここでは VGGT と違い、p98 まで強く切る必要はない。proxy render と top-down 比較では、`min_opacity=0.08` + `max_scale_percentile=99` が構造を残しつつ散った外れ点を落とす最も保守的な選択だったため、370,679 gauss / 11.9 MB の clean asset を採用する方針にした。cleanup 後は low-opacity 0%、`scale_max=0.0940`、`scale_tail_ratio=1.1x` になる。
+
+重要なのは、このフェーズでは「きれいに見せる」ことと「実データの弱点を隠さない」ことを分けること。外部 SLAM comparison scene は、default demo ではなく比較のための scene であり、README でも comparison-quality と明記している。したがって、training をやり直して結果を盛るのではなく、browser viewer で不必要に悪く見える gaussian export の外れ値を落とす。逆に、pose recovery が弱い、地物が欠ける、スケールが不安定といった本質的な reconstruction quality は README / benchmark table / labels で隠さない。この線引きがあるから、public demo は star を狙いつつも技術的に誠実でいられる。
+
+今後の優先順位は次の通り。第一に、README と Pages の visual proof を継続して強くする。具体的には、preview PNG を実 WebGL で再キャプチャできる環境を用意し、asset cleanup 後の public scene と thumbnails のズレを減らす。現ローカル環境には Playwright / GPU-backed WebGL / ffmpeg が揃っていないため、今は `.splat` byte 由来の proxy render で判断しているが、最終的には `scripts/capture_readme_splat_previews.py` と `scripts/record_demo_gif.py` を GPU 環境で再実行し、README の visual 一式を production asset と同期させる必要がある。
+
+第二に、asset health report を release / launch kit とつなぐ。`splat-inspect --json` の出力を `docs/launch-kit.json` または generated report に取り込み、public demo が「9 scenes を shipped している」だけでなく、「各 scene の gauss count、size、opacity p10、scale p98、tail ratio がこうなっている」と説明できるようにする。これは SNS 投稿や awesome list 申請よりも地味だが、3DGS / robotics に詳しい人ほど効く。雑に作った demo ではなく、export quality を測って公開している repo だと伝わる。
+
+第三に、ユーザー向け quick path を磨く。`photos-to-splat --quality clean` と `splat-inspect` / `splat-filter` の組み合わせを README だけでなく、short tutorial / docs page にする。ユーザーが「写真フォルダを入れる」「`.splat` を inspect する」「曇っていたら filter する」「Pages viewer で確認する」という 4 step を迷わず踏める状態にしたい。ここができると、GS Mapper は単なる research repo ではなく、外部 SLAM artifact と browser-viewable 3DGS をつなぐ practical toolkit として見える。
+
+第四に、MCD `ntu_day_02` / Profile 3 の GPU rerun を戻す。README first-view と public asset cleanup は star 獲得のための短期施策だが、repo の中核は real robotics data → 3DGS → Physical AI benchmark の chain である。`multi_2cam_300each_ba` の redefine は済んでいるので、GPU 環境が使えるタイミングで preprocess/train/export を実行し、gate report を更新する。MCD supervised の valid-GNSS asset はすでに `mcd-ntu-day02-supervised.splat` として production picker にあるが、profile plan と実 asset の説明をさらに合わせる余地がある。
+
+第五に、Physical AI scenario CI との接続を README first-view からより強く見せる。3DGS visual だけでは「綺麗な点群 demo」で終わる可能性がある。GS Mapper の差別化は、同じ scene catalog を policy benchmark / route-policy scenario CI / review bundle に流すところにある。したがって、visual proof の次は、scene → sim-scenes catalog → policy benchmark → Pages review の一連の成果を、短い animated proof または compact diagram で見せる。ここまで見せると、star する理由が「3DGS が見える」から「robotics evaluation stack として使えそう」に変わる。
 
 ## 2. 現在の主戦場
 
