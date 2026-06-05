@@ -6,7 +6,22 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Last commit](https://img.shields.io/github/last-commit/rsasaki0109/gs-mapper/main)](https://github.com/rsasaki0109/gs-mapper/commits/main)
 
-**Turn real outdoor robot data into Gaussian-splat scenes, Physical AI policy benchmarks, and CI review artifacts.**
+**Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI.**
+
+GS Mapper turns photos, rosbags, and external SLAM outputs into inspectable
+`.splat` scenes, then reuses those same scenes as route-policy benchmark and
+review-bundle inputs.
+
+**Try it first:** [Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) ·
+[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section) ·
+[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) ·
+[Physical AI docs](docs/physical-ai-sim.md)
+
+[![Kinetic 3DGS sweep from real outdoor robot logs](docs/images/demo-sweep/hero.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+
+Star/watch this repo if you want updates on real-world robotics logs becoming
+browser-viewable 3DGS scenes, route-policy benchmark artifacts, and reviewable
+scenario CI gates.
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
@@ -20,16 +35,8 @@ gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
 python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
 ```
 
-Open first: [live splat viewer](https://rsasaki0109.github.io/gs-mapper/splat.html),
-[Spark mobile / VR viewer](https://rsasaki0109.github.io/gs-mapper/splat_spark.html),
-[WebGPU viewer](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html), and
-[Physical AI contract](docs/physical-ai-sim.md).
-
-Star/watch this repo if you want updates on real-world robotics logs becoming
-browser-viewable 3DGS scenes, route-policy benchmark artifacts, and reviewable
-scenario CI gates.
-
-[![Scene picker cycling through bundled splats on github.io](docs/images/demo-sweep/hero.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+More viewers: [Spark mobile / VR](https://rsasaki0109.github.io/gs-mapper/splat_spark.html)
+and [WebGPU](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html).
 
 GS Mapper is the glue layer between modern visual geometry front-ends and
 Physical AI evaluation workflows. It can run DUSt3R / MASt3R pose-free
@@ -39,16 +46,15 @@ wrap those scenes in route-policy benchmark and scenario-CI artifacts.
 
 What makes it different:
 
-- **Real data first**: robotics logs, outdoor photos, and external SLAM outputs
-  are first-class inputs.
-- **Scene artifacts are inspectable**: every production splat opens in the
-  bundled WebGL / Spark / WebGPU viewers.
-- **Policy evaluation is part of the repo**: scene contracts, observations,
-  collision checks, route-policy baselines, imitation benchmarks, history gates,
-  scenario sets, matrix expansion, sharding, CI manifests, workflow validation,
-  activation, and review bundles are split into testable modules.
-- **CI is designed as a product surface**: benchmark execution is broken into
-  small shardable artifacts instead of one giant opaque end-to-end job.
+- **Real outdoor proof, not mock screenshots**: nine shipped `.splat` scenes
+  compare supervised GNSS/LiDAR, pose-free DUSt3R / MASt3R, VGGT-SLAM 2.0,
+  MASt3R-SLAM, and Pi3X outputs.
+- **One repo from mapping to evaluation**: the same scene catalog feeds browser
+  viewers, Physical AI scene contracts, route-policy benchmarks, and scenario
+  CI review bundles.
+- **Reviewable CI artifacts**: scenario matrices are sharded, validated,
+  activated, merged, and published as inspectable Markdown / HTML / JSON
+  instead of one opaque E2E job.
 
 ```mermaid
 flowchart LR

@@ -128,7 +128,7 @@
       "withinLimit": true
     }
   ],
-  "socialImageUrl": "https://rsasaki0109.github.io/gs-mapper/images/demo-sweep/01_outdoor-demo.png",
+  "socialImageUrl": "https://rsasaki0109.github.io/gs-mapper/images/social-card.png",
   "tagline": "Real robot data to Gaussian-splat Physical AI benchmarks.",
   "topics": [
     "3d-gaussian-splatting",
