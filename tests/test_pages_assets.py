@@ -380,7 +380,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
     assert "Slow FPS course through an actual shipped outdoor 3DGS splat" in readme
     assert "Lead GIF: slow FPS movement through an actual shipped `.splat`" in readme
-    assert "larger top-down route map from the same point cloud" in readme
+    assert "route-aligned dynamic map showing point density, residency tiles" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
