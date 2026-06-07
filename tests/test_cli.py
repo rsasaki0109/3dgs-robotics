@@ -61,6 +61,12 @@ class TestCLIHelp:
             main(["large-scale-3dgs-catalog", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_route_help(self) -> None:
+        """Running large-scale-3dgs-route --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-route", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_large_scale_3dgs_catalog_route_args(self) -> None:
         """large-scale-3dgs-catalog accepts robot route playback runbook args."""
         args = build_parser().parse_args(
@@ -81,6 +87,32 @@ class TestCLIHelp:
         assert args.route_playback is True
         assert args.route_playback_ms == 800
         assert args.route_playback_loop is True
+
+    def test_cli_large_scale_3dgs_route_args(self) -> None:
+        """large-scale-3dgs-route accepts route generation args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-route",
+                "--catalog",
+                "public/manifests/demo-catalog.json",
+                "--output",
+                "public/robot-routes/demo-route.json",
+                "--label",
+                "Demo Route",
+                "--order",
+                "snake",
+                "--default-y",
+                "1.25",
+                "--include-missing-splats",
+            ]
+        )
+
+        assert args.catalog == "public/manifests/demo-catalog.json"
+        assert args.output == "public/robot-routes/demo-route.json"
+        assert args.label == "Demo Route"
+        assert args.order == "snake"
+        assert args.default_y == 1.25
+        assert args.include_missing_splats is True
 
     def test_cmd_train_gsplat_fails_fast_without_colmap(self, tmp_path: Path) -> None:
         """gsplat training should reject data dirs with no COLMAP sparse model."""
