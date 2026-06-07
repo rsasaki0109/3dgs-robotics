@@ -17,9 +17,9 @@ reviewable scenario CI artifacts.
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
 [Physical AI docs](docs/physical-ai-sim.md)
 
-[![Dynamic map loading material rendered from outdoor-demo-dust3r.splat](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+[![Autoware-style dynamic map loading material rendered from outdoor-demo-dust3r.splat](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`; the white density is the `.splat` footprint, green tiles are resident, and amber tiles are preload. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: Autoware-style dynamic map loading over `outdoor-demo-dust3r.splat`; white is the PCD-like `.splat` footprint, green cells are resident, amber cells are preload, and the vector overlay shows a Lanelet2-style route layer. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git

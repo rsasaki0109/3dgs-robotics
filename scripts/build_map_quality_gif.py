@@ -623,10 +623,10 @@ def _render_dynamic_map_material(
         subtitle_font = _load_font(15 if width < 1100 else 17)
         source_name = source_asset or "actual shipped .splat"
         gaussian_text = f" / {gaussian_count // 1000}k gaussians" if gaussian_count is not None else ""
-        draw.text((48, 32), "3DGS footprint -> dynamic map tiles", font=title_font, fill=(245, 250, 255, 255))
+        draw.text((48, 32), "Autoware-style dynamic map loading", font=title_font, fill=(245, 250, 255, 255))
         draw.text(
             (52, 82),
-            f"white = {source_name} footprint{gaussian_text}; green resident, amber preload",
+            f"PCD cells + Lanelet2 vector layer over {source_name} footprint{gaussian_text}",
             font=subtitle_font,
             fill=(176, 197, 214, 235),
         )
@@ -638,6 +638,8 @@ def _render_dynamic_map_material(
     )
     _draw_dynamic_tile_layer(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
     _draw_density_material(image, points, projection=projection, box=map_box, full_material=full_material)
+    _draw_lanelet_vector_layer(draw, projection=projection, route=route, box=map_box, full_material=full_material)
+    _draw_load_radius(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
     _draw_route_material(
         draw, projection=projection, camera=camera, route=route, box=map_box, full_material=full_material
     )
@@ -645,6 +647,9 @@ def _render_dynamic_map_material(
 
     if full_material:
         _draw_material_legend(draw, box=map_box)
+        _draw_autoware_status_hud(
+            draw, projection=projection, camera=camera, box=map_box, gaussian_count=gaussian_count
+        )
         _draw_material_footer(
             draw,
             points,
@@ -694,7 +699,7 @@ def _draw_dynamic_tile_layer(
             draw.rectangle(rect, fill=fill, outline=outline, width=2 if (column, row) == active_tile else 1)
 
             if full_material or (row in (0, MAP_TILE_ROWS - 1) and column % 2 == 0):
-                label = f"T{column + 1}{row + 1}"
+                label = f"PCD {column + 1}{row + 1}" if full_material else f"P{column + 1}{row + 1}"
                 draw.text((rect[0] + 7, rect[1] + 7), label, font=tile_font, fill=(157, 190, 210, 150))
 
     loaded_bounds = _tile_group_bounds(loaded_tiles, box=box)
@@ -714,6 +719,64 @@ def _draw_dynamic_tile_layer(
         draw.text(
             (preload_bounds[0] + 12, preload_bounds[1] + 10), "PRELOAD", font=_load_font(15), fill=(255, 221, 139, 240)
         )
+
+
+def _draw_lanelet_vector_layer(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    route: list[CameraPose],
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    route_xy = _dynamic_route_xy(projection=projection, route=route, box=box)
+    if len(route_xy) < 2:
+        return
+
+    lane_width = max(18, int((box[3] - box[1]) * (0.075 if full_material else 0.060)))
+    left_lane = _offset_polyline(route_xy, lane_width)
+    right_lane = _offset_polyline(route_xy, -lane_width)
+    shoulder_left = _offset_polyline(route_xy, int(lane_width * 1.55))
+    shoulder_right = _offset_polyline(route_xy, int(-lane_width * 1.55))
+
+    draw.line(shoulder_left, fill=(78, 216, 178, 95), width=2 if full_material else 1, joint="curve")
+    draw.line(shoulder_right, fill=(78, 216, 178, 95), width=2 if full_material else 1, joint="curve")
+    draw.line(left_lane, fill=(230, 244, 236, 210), width=3 if full_material else 2, joint="curve")
+    draw.line(right_lane, fill=(230, 244, 236, 210), width=3 if full_material else 2, joint="curve")
+    _draw_dashed_polyline(draw, route_xy, fill=(244, 204, 72, 230), width=2 if full_material else 1, dash=16)
+
+    stop_index = min(len(route_xy) - 2, max(1, int(len(route_xy) * 0.72)))
+    stop_start, stop_end = _perpendicular_segment(route_xy, stop_index, lane_width * 1.25)
+    draw.line((*stop_start, *stop_end), fill=(255, 82, 82, 230), width=4 if full_material else 2)
+    if full_material:
+        label_x = int((stop_start[0] + stop_end[0]) / 2) + 8
+        label_y = int((stop_start[1] + stop_end[1]) / 2) - 24
+        draw.text((label_x, label_y), "Lanelet2 / stop_line", font=_load_font(14), fill=(230, 244, 236, 220))
+
+
+def _draw_load_radius(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=box)
+    radius = int((box[3] - box[1]) * (0.23 if full_material else 0.18))
+    draw.ellipse(
+        (eye_x - radius, eye_y - radius, eye_x + radius, eye_y + radius),
+        outline=(91, 232, 120, 105),
+        width=3 if full_material else 2,
+    )
+    inner_radius = int(radius * 0.58)
+    draw.ellipse(
+        (eye_x - inner_radius, eye_y - inner_radius, eye_x + inner_radius, eye_y + inner_radius),
+        outline=(96, 178, 255, 80),
+        width=2 if full_material else 1,
+    )
+    if full_material:
+        draw.text((eye_x + radius + 8, eye_y - 10), "load radius", font=_load_font(14), fill=(190, 240, 204, 220))
 
 
 def _draw_density_material(
@@ -783,19 +846,12 @@ def _draw_route_material(
 
     eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=box)
     target_x, target_y = _route_map_xy(camera.target, projection=projection, box=box)
-    marker_radius = 15 if full_material else 8
-    draw.line((eye_x, eye_y, target_x, target_y), fill=(91, 232, 120, 255), width=7 if full_material else 5)
-    draw.ellipse(
-        (eye_x - marker_radius, eye_y - marker_radius, eye_x + marker_radius, eye_y + marker_radius),
-        fill=(91, 232, 120, 255),
+    _draw_ego_vehicle_marker(
+        draw,
+        eye=(eye_x, eye_y),
+        target=(target_x, target_y),
+        full_material=full_material,
     )
-    draw.ellipse(
-        (eye_x - marker_radius - 8, eye_y - marker_radius - 8, eye_x + marker_radius + 8, eye_y + marker_radius + 8),
-        outline=(91, 232, 120, 150),
-        width=3 if full_material else 2,
-    )
-    if full_material:
-        draw.text((eye_x + 22, eye_y - 10), "CAMERA", font=_load_font(15), fill=(196, 255, 206, 245))
 
 
 def _draw_material_scale(
@@ -824,21 +880,164 @@ def _draw_material_scale(
     )
 
 
+def _offset_polyline(points: list[tuple[int, int]], offset: int) -> list[tuple[int, int]]:
+    shifted: list[tuple[int, int]] = []
+    for index, point in enumerate(points):
+        if index == 0:
+            previous_point = points[index]
+            next_point = points[index + 1]
+        elif index == len(points) - 1:
+            previous_point = points[index - 1]
+            next_point = points[index]
+        else:
+            previous_point = points[index - 1]
+            next_point = points[index + 1]
+        dx = next_point[0] - previous_point[0]
+        dy = next_point[1] - previous_point[1]
+        length = math.hypot(dx, dy)
+        if length <= 1e-6:
+            normal = (0.0, -1.0)
+        else:
+            normal = (-dy / length, dx / length)
+        shifted.append((int(point[0] + normal[0] * offset), int(point[1] + normal[1] * offset)))
+    return shifted
+
+
+def _draw_dashed_polyline(
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple[int, int]],
+    *,
+    fill: tuple[int, int, int, int],
+    width: int,
+    dash: int,
+) -> None:
+    for start, end in zip(points, points[1:]):
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        segment_length = math.hypot(dx, dy)
+        if segment_length <= 1e-6:
+            continue
+        steps = max(1, int(segment_length / dash))
+        for step_index in range(steps):
+            if step_index % 2:
+                continue
+            t0 = step_index / steps
+            t1 = min(1.0, (step_index + 0.72) / steps)
+            x0 = int(start[0] + dx * t0)
+            y0 = int(start[1] + dy * t0)
+            x1 = int(start[0] + dx * t1)
+            y1 = int(start[1] + dy * t1)
+            draw.line((x0, y0, x1, y1), fill=fill, width=width)
+
+
+def _perpendicular_segment(
+    points: list[tuple[int, int]],
+    index: int,
+    half_width: float,
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    point = points[index]
+    next_point = points[min(len(points) - 1, index + 1)]
+    dx = next_point[0] - point[0]
+    dy = next_point[1] - point[1]
+    length = math.hypot(dx, dy)
+    if length <= 1e-6:
+        normal = (0.0, -1.0)
+    else:
+        normal = (-dy / length, dx / length)
+    return (
+        (int(point[0] - normal[0] * half_width), int(point[1] - normal[1] * half_width)),
+        (int(point[0] + normal[0] * half_width), int(point[1] + normal[1] * half_width)),
+    )
+
+
+def _draw_ego_vehicle_marker(
+    draw: ImageDraw.ImageDraw,
+    *,
+    eye: tuple[int, int],
+    target: tuple[int, int],
+    full_material: bool,
+) -> None:
+    dx = target[0] - eye[0]
+    dy = target[1] - eye[1]
+    length = math.hypot(dx, dy)
+    if length <= 1e-6:
+        direction = (1.0, 0.0)
+    else:
+        direction = (dx / length, dy / length)
+    normal = (-direction[1], direction[0])
+    vehicle_length = 42 if full_material else 26
+    vehicle_width = 22 if full_material else 14
+    front = (eye[0] + direction[0] * vehicle_length * 0.58, eye[1] + direction[1] * vehicle_length * 0.58)
+    rear = (eye[0] - direction[0] * vehicle_length * 0.42, eye[1] - direction[1] * vehicle_length * 0.42)
+    corners = (
+        (front[0], front[1]),
+        (eye[0] + normal[0] * vehicle_width * 0.5, eye[1] + normal[1] * vehicle_width * 0.5),
+        (rear[0] + normal[0] * vehicle_width * 0.5, rear[1] + normal[1] * vehicle_width * 0.5),
+        (rear[0] - normal[0] * vehicle_width * 0.5, rear[1] - normal[1] * vehicle_width * 0.5),
+        (eye[0] - normal[0] * vehicle_width * 0.5, eye[1] - normal[1] * vehicle_width * 0.5),
+    )
+    polygon = [(int(x), int(y)) for x, y in corners]
+    draw.polygon(polygon, fill=(91, 232, 120, 220), outline=(210, 255, 218, 245))
+    axis_length = 28 if full_material else 16
+    draw.line(
+        (eye[0], eye[1], int(eye[0] + direction[0] * axis_length), int(eye[1] + direction[1] * axis_length)),
+        fill=(255, 82, 82, 245),
+        width=3 if full_material else 2,
+    )
+    draw.line(
+        (eye[0], eye[1], int(eye[0] + normal[0] * axis_length), int(eye[1] + normal[1] * axis_length)),
+        fill=(88, 178, 255, 235),
+        width=3 if full_material else 2,
+    )
+    if full_material:
+        draw.text((eye[0] + 24, eye[1] - 12), "base_link", font=_load_font(15), fill=(196, 255, 206, 245))
+
+
 def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int, int]) -> None:
     legend_font = _load_font(15)
     x = box[2] - 358
     y = box[1] + 18
     items = (
-        ((91, 232, 120, 150), "resident tiles in memory"),
-        ((242, 190, 82, 150), "preload edge"),
-        ((47, 137, 221, 210), "route corridor"),
-        ((232, 246, 238, 165), "actual .splat footprint"),
+        ((91, 232, 120, 150), "resident PCD cells"),
+        ((242, 190, 82, 150), "preload request"),
+        ((230, 244, 236, 190), "Lanelet2 vector layer"),
+        ((232, 246, 238, 165), ".splat footprint density"),
     )
     draw.rounded_rectangle((x - 16, y - 12, box[2] - 18, y + len(items) * 28 + 8), radius=8, fill=(4, 10, 14, 205))
     for index, (color, label) in enumerate(items):
         yy = y + index * 28
         draw.rounded_rectangle((x, yy, x + 26, yy + 14), radius=3, fill=color)
         draw.text((x + 38, yy - 2), label, font=legend_font, fill=(218, 232, 242, 235))
+
+
+def _draw_autoware_status_hud(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    box: tuple[int, int, int, int],
+    gaussian_count: int | None,
+) -> None:
+    loaded_tiles, preload_tiles, active_tile = _tile_residency_sets(camera, projection=projection)
+    panel_width = 382
+    panel_height = 118
+    x0 = box[2] - panel_width - 18
+    y0 = box[3] - panel_height - 18
+    x1 = x0 + panel_width
+    y1 = y0 + panel_height
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=(3, 8, 12, 214), outline=(87, 158, 206, 92))
+    title_font = _load_font(15)
+    text_font = _load_font(13)
+    total = f"{gaussian_count // 1000}k" if gaussian_count is not None else "n/a"
+    lines = (
+        "/map/pointcloud_map  GetPartialPointCloudMap",
+        "/map/vector_map      Lanelet2 marker layer",
+        f"loaded {len(loaded_tiles):02d} PCD cells / preload {len(preload_tiles):02d} / src {total}",
+        f"active cell pcd_{active_tile[0] + 1:02d}_{active_tile[1] + 1:02d}  frame_id=map -> base_link",
+    )
+    draw.text((x0 + 14, y0 + 12), "Autoware map_loader view", font=title_font, fill=(196, 225, 243, 245))
+    for index, line in enumerate(lines):
+        draw.text((x0 + 14, y0 + 36 + index * 18), line, font=text_font, fill=(155, 185, 205, 230))
 
 
 def _draw_material_footer(
@@ -855,18 +1054,26 @@ def _draw_material_footer(
     left, right, bottom, top = bounds
     width, height = size
     footer_font = _load_font(18)
-    meta_font = _load_font(16)
+    meta_font = _load_font(14 if width < 1100 else 16)
     source_name = source_asset or "actual shipped .splat"
-    gaussian_text = f"{gaussian_count // 1000}k total gaussians / " if gaussian_count is not None else ""
+    if width < 1100:
+        gaussian_text = f"{gaussian_count // 1000}k gaussians" if gaussian_count is not None else "sampled splats"
+        source_line = f"source: {source_name} / {gaussian_text} / partial map loading"
+    else:
+        gaussian_text = f"{gaussian_count // 1000}k total gaussians / " if gaussian_count is not None else ""
+        source_line = (
+            f"source: {source_name} / {gaussian_text}sampled {len(points) // 1000}k splats / "
+            "Autoware-style partial map loading"
+        )
     draw.text(
         (box[0], height - 68),
-        f"footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
+        f"PCD footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
         font=footer_font,
         fill=(225, 238, 247, 240),
     )
     draw.text(
         (box[0], height - 38),
-        f"source: {source_name} / {gaussian_text}sampled {len(points) // 1000}k splats for this material",
+        source_line,
         font=meta_font,
         fill=(162, 184, 202, 220),
     )
