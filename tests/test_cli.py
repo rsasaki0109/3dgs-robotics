@@ -55,6 +55,22 @@ class TestCLIHelp:
             main(["large-scale-3dgs-preflight", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_preflight_write_plan_args(self) -> None:
+        """large-scale-3dgs-preflight accepts plan materialization args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-preflight",
+                "--data",
+                "outputs/sparse",
+                "--write-plan",
+                "--link-mode",
+                "copy",
+            ]
+        )
+
+        assert args.write_plan is True
+        assert args.link_mode == "copy"
+
     def test_cli_large_scale_3dgs_run_help(self) -> None:
         """Running large-scale-3dgs-run --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:

@@ -81,6 +81,8 @@ class LargeScale3DGSPreflightOptions:
     target_images_per_chunk: int = 48
     iterations: int = 30000
     config: str | None = "configs/training_ba.yaml"
+    write_plan: bool = False
+    link_mode: str = "symlink"
 
 
 @dataclass(frozen=True)
@@ -905,7 +907,7 @@ def _build_preflight_plan_command(options: LargeScale3DGSPreflightOptions, recom
     ]
     if options.config:
         parts.extend(["--config", options.config])
-    parts.extend(["--materialize"])
+    parts.extend(["--materialize", "--link-mode", options.link_mode])
     return _format_command(parts)
 
 
@@ -917,6 +919,8 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
         raise ValueError("--min-images must be >= 1")
     if options.target_images_per_chunk < 1:
         raise ValueError("--target-images-per-chunk must be >= 1")
+    if options.link_mode not in {"symlink", "copy", "none"}:
+        raise ValueError("--link-mode must be symlink, copy, or none")
 
     tile_sizes = parse_large_scale_3dgs_tile_sizes(options.tile_sizes)
     data_dir = Path(options.data_dir)
@@ -962,6 +966,23 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
     plan_path = output_dir / "large_scale_3dgs_plan.json"
     run_report_path = output_dir / "large_scale_3dgs_run_report.json"
     plan_command = _build_preflight_plan_command(options, recommended)
+    written_plan_path = ""
+    if options.write_plan:
+        plan = build_large_scale_3dgs_plan(
+            LargeScale3DGSOptions(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                tile_size=float(recommended["tileSize"]),
+                overlap=float(recommended["overlap"]),
+                axes="".join(axes),
+                min_images=options.min_images,
+                iterations=options.iterations,
+                config=options.config,
+                materialize=True,
+                link_mode=options.link_mode,
+            )
+        )
+        written_plan_path = str(write_large_scale_3dgs_plan(plan, output_dir))
 
     return {
         "version": 1,
@@ -993,6 +1014,8 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
             "sourceImageBytesPerChunk": recommended["sourceImageBytesPerChunk"],
         },
         "next": {
+            "planWritten": bool(options.write_plan),
+            "planPath": written_plan_path,
             "planCommand": plan_command,
             "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
             "catalogCommand": _format_command(
@@ -1032,6 +1055,8 @@ def format_large_scale_3dgs_preflight_text(report: dict[str, Any], report_path: 
     ]
     if report_path is not None:
         lines.append(f"  report: {report_path}")
+    if report["next"].get("planPath"):
+        lines.append(f"  plan: {report['next']['planPath']}")
     lines.append("  candidates:")
     for candidate in report["candidates"]:
         marker = "*" if candidate.get("recommended") else "-"

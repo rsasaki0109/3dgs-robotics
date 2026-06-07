@@ -193,15 +193,8 @@ gs-mapper large-scale-3dgs-preflight \
   --output outputs/autoware_large \
   --axes xy \
   --tile-sizes 20,30,50 \
-  --target-images-per-chunk 48
-
-gs-mapper large-scale-3dgs-plan \
-  --data outputs/autoware_sparse \
-  --output outputs/autoware_large \
-  --tile-size 30 \
-  --overlap 5 \
-  --axes xy \
-  --materialize
+  --target-images-per-chunk 48 \
+  --write-plan
 
 gs-mapper large-scale-3dgs-run --plan outputs/autoware_large/large_scale_3dgs_plan.json
 gs-mapper large-scale-3dgs-catalog \

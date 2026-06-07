@@ -183,6 +183,35 @@ def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands
     assert "next plan: gs-mapper large-scale-3dgs-plan" in text
 
 
+def test_build_large_scale_3dgs_preflight_can_write_recommended_plan(tmp_path: Path) -> None:
+    data_dir = _write_sparse_fixture(tmp_path / "data")
+    output_dir = tmp_path / "large"
+
+    report = build_large_scale_3dgs_preflight(
+        LargeScale3DGSPreflightOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            axes="xy",
+            tile_sizes=(10.0, 20.0),
+            overlap=0,
+            min_images=1,
+            target_images_per_chunk=2,
+            write_plan=True,
+            link_mode="copy",
+        )
+    )
+    text = format_large_scale_3dgs_preflight_text(report)
+    plan_path = Path(report["next"]["planPath"])
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    assert report["next"]["planWritten"] is True
+    assert plan_path == output_dir / "large_scale_3dgs_plan.json"
+    assert plan["tiling"]["tileSize"] == 20.0
+    assert plan["materialized"] is True
+    assert Path(plan["chunks"][0]["dataDir"], "images", "frame_000.jpg").read_bytes() == b"jpg"
+    assert f"plan: {plan_path}" in text
+
+
 def test_build_large_scale_3dgs_plan_materializes_chunk_sparse_and_images(tmp_path: Path) -> None:
     data_dir = _write_sparse_fixture(tmp_path / "data")
     output_dir = tmp_path / "large"

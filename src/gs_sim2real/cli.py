@@ -429,6 +429,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Training config path used in the suggested plan command",
     )
     lsgp.add_argument(
+        "--write-plan",
+        action="store_true",
+        help="Also write large_scale_3dgs_plan.json using the recommended tile size",
+    )
+    lsgp.add_argument(
+        "--link-mode",
+        choices=["symlink", "copy", "none"],
+        default="symlink",
+        help="How --write-plan materializes images/depth into per-tile directories",
+    )
+    lsgp.add_argument(
         "--format",
         choices=["text", "json"],
         default="text",
@@ -2592,6 +2603,8 @@ def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
         target_images_per_chunk=args.target_images_per_chunk,
         iterations=args.iterations,
         config=args.config,
+        write_plan=args.write_plan,
+        link_mode=args.link_mode,
     )
     report = build_large_scale_3dgs_preflight(options)
     report_path = write_large_scale_3dgs_preflight(report, Path(args.output))
