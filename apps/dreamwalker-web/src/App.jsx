@@ -11,6 +11,7 @@ import {
 } from './studio-health.js';
 import {
   buildDynamicMapLoadPlan,
+  buildDynamicMapTileCatalogLaunchUrl,
   normalizeDynamicMapPreloadMode,
   preloadDynamicMapEntry
 } from './dynamic-map-loading.js';
@@ -9265,6 +9266,38 @@ export default function App() {
     return nextUrl.toString();
   }
 
+  function buildLargeScaleDemoLaunchUrl() {
+    return buildDynamicMapTileCatalogLaunchUrl(
+      typeof window === 'undefined' ? '/' : window.location.href,
+      dreamwalkerConfig.largeScaleDemo
+    );
+  }
+
+  function openLargeScaleDemo() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const launchUrl = buildLargeScaleDemoLaunchUrl();
+    if (launchUrl) {
+      window.location.assign(launchUrl);
+    }
+  }
+
+  async function copyLargeScaleDemoLaunchUrl() {
+    const launchUrl = buildLargeScaleDemoLaunchUrl();
+    if (!launchUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(launchUrl);
+      setStatusMessage(`${dreamwalkerConfig.largeScaleDemo.label} launch URL をコピーしました`);
+    } catch {
+      setStatusMessage('Large-scale demo URL をコピーできませんでした');
+    }
+  }
+
   async function applyPublicStudioBundle(entry) {
     if (!entry?.url) {
       return;
@@ -9934,6 +9967,14 @@ export default function App() {
           <p className="panel-note">
             {tileCatalogState.url || 'tileCatalog query 未指定'}
           </p>
+          <div className="button-stack">
+            <button className="primary-button" onClick={openLargeScaleDemo} type="button">
+              Open Large-scale Demo
+            </button>
+            <button className="ghost-button" onClick={copyLargeScaleDemoLaunchUrl} type="button">
+              Copy Large-scale URL
+            </button>
+          </div>
         </div>
         <p className="panel-note">
           {effectiveSplatUrl ? `Active splat: ${effectiveSplatUrl}` : 'splat asset 未設定'}

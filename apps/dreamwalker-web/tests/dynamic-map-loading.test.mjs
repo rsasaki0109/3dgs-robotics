@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { resolveDreamwalkerConfig } from '../src/app-config.js';
 import {
   buildDynamicMapLoadPlan,
+  buildDynamicMapTileCatalogLaunchUrl,
   collectDynamicMapTargetFragmentIds,
   preloadDynamicMapEntry,
   selectDynamicMapTile
@@ -27,6 +28,31 @@ test('collectDynamicMapTargetFragmentIds can skip gate target and dedupe extras'
     }),
     ['residency', 'echo-chamber']
   );
+});
+
+test('buildDynamicMapTileCatalogLaunchUrl wires a large-scale catalog into the current app URL', () => {
+  const launchUrl = buildDynamicMapTileCatalogLaunchUrl(
+    'http://127.0.0.1:4173/?overlay=1&tileId=old#fragment=echo-chamber',
+    {
+      tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+      preloadMode: 'cache',
+      tilePreloadLimit: 2,
+      tileResidentLimit: 3
+    }
+  );
+  const parsedUrl = new URL(launchUrl);
+
+  assert.equal(parsedUrl.origin, 'http://127.0.0.1:4173');
+  assert.equal(parsedUrl.hash, '');
+  assert.equal(
+    parsedUrl.searchParams.get('tileCatalog'),
+    '/manifests/outdoor-demo-dust3r-tile-catalog.json'
+  );
+  assert.equal(parsedUrl.searchParams.get('tilePreload'), 'cache');
+  assert.equal(parsedUrl.searchParams.get('tilePreloadLimit'), '2');
+  assert.equal(parsedUrl.searchParams.get('tileResidentLimit'), '3');
+  assert.equal(parsedUrl.searchParams.has('tileId'), false);
+  assert.equal(parsedUrl.searchParams.has('overlay'), false);
 });
 
 test('buildDynamicMapLoadPlan resolves active map and gate preload candidate from manifest', () => {
