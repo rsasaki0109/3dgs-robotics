@@ -81,6 +81,9 @@ test('large-scale demo button launches the bundled outdoor tile catalog', async 
   await expect(page.getByText('4 ready / 4 tiles').first()).toBeVisible();
   await expect(page.getByText('Preload limit: 2').first()).toBeVisible();
   await expect(page.getByText('Resident limit: 3').first()).toBeVisible();
+  await expect(page.locator('.dynamic-map-tile-overlay')).toBeVisible();
+  await expect(page.locator('.dynamic-map-tile-active')).toHaveCount(1);
+  await expect(page.locator('.dynamic-map-tile-preload')).toHaveCount(2);
   await expect(page.getByText(/Active tile: tile_x\d{3}_z\d{3}/).first()).toBeVisible();
   await expect(
     page
