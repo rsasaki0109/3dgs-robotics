@@ -16,6 +16,7 @@ from gs_sim2real.viewer.web_export import (
     ply_to_json,
     ply_to_scene_bundle,
     points_to_scene_bundle,
+    splat_to_tile_catalog,
 )
 
 
@@ -306,6 +307,47 @@ class TestInspectSplatFile:
         src.write_bytes(b"")
         with pytest.raises(ValueError, match="does not contain any splats"):
             inspect_splat_file(src)
+
+
+class TestSplatToTileCatalog:
+    """Tests for tiling an existing browser .splat into dynamic-map assets."""
+
+    def test_writes_tile_splats_and_catalog(self, tmp_path: Path) -> None:
+        src = tmp_path / "raw.splat"
+        src.write_bytes(
+            b"".join(
+                [
+                    _pack_splat_record((0, 0, 0), (0.1, 0.1, 0.1), 255),
+                    _pack_splat_record((4, 0, 0), (0.1, 0.1, 0.1), 255),
+                    _pack_splat_record((9, 0, 0), (0.1, 0.1, 0.1), 255),
+                    _pack_splat_record((12, 0, 0), (0.1, 0.1, 0.1), 255),
+                ]
+            )
+        )
+        catalog_path = tmp_path / "public" / "manifests" / "demo-catalog.json"
+
+        catalog = splat_to_tile_catalog(
+            src,
+            catalog_path,
+            public_root=tmp_path / "public",
+            scene_id="Demo Tiles",
+            label="Demo Tiles",
+            tile_size=10,
+            overlap=1,
+            axes="xz",
+            min_splats=1,
+        )
+
+        assert catalog["type"] == "large-scale-3dgs-tile-catalog"
+        assert catalog["sceneId"] == "demo-tiles"
+        assert catalog["summary"]["inputSplatCount"] == 4
+        assert catalog["summary"]["tileCount"] == 2
+        assert [tile["coreSplatCount"] for tile in catalog["tiles"]] == [3, 1]
+        assert [tile["splatCount"] for tile in catalog["tiles"]] == [3, 2]
+        assert catalog["tiles"][0]["splatUrl"] == "/splats/demo-tiles/tile_x000_z000.splat"
+        assert Path(catalog["tiles"][0]["publicPath"]).stat().st_size == 3 * 32
+        assert Path(catalog["tiles"][1]["publicPath"]).stat().st_size == 2 * 32
+        assert json.loads(catalog_path.read_text(encoding="utf-8"))["summary"]["tileCount"] == 2
 
 
 class TestPlyToSceneBundle:

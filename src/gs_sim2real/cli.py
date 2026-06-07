@@ -782,6 +782,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     si.add_argument("--json", action="store_true", help="Print machine-readable JSON")
 
+    stc = subparsers.add_parser(
+        "splat-tile-catalog",
+        help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
+    )
+    stc.add_argument("--input", required=True, help="Input 32-byte-per-gaussian .splat file")
+    stc.add_argument("--output", required=True, help="Output tile catalog JSON path")
+    stc.add_argument(
+        "--public-root",
+        default="apps/dreamwalker-web/public",
+        help="Web public root where tile .splat files are written",
+    )
+    stc.add_argument("--scene-id", default=None, help="Scene id for the generated tile catalog")
+    stc.add_argument("--label", default=None, help="Human-readable catalog label")
+    stc.add_argument("--tile-size", type=float, default=10.0, help="Tile size in .splat coordinate units")
+    stc.add_argument("--overlap", type=float, default=2.0, help="Tile overlap in .splat coordinate units")
+    stc.add_argument("--axes", choices=["xy", "xz", "yz"], default="xz", help="Axes used for tile splitting")
+    stc.add_argument("--min-splats", type=int, default=1, help="Minimum core splats required to write a tile")
+    stc.add_argument(
+        "--public-url-prefix",
+        default="/splats",
+        help="URL prefix under --public-root for generated tile .splat files",
+    )
+    stc.add_argument("--json", action="store_true", help="Print machine-readable JSON")
+
     # benchmark
     bm = subparsers.add_parser("benchmark", help="Benchmark training backends")
     bm.add_argument("--data", required=True, help="Data directory for training")
@@ -2807,6 +2831,34 @@ def cmd_export(args: argparse.Namespace) -> None:
     print(f"Exported to: {result}")
 
 
+def cmd_splat_tile_catalog(args: argparse.Namespace) -> None:
+    """Handle the splat-tile-catalog subcommand."""
+    from gs_sim2real.viewer.web_export import splat_to_tile_catalog
+
+    catalog = splat_to_tile_catalog(
+        args.input,
+        args.output,
+        public_root=args.public_root,
+        scene_id=args.scene_id,
+        label=args.label,
+        tile_size=args.tile_size,
+        overlap=args.overlap,
+        axes=args.axes,
+        min_splats=args.min_splats,
+        public_url_prefix=args.public_url_prefix,
+    )
+
+    if args.json:
+        print(json.dumps(catalog, indent=2))
+    else:
+        summary = catalog["summary"]
+        print("Splat tile catalog")
+        print(f"  scene: {catalog['sceneId']} / {catalog['label']}")
+        print(f"  input: {catalog['planPath'].removesuffix(':splat-tiling')}")
+        print(f"  tiles: {summary['readyTileCount']} ready / {summary['inputSplatCount']} input splats")
+        print(f"  catalog: {args.output}")
+
+
 def cmd_photos_to_splat(args: argparse.Namespace) -> None:
     """Handle the photos-to-splat subcommand.
 
@@ -3653,6 +3705,7 @@ def main(argv: list[str] | None = None) -> None:
         "photos-to-splat": cmd_photos_to_splat,
         "splat-filter": cmd_splat_filter,
         "splat-inspect": cmd_splat_inspect,
+        "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,
         "run": cmd_run,
         "demo": cmd_demo,

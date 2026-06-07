@@ -12,10 +12,11 @@ import logging
 import struct
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 SPLAT_RECORD_BYTES = 32
+_SPLAT_AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
 
 if TYPE_CHECKING:
     import numpy as np
@@ -221,6 +222,181 @@ def inspect_splat_file(
         scale_p99=_percentile(scale_max_values, 99.0),
         scale_max=scale_max_values[-1],
     )
+
+
+def _validate_splat_axes(axes: str) -> tuple[str, str]:
+    normalized = str(axes or "").strip().lower()
+    if len(normalized) != 2 or normalized[0] == normalized[1]:
+        raise ValueError("--axes must contain two distinct axes, e.g. xy, xz, yz")
+    if normalized[0] not in _SPLAT_AXIS_INDEX or normalized[1] not in _SPLAT_AXIS_INDEX:
+        raise ValueError("--axes must contain only x, y, z")
+    return normalized[0], normalized[1]
+
+
+def _splat_axis_value(data: bytes, record_index: int, axis: str) -> float:
+    return struct.unpack_from("<f", data, record_index * SPLAT_RECORD_BYTES + _SPLAT_AXIS_INDEX[axis] * 4)[0]
+
+
+def _record_in_axis_bounds(
+    data: bytes,
+    record_index: int,
+    *,
+    axes: tuple[str, str],
+    bounds: dict[str, float],
+) -> bool:
+    first = _splat_axis_value(data, record_index, axes[0])
+    second = _splat_axis_value(data, record_index, axes[1])
+    return (
+        bounds[f"min{axes[0].upper()}"] <= first <= bounds[f"max{axes[0].upper()}"]
+        and bounds[f"min{axes[1].upper()}"] <= second <= bounds[f"max{axes[1].upper()}"]
+    )
+
+
+def _splat_world_bounds(data: bytes, count: int, axes: tuple[str, str]) -> dict[str, float]:
+    first_values = [_splat_axis_value(data, index, axes[0]) for index in range(count)]
+    second_values = [_splat_axis_value(data, index, axes[1]) for index in range(count)]
+    return {
+        f"min{axes[0].upper()}": float(min(first_values)),
+        f"max{axes[0].upper()}": float(max(first_values)),
+        f"min{axes[1].upper()}": float(min(second_values)),
+        f"max{axes[1].upper()}": float(max(second_values)),
+    }
+
+
+def splat_to_tile_catalog(
+    input_path: str | Path,
+    catalog_path: str | Path,
+    *,
+    public_root: str | Path,
+    scene_id: str | None = None,
+    label: str | None = None,
+    tile_size: float = 10.0,
+    overlap: float = 2.0,
+    axes: str = "xz",
+    min_splats: int = 1,
+    public_url_prefix: str = "/splats",
+) -> dict[str, Any]:
+    """Split an existing browser .splat into tile files and a dynamic-map catalog."""
+    if tile_size <= 0:
+        raise ValueError("--tile-size must be > 0")
+    if overlap < 0:
+        raise ValueError("--overlap must be >= 0")
+    if min_splats < 1:
+        raise ValueError("--min-splats must be >= 1")
+
+    src = Path(input_path)
+    data = src.read_bytes()
+    if len(data) % SPLAT_RECORD_BYTES:
+        raise ValueError(f"{src} is not a 32-byte-per-gaussian .splat file")
+    count = len(data) // SPLAT_RECORD_BYTES
+    if count == 0:
+        raise ValueError(f"{src} does not contain any splats")
+
+    split_axes = _validate_splat_axes(axes)
+    catalog = Path(catalog_path)
+    root = Path(public_root)
+    normalized_scene_id = _sanitize_scene_id(scene_id or src.stem)
+    tile_dir = root / public_url_prefix.strip("/") / normalized_scene_id
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    world_bounds = _splat_world_bounds(data, count, split_axes)
+    axis_a, axis_b = split_axes
+    min_a = world_bounds[f"min{axis_a.upper()}"]
+    min_b = world_bounds[f"min{axis_b.upper()}"]
+    max_a = world_bounds[f"max{axis_a.upper()}"]
+    max_b = world_bounds[f"max{axis_b.upper()}"]
+    num_a = max(1, int((max_a - min_a) // tile_size) + 1)
+    num_b = max(1, int((max_b - min_b) // tile_size) + 1)
+    tiles: list[dict[str, Any]] = []
+
+    for tile_a in range(num_a):
+        for tile_b in range(num_b):
+            core_bounds = {
+                f"min{axis_a.upper()}": min_a + tile_a * tile_size,
+                f"max{axis_a.upper()}": min_a + (tile_a + 1) * tile_size,
+                f"min{axis_b.upper()}": min_b + tile_b * tile_size,
+                f"max{axis_b.upper()}": min_b + (tile_b + 1) * tile_size,
+            }
+            expanded_bounds = {
+                f"min{axis_a.upper()}": core_bounds[f"min{axis_a.upper()}"] - overlap,
+                f"max{axis_a.upper()}": core_bounds[f"max{axis_a.upper()}"] + overlap,
+                f"min{axis_b.upper()}": core_bounds[f"min{axis_b.upper()}"] - overlap,
+                f"max{axis_b.upper()}": core_bounds[f"max{axis_b.upper()}"] + overlap,
+            }
+            core_indices = [
+                index
+                for index in range(count)
+                if _record_in_axis_bounds(data, index, axes=split_axes, bounds=core_bounds)
+            ]
+            if len(core_indices) < min_splats:
+                continue
+
+            expanded_indices = [
+                index
+                for index in range(count)
+                if _record_in_axis_bounds(data, index, axes=split_axes, bounds=expanded_bounds)
+            ]
+            tile_id = f"tile_{axis_a}{tile_a:03d}_{axis_b}{tile_b:03d}"
+            tile_path = tile_dir / f"{tile_id}.splat"
+            tile_path.write_bytes(
+                b"".join(
+                    data[index * SPLAT_RECORD_BYTES : (index + 1) * SPLAT_RECORD_BYTES] for index in expanded_indices
+                )
+            )
+            tiles.append(
+                {
+                    "id": tile_id,
+                    "label": tile_id.replace("_", " "),
+                    "status": "ready",
+                    "runStatus": "tiled",
+                    "splatUrl": "/"
+                    + "/".join(
+                        part for part in [public_url_prefix.strip("/"), normalized_scene_id, tile_path.name] if part
+                    ),
+                    "sourceSplat": str(src),
+                    "publicPath": str(tile_path),
+                    "coreBounds": core_bounds,
+                    "expandedBounds": expanded_bounds,
+                    "tileIndex": {
+                        axis_a: tile_a,
+                        axis_b: tile_b,
+                    },
+                    "axes": "".join(split_axes),
+                    "imageCount": 0,
+                    "coreImageCount": 0,
+                    "pointCount": len(expanded_indices),
+                    "coreSplatCount": len(core_indices),
+                    "splatCount": len(expanded_indices),
+                }
+            )
+
+    catalog_payload = {
+        "version": 1,
+        "type": "large-scale-3dgs-tile-catalog",
+        "sceneId": normalized_scene_id,
+        "label": label or src.stem.replace("_", " ").replace("-", " "),
+        "planPath": f"{src}:splat-tiling",
+        "runReportPath": "",
+        "tiling": {
+            "strategy": "existing-splat-axis-grid",
+            "axes": "".join(split_axes),
+            "tileSize": float(tile_size),
+            "overlap": float(overlap),
+            "minSplats": int(min_splats),
+            "worldBounds": world_bounds,
+        },
+        "summary": {
+            "tileCount": len(tiles),
+            "readyTileCount": len(tiles),
+            "missingSplatTileCount": 0,
+            "inputSplatCount": count,
+            "inputBytes": len(data),
+            "tiledSplatCount": sum(tile["splatCount"] for tile in tiles),
+        },
+        "tiles": tiles,
+    }
+    catalog.parent.mkdir(parents=True, exist_ok=True)
+    catalog.write_text(json.dumps(catalog_payload, indent=2) + "\n", encoding="utf-8")
+    return catalog_payload
 
 
 def _sanitize_scene_id(value: str) -> str:

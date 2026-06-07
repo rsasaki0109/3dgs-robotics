@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "sceneId": "outdoor-demo-dust3r-tiled",
+  "label": "Outdoor Demo DUSt3R Tiled",
+  "planPath": "docs/assets/outdoor-demo/outdoor-demo-dust3r.splat:splat-tiling",
+  "runReportPath": "",
+  "tiling": {
+    "strategy": "existing-splat-axis-grid",
+    "axes": "xz",
+    "tileSize": 10.0,
+    "overlap": 0.5,
+    "minSplats": 500,
+    "worldBounds": {
+      "minX": -8.106985092163086,
+      "maxX": 8.893013954162598,
+      "minZ": -8.106915473937988,
+      "maxZ": 7.050594806671143
+    }
+  },
+  "summary": {
+    "tileCount": 4,
+    "readyTileCount": 4,
+    "missingSplatTileCount": 0,
+    "inputSplatCount": 400000,
+    "inputBytes": 12800000,
+    "tiledSplatCount": 430474
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_z000",
+      "label": "tile x000 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-demo-dust3r-tiled/tile_x000_z000.splat",
+      "sourceSplat": "docs/assets/outdoor-demo/outdoor-demo-dust3r.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-demo-dust3r-tiled/tile_x000_z000.splat",
+      "coreBounds": {
+        "minX": -8.106985092163086,
+        "maxX": 1.893014907836914,
+        "minZ": -8.106915473937988,
+        "maxZ": 1.8930845260620117
+      },
+      "expandedBounds": {
+        "minX": -8.606985092163086,
+        "maxX": 2.393014907836914,
+        "minZ": -8.606915473937988,
+        "maxZ": 2.3930845260620117
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 263730,
+      "coreSplatCount": 246666,
+      "splatCount": 263730
+    },
+    {
+      "id": "tile_x000_z001",
+      "label": "tile x000 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-demo-dust3r-tiled/tile_x000_z001.splat",
+      "sourceSplat": "docs/assets/outdoor-demo/outdoor-demo-dust3r.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-demo-dust3r-tiled/tile_x000_z001.splat",
+      "coreBounds": {
+        "minX": -8.106985092163086,
+        "maxX": 1.893014907836914,
+        "minZ": 1.8930845260620117,
+        "maxZ": 11.893084526062012
+      },
+      "expandedBounds": {
+        "minX": -8.606985092163086,
+        "maxX": 2.393014907836914,
+        "minZ": 1.3930845260620117,
+        "maxZ": 12.393084526062012
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 30331,
+      "coreSplatCount": 23413,
+      "splatCount": 30331
+    },
+    {
+      "id": "tile_x001_z000",
+      "label": "tile x001 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-demo-dust3r-tiled/tile_x001_z000.splat",
+      "sourceSplat": "docs/assets/outdoor-demo/outdoor-demo-dust3r.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-demo-dust3r-tiled/tile_x001_z000.splat",
+      "coreBounds": {
+        "minX": 1.893014907836914,
+        "maxX": 11.893014907836914,
+        "minZ": -8.106915473937988,
+        "maxZ": 1.8930845260620117
+      },
+      "expandedBounds": {
+        "minX": 1.393014907836914,
+        "maxX": 12.393014907836914,
+        "minZ": -8.606915473937988,
+        "maxZ": 2.3930845260620117
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 4879,
+      "coreSplatCount": 1095,
+      "splatCount": 4879
+    },
+    {
+      "id": "tile_x001_z001",
+      "label": "tile x001 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-demo-dust3r-tiled/tile_x001_z001.splat",
+      "sourceSplat": "docs/assets/outdoor-demo/outdoor-demo-dust3r.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-demo-dust3r-tiled/tile_x001_z001.splat",
+      "coreBounds": {
+        "minX": 1.893014907836914,
+        "maxX": 11.893014907836914,
+        "minZ": 1.8930845260620117,
+        "maxZ": 11.893084526062012
+      },
+      "expandedBounds": {
+        "minX": 1.393014907836914,
+        "maxX": 12.393014907836914,
+        "minZ": 1.3930845260620117,
+        "maxZ": 12.393084526062012
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 131534,
+      "coreSplatCount": 128826,
+      "splatCount": 131534
+    }
+  ]
+}

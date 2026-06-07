@@ -202,6 +202,18 @@ gs-mapper large-scale-3dgs-catalog \
   --run-report outputs/autoware_large/large_scale_3dgs_run_report.json
 ```
 
+If you already have a browser `.splat`, tile it directly for dynamic map
+loading:
+
+```bash
+gs-mapper splat-tile-catalog \
+  --input docs/assets/outdoor-demo/outdoor-demo-dust3r.splat \
+  --output apps/dreamwalker-web/public/manifests/outdoor-demo-dust3r-tile-catalog.json \
+  --scene-id outdoor-demo-dust3r-tiled \
+  --tile-size 10 \
+  --overlap 0.5
+```
+
 For MCD GNSS-seeded runs, first verify non-zero GNSS fixes:
 
 ```bash
