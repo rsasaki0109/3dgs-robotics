@@ -495,6 +495,12 @@ export function buildDynamicMapLoadPlan(activeConfig, assetManifest, options = {
       ? Number(options.maxTilePreloadCandidates)
       : 4
   );
+  const maxResidentTiles = Math.max(
+    1,
+    Number.isFinite(options.maxResidentTiles)
+      ? Number(options.maxResidentTiles)
+      : maxTilePreloadCandidates + 1
+  );
 
   if (active && activeTile) {
     active = buildTileCatalogLoadEntry(activeTile, active, tileCatalog, 'active-tile');
@@ -528,10 +534,15 @@ export function buildDynamicMapLoadPlan(activeConfig, assetManifest, options = {
           )
         ]
       : [];
+  const maxResidentPreloadCandidates = Math.max(0, maxResidentTiles - (activeTile ? 1 : 0));
+  const effectiveTilePreloadLimit = Math.min(
+    maxTilePreloadCandidates,
+    maxResidentPreloadCandidates
+  );
   const tilePreloadCandidates =
     active && activeTile
       ? sortedTilePreloadCandidateTiles
-          .slice(0, maxTilePreloadCandidates)
+          .slice(0, effectiveTilePreloadLimit)
           .map((tile) =>
             buildTileCatalogLoadEntry(
               tile,
@@ -540,6 +551,19 @@ export function buildDynamicMapLoadPlan(activeConfig, assetManifest, options = {
               routePreviewTileIds.has(tile.id) ? 'route-preload-tile' : 'preload-tile'
             )
           )
+      : [];
+  const residentTileIds = new Set(
+    [
+      active && activeTile ? activeTile.id : '',
+      ...tilePreloadCandidates.map((entry) => entry.tileId)
+    ].filter(Boolean)
+  );
+  const tileResidentCandidates = active && activeTile ? [active, ...tilePreloadCandidates] : [];
+  const tileEvictionCandidates =
+    active && activeTile
+      ? sortedTilePreloadCandidateTiles
+          .filter((tile) => !residentTileIds.has(tile.id))
+          .map((tile) => buildTileCatalogLoadEntry(tile, active, tileCatalog, 'evicted-tile'))
       : [];
 
   return {
@@ -551,7 +575,10 @@ export function buildDynamicMapLoadPlan(activeConfig, assetManifest, options = {
         : '',
     active,
     activeTile,
+    maxResidentTiles,
     tileCatalog: tileCatalog.tiles.length ? tileCatalog : null,
+    tileResidentCandidates,
+    tileEvictionCandidates,
     tilePreloadCandidates,
     preloadCandidates,
     entries,

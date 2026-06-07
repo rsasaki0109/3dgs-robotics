@@ -189,6 +189,82 @@ test('buildDynamicMapLoadPlan limits tile preload candidates', () => {
   );
 });
 
+test('buildDynamicMapLoadPlan applies a resident tile budget before preloading', () => {
+  const activeConfig = resolveDreamwalkerConfig('residency');
+  const plan = buildDynamicMapLoadPlan(
+    activeConfig,
+    {
+      fragments: {
+        residency: {
+          label: 'Runtime Residency',
+          splatUrl: '/splats/runtime-residency.sog'
+        }
+      }
+    },
+    {
+      maxResidentTiles: 2,
+      maxTilePreloadCandidates: 3,
+      position: { x: 1, y: 0, z: 1 },
+      tileCatalog: {
+        sceneId: 'resident-budget-scene',
+        label: 'Resident Budget Scene',
+        tiles: [
+          {
+            id: 'tile_active',
+            axes: 'xz',
+            status: 'ready',
+            splatUrl: '/splats/resident-budget/tile_active.splat',
+            tileIndex: { x: 0, z: 0 },
+            coreBounds: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 }
+          },
+          {
+            id: 'tile_near',
+            axes: 'xz',
+            status: 'ready',
+            splatUrl: '/splats/resident-budget/tile_near.splat',
+            tileIndex: { x: 1, z: 0 },
+            coreBounds: { minX: 2, maxX: 4, minZ: 0, maxZ: 2 }
+          },
+          {
+            id: 'tile_mid',
+            axes: 'xz',
+            status: 'ready',
+            splatUrl: '/splats/resident-budget/tile_mid.splat',
+            tileIndex: { x: 1, z: 1 },
+            coreBounds: { minX: 2, maxX: 4, minZ: 2, maxZ: 4 }
+          },
+          {
+            id: 'tile_far',
+            axes: 'xz',
+            status: 'ready',
+            splatUrl: '/splats/resident-budget/tile_far.splat',
+            tileIndex: { x: 2, z: 0 },
+            coreBounds: { minX: 4, maxX: 6, minZ: 0, maxZ: 2 }
+          }
+        ]
+      }
+    }
+  );
+
+  assert.equal(plan.maxResidentTiles, 2);
+  assert.deepEqual(
+    plan.tilePreloadCandidates.map((entry) => entry.tileId),
+    ['tile_near']
+  );
+  assert.deepEqual(
+    plan.tileResidentCandidates.map((entry) => entry.tileId),
+    ['tile_active', 'tile_near']
+  );
+  assert.deepEqual(
+    plan.tileEvictionCandidates.map((entry) => entry.tileId),
+    ['tile_mid', 'tile_far']
+  );
+  assert.deepEqual(
+    plan.tileEvictionCandidates.map((entry) => entry.role),
+    ['evicted-tile', 'evicted-tile']
+  );
+});
+
 test('buildDynamicMapLoadPlan prioritizes adjacent tileIndex preload candidates', () => {
   const activeConfig = resolveDreamwalkerConfig('residency');
   const plan = buildDynamicMapLoadPlan(
