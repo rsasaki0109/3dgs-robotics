@@ -426,6 +426,13 @@ export const dreamwalkerConfig = {
     preloadLimitQueryParam: 'tilePreloadLimit',
     residentLimitQueryParam: 'tileResidentLimit'
   },
+  largeScaleDemo: {
+    label: 'Outdoor Demo DUSt3R Tiled',
+    tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+    preloadMode: 'metadata',
+    tilePreloadLimit: 2,
+    tileResidentLimit: 3
+  },
   studioBundle: {
     defaultUrl: '',
     queryParam: 'studioBundle'

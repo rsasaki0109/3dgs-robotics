@@ -214,6 +214,12 @@ gs-mapper splat-tile-catalog \
   --overlap 0.5
 ```
 
+Open the bundled large-scale viewer entrypoint:
+
+```text
+http://localhost:5173/?tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=2&tileResidentLimit=3
+```
+
 For MCD GNSS-seeded runs, first verify non-zero GNSS fixes:
 
 ```bash

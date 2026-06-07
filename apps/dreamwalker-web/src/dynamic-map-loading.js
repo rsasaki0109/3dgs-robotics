@@ -339,6 +339,10 @@ function buildFetchErrorMessage(response) {
   return `HTTP ${normalized.status}${statusText}`.trim();
 }
 
+function isAbsoluteUrl(value) {
+  return /^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
 export function normalizeDynamicMapPreloadMode(value, fallback = 'metadata') {
   const normalizedFallback = dynamicMapPreloadModes.includes(fallback) ? fallback : 'metadata';
 
@@ -361,6 +365,52 @@ export function normalizeDynamicMapPreloadMode(value, fallback = 'metadata') {
   }
 
   return normalizedFallback;
+}
+
+export function buildDynamicMapTileCatalogLaunchUrl(baseUrl, options = {}) {
+  const tileCatalogUrl = hasNonEmptyString(options.tileCatalogUrl)
+    ? options.tileCatalogUrl.trim()
+    : '';
+
+  if (!tileCatalogUrl) {
+    return '';
+  }
+
+  const normalizedBaseUrl = hasNonEmptyString(baseUrl) ? baseUrl.trim() : '/';
+  const launchUrl = new URL(normalizedBaseUrl, 'http://dreamwalker.local');
+  const tileCatalogConfig = dreamwalkerConfig.tileCatalog;
+  const preloadMode = normalizeDynamicMapPreloadMode(options.preloadMode, 'metadata');
+  const preloadLimit = Number(options.tilePreloadLimit);
+  const residentLimit = Number(options.tileResidentLimit);
+
+  launchUrl.searchParams.set(tileCatalogConfig.queryParam, tileCatalogUrl);
+  launchUrl.searchParams.delete(tileCatalogConfig.tileQueryParam);
+  launchUrl.searchParams.set('tilePreload', preloadMode);
+
+  if (Number.isFinite(preloadLimit) && preloadLimit >= 0) {
+    launchUrl.searchParams.set(
+      tileCatalogConfig.preloadLimitQueryParam,
+      String(Math.floor(preloadLimit))
+    );
+  }
+
+  if (Number.isFinite(residentLimit) && residentLimit >= 1) {
+    launchUrl.searchParams.set(
+      tileCatalogConfig.residentLimitQueryParam,
+      String(Math.floor(residentLimit))
+    );
+  }
+
+  if (options.enableDiagnostics) {
+    launchUrl.searchParams.set('dynamicMapDiagnostics', '1');
+  }
+
+  launchUrl.searchParams.delete('overlay');
+  launchUrl.hash = '';
+
+  return isAbsoluteUrl(normalizedBaseUrl)
+    ? launchUrl.toString()
+    : `${launchUrl.pathname}${launchUrl.search}${launchUrl.hash}`;
 }
 
 export function normalizeDynamicMapTileCatalog(catalogLike) {
