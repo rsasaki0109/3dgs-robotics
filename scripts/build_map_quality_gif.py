@@ -626,7 +626,7 @@ def _render_dynamic_map_material(
         draw.text((48, 32), "Dynamic map loading", font=title_font, fill=(245, 250, 255, 255))
         draw.text(
             (52, 82),
-            f"PCD cells + Lanelet2 vector layer over {source_name} footprint{gaussian_text}",
+            f"PCD cells + route overlay over {source_name} footprint{gaussian_text}",
             font=subtitle_font,
             fill=(176, 197, 214, 235),
         )
@@ -638,7 +638,7 @@ def _render_dynamic_map_material(
     )
     _draw_dynamic_tile_layer(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
     _draw_density_material(image, points, projection=projection, box=map_box, full_material=full_material)
-    _draw_lanelet_vector_layer(draw, projection=projection, route=route, box=map_box, full_material=full_material)
+    _draw_route_overlay_layer(draw, projection=projection, route=route, box=map_box, full_material=full_material)
     _draw_load_radius(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
     _draw_route_material(
         draw, projection=projection, camera=camera, route=route, box=map_box, full_material=full_material
@@ -721,7 +721,7 @@ def _draw_dynamic_tile_layer(
         )
 
 
-def _draw_lanelet_vector_layer(
+def _draw_route_overlay_layer(
     draw: ImageDraw.ImageDraw,
     *,
     projection: RouteMapProjection,
@@ -751,7 +751,7 @@ def _draw_lanelet_vector_layer(
     if full_material:
         label_x = int((stop_start[0] + stop_end[0]) / 2) + 8
         label_y = int((stop_start[1] + stop_end[1]) / 2) - 24
-        draw.text((label_x, label_y), "Lanelet2 / stop_line", font=_load_font(14), fill=(230, 244, 236, 220))
+        draw.text((label_x, label_y), "route / stop marker", font=_load_font(14), fill=(230, 244, 236, 220))
 
 
 def _draw_load_radius(
@@ -1000,7 +1000,7 @@ def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int
     items = (
         ((91, 232, 120, 150), "resident PCD cells"),
         ((242, 190, 82, 150), "preload request"),
-        ((230, 244, 236, 190), "Lanelet2 vector layer"),
+        ((230, 244, 236, 190), "route overlay"),
         ((232, 246, 238, 165), ".splat footprint density"),
     )
     draw.rounded_rectangle((x - 16, y - 12, box[2] - 18, y + len(items) * 28 + 8), radius=8, fill=(4, 10, 14, 205))
@@ -1031,7 +1031,7 @@ def _draw_map_loading_status_hud(
     total = f"{gaussian_count // 1000}k" if gaussian_count is not None else "n/a"
     lines = (
         "/map/pointcloud_map  GetPartialPointCloudMap",
-        "/map/vector_map      Lanelet2 marker layer",
+        "/route_overlay       debug marker layer",
         f"loaded {len(loaded_tiles):02d} PCD cells / preload {len(preload_tiles):02d} / src {total}",
         f"active cell pcd_{active_tile[0] + 1:02d}_{active_tile[1] + 1:02d}  frame_id=map -> base_link",
     )

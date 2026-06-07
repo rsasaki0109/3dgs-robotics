@@ -381,7 +381,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "Dynamic map loading material rendered from outdoor-demo-dust3r.splat" in readme
     assert "Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`" in readme
     assert "white is the PCD-like `.splat` footprint" in readme
-    assert "vector overlay shows the route layer" in readme
+    assert "route overlay tracks the loading window" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
 
