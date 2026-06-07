@@ -17,8 +17,102 @@ import {
 const WalkRuntime = lazy(() => import('./WalkRuntime.jsx'));
 const defaultRobotFrameStreamFps = 10;
 
-function SplatContent({ splatUrl, entityRef }) {
+function dynamicMapDiagnosticsEnabled() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const value = new URLSearchParams(window.location.search)
+    .get('dynamicMapDiagnostics')
+    ?.trim()
+    .toLowerCase();
+
+  return value === '1' || value === 'true';
+}
+
+function updateDynamicMapDiagnostics(update) {
+  if (!dynamicMapDiagnosticsEnabled()) {
+    return;
+  }
+
+  const current = window.__dreamwalkerDynamicMapDiagnostics ?? {
+    activeSplatUrls: [],
+    events: [],
+    splatRefs: {}
+  };
+  const normalizedCurrent = {
+    ...current,
+    activeSplatUrls: Array.isArray(current.activeSplatUrls)
+      ? current.activeSplatUrls
+      : [],
+    events: Array.isArray(current.events) ? current.events : [],
+    splatRefs: current.splatRefs && typeof current.splatRefs === 'object'
+      ? current.splatRefs
+      : {}
+  };
+  const next = update(normalizedCurrent);
+
+  window.__dreamwalkerDynamicMapDiagnostics = {
+    ...current,
+    ...next,
+    events: next.events.slice(-80),
+    updatedAt: Date.now()
+  };
+}
+
+function recordSplatLifecycleEvent(type, splatUrl) {
+  updateDynamicMapDiagnostics((current) => {
+    const splatRefs = { ...current.splatRefs };
+    const currentCount = Number(splatRefs[splatUrl] ?? 0);
+
+    if (type === 'mount') {
+      splatRefs[splatUrl] = currentCount + 1;
+    } else if (type === 'unmount') {
+      const nextCount = Math.max(0, currentCount - 1);
+      if (nextCount > 0) {
+        splatRefs[splatUrl] = nextCount;
+      } else {
+        delete splatRefs[splatUrl];
+      }
+    }
+
+    return {
+      ...current,
+      activeSplatUrls: Object.keys(splatRefs),
+      events: [
+        ...current.events,
+        {
+          at: Date.now(),
+          type,
+          url: splatUrl
+        }
+      ],
+      splatRefs
+    };
+  });
+}
+
+function SplatContent({ splatUrl, entityRef, onStatusChange }) {
   const { asset } = useSplat(splatUrl);
+
+  useEffect(() => {
+    recordSplatLifecycleEvent('mount', splatUrl);
+
+    return () => {
+      recordSplatLifecycleEvent('unmount', splatUrl);
+    };
+  }, [splatUrl]);
+
+  useEffect(() => {
+    onStatusChange?.({
+      status: asset ? 'ready' : 'loading',
+      url: splatUrl
+    });
+
+    if (asset) {
+      recordSplatLifecycleEvent('asset-ready', splatUrl);
+    }
+  }, [asset, onStatusChange, splatUrl]);
 
   if (!asset) {
     return null;
@@ -711,6 +805,71 @@ function RobotCameraBridge({
   return null;
 }
 
+function MapPositionBridge({
+  cameraEntityRef,
+  enabled,
+  onPositionChange,
+  robotPose,
+  roboticsCameraEnabled
+}) {
+  const lastEmitTimeRef = useRef(0);
+  const lastSignatureRef = useRef('');
+
+  useAppEvent('update', () => {
+    if (!enabled || typeof onPositionChange !== 'function') {
+      return;
+    }
+
+    const now = performance.now();
+    if (now - lastEmitTimeRef.current < 250) {
+      return;
+    }
+
+    const source = roboticsCameraEnabled && robotPose ? 'robot' : 'camera';
+    const position =
+      source === 'robot'
+        ? {
+            x: Number(robotPose.position?.[0] ?? 0),
+            y: Number(robotPose.position?.[1] ?? 0),
+            z: Number(robotPose.position?.[2] ?? 0)
+          }
+        : (() => {
+            const cameraPosition = cameraEntityRef.current?.getPosition?.();
+            return cameraPosition
+              ? {
+                  x: Number(cameraPosition.x),
+                  y: Number(cameraPosition.y),
+                  z: Number(cameraPosition.z)
+                }
+              : null;
+          })();
+
+    if (!position || ![position.x, position.y, position.z].every(Number.isFinite)) {
+      return;
+    }
+
+    const signature = [
+      source,
+      position.x.toFixed(2),
+      position.y.toFixed(2),
+      position.z.toFixed(2)
+    ].join(':');
+    if (signature === lastSignatureRef.current) {
+      return;
+    }
+
+    lastEmitTimeRef.current = now;
+    lastSignatureRef.current = signature;
+    onPositionChange({
+      source,
+      position,
+      timestamp: Date.now()
+    });
+  });
+
+  return null;
+}
+
 export default function DreamwalkerScene({
   worldConfig,
   cameraMode,
@@ -734,6 +893,9 @@ export default function DreamwalkerScene({
   onSemanticZoneSurfacePointsProjected,
   onFrame,
   onDepthFrame,
+  onMapPositionChange,
+  onSplatStatusChange,
+  dynamicMapPositionTrackingEnabled = true,
   splatUrl
 }) {
   const frameStreamConfig = parseRobotFrameStreamConfigFromSearch();
@@ -777,6 +939,15 @@ export default function DreamwalkerScene({
     walkCameraEntityRef.current = entity;
     setWalkCameraEntity(entity);
   }, []);
+  const handleSplatStatusChange = useCallback(
+    (nextStatus) => {
+      onSplatStatusChange?.({
+        ...nextStatus,
+        fragmentId: worldConfig.fragmentId
+      });
+    },
+    [onSplatStatusChange, worldConfig.fragmentId]
+  );
 
   return (
     <Application
@@ -824,7 +995,14 @@ export default function DreamwalkerScene({
           />
         </Suspense>
       ) : null}
-      {splatUrl ? <SplatContent splatUrl={splatUrl} entityRef={splatEntityRef} /> : null}
+      {splatUrl ? (
+        <SplatContent
+          key={splatUrl}
+          splatUrl={splatUrl}
+          entityRef={splatEntityRef}
+          onStatusChange={handleSplatStatusChange}
+        />
+      ) : null}
       <CameraPresetBridge
         orbitCameraEntityRef={orbitCameraEntityRef}
         playerEntityRef={playerEntityRef}
@@ -841,6 +1019,13 @@ export default function DreamwalkerScene({
         enabled={isRoboticsCameraEnabled}
         robotPose={roboticsCamera?.robotPose}
         selectedCamera={roboticsCamera?.selectedCamera}
+      />
+      <MapPositionBridge
+        cameraEntityRef={activeCameraEntityRef}
+        enabled={Boolean(dynamicMapPositionTrackingEnabled)}
+        onPositionChange={onMapPositionChange}
+        robotPose={roboticsCamera?.robotPose}
+        roboticsCameraEnabled={isRoboticsCameraEnabled}
       />
       <FrameStreamBridge
         cameraEntityRef={activeCameraEntityRef}

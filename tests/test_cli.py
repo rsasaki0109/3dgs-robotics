@@ -37,6 +37,51 @@ class TestCLIHelp:
             main(["train", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_plan_help(self) -> None:
+        """Running large-scale-3dgs-plan --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-plan", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_smoke_data_help(self) -> None:
+        """Running large-scale-3dgs-smoke-data --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-smoke-data", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_run_help(self) -> None:
+        """Running large-scale-3dgs-run --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-run", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_catalog_help(self) -> None:
+        """Running large-scale-3dgs-catalog --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-catalog", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_catalog_route_args(self) -> None:
+        """large-scale-3dgs-catalog accepts robot route playback runbook args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-catalog",
+                "--plan",
+                "large_scale_3dgs_plan.json",
+                "--route",
+                "public/robot-routes/demo-route.json",
+                "--route-playback",
+                "--route-playback-ms",
+                "800",
+                "--route-playback-loop",
+            ]
+        )
+
+        assert args.route == "public/robot-routes/demo-route.json"
+        assert args.route_playback is True
+        assert args.route_playback_ms == 800
+        assert args.route_playback_loop is True
+
     def test_cmd_train_gsplat_fails_fast_without_colmap(self, tmp_path: Path) -> None:
         """gsplat training should reject data dirs with no COLMAP sparse model."""
         from gs_sim2real import cli

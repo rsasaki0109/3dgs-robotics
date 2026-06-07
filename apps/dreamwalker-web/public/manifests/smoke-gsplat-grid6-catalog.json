@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "createdAt": "2026-06-06T22:46:42.536271+00:00",
+  "sceneId": "smoke-gsplat-grid6",
+  "label": "Smoke gsplat Grid 6",
+  "planPath": "outputs/dynamic_map_gsplat_grid_smoke_v2/large_scale_3dgs_plan.json",
+  "runReportPath": "outputs/dynamic_map_gsplat_grid_smoke_v2/large_scale_3dgs_run_report.json",
+  "tiling": {
+    "strategy": "camera-center-grid",
+    "axes": "xz",
+    "tileSize": 8.0,
+    "overlap": 0.0,
+    "minImages": 2,
+    "worldBounds": {
+      "minX": 3.75,
+      "maxX": 21.85,
+      "minZ": 3.75,
+      "maxZ": 13.05
+    }
+  },
+  "summary": {
+    "tileCount": 6,
+    "readyTileCount": 6,
+    "missingSplatTileCount": 0
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_z000",
+      "label": "tile x000 z000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x000_z000.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x000_z000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x000_z000.splat",
+      "coreBounds": {
+        "minX": 3.75,
+        "maxX": 11.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "expandedBounds": {
+        "minX": 3.75,
+        "maxX": 11.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    },
+    {
+      "id": "tile_x000_z001",
+      "label": "tile x000 z001",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x000_z001.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x000_z001.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x000_z001.splat",
+      "coreBounds": {
+        "minX": 3.75,
+        "maxX": 11.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "expandedBounds": {
+        "minX": 3.75,
+        "maxX": 11.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    },
+    {
+      "id": "tile_x001_z000",
+      "label": "tile x001 z000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x001_z000.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x001_z000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x001_z000.splat",
+      "coreBounds": {
+        "minX": 11.75,
+        "maxX": 19.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "expandedBounds": {
+        "minX": 11.75,
+        "maxX": 19.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    },
+    {
+      "id": "tile_x001_z001",
+      "label": "tile x001 z001",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x001_z001.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x001_z001.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x001_z001.splat",
+      "coreBounds": {
+        "minX": 11.75,
+        "maxX": 19.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "expandedBounds": {
+        "minX": 11.75,
+        "maxX": 19.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    },
+    {
+      "id": "tile_x002_z000",
+      "label": "tile x002 z000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x002_z000.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x002_z000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x002_z000.splat",
+      "coreBounds": {
+        "minX": 19.75,
+        "maxX": 27.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "expandedBounds": {
+        "minX": 19.75,
+        "maxX": 27.75,
+        "minZ": 3.75,
+        "maxZ": 11.75
+      },
+      "tileIndex": {
+        "x": 2,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    },
+    {
+      "id": "tile_x002_z001",
+      "label": "tile x002 z001",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-grid6/tile_x002_z001.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_grid_smoke_v2/splats/tile_x002_z001.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-grid6/tile_x002_z001.splat",
+      "coreBounds": {
+        "minX": 19.75,
+        "maxX": 27.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "expandedBounds": {
+        "minX": 19.75,
+        "maxX": 27.75,
+        "minZ": 11.75,
+        "maxZ": 19.75
+      },
+      "tileIndex": {
+        "x": 2,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 2,
+      "coreImageCount": 2,
+      "pointCount": 12
+    }
+  ]
+}

@@ -681,11 +681,18 @@ class GsplatTrainer:
         from scipy.spatial import KDTree
 
         try:
-            tree = KDTree(points3d[:, :3])
-            dists, _ = tree.query(points3d[:, :3], k=4)  # k=4: self + 3 neighbors
-            avg_dist = np.mean(dists[:, 1:], axis=1)  # exclude self
-            avg_dist = np.clip(avg_dist, 1e-7, None)
-            init_scale = np.log(avg_dist)
+            if N < 2:
+                init_scale = np.full(N, np.log(0.01))
+            else:
+                tree = KDTree(points3d[:, :3])
+                neighbor_count = min(4, N)
+                dists, _ = tree.query(points3d[:, :3], k=neighbor_count)
+                neighbor_dists = np.asarray(dists)[:, 1:]  # exclude self
+                finite_dists = np.where(np.isfinite(neighbor_dists), neighbor_dists, np.nan)
+                avg_dist = np.nanmean(finite_dists, axis=1)
+                avg_dist = np.where(np.isfinite(avg_dist), avg_dist, 0.01)
+                avg_dist = np.clip(avg_dist, 1e-7, None)
+                init_scale = np.log(avg_dist)
         except Exception:
             init_scale = np.full(N, np.log(0.01))
 

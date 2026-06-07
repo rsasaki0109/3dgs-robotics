@@ -419,6 +419,12 @@ export const dreamwalkerConfig = {
     defaultUrl: '/manifests/dreamwalker-live.assets.json',
     queryParam: 'assetManifest'
   },
+  tileCatalog: {
+    defaultUrl: '',
+    queryParam: 'tileCatalog',
+    tileQueryParam: 'tileId',
+    preloadLimitQueryParam: 'tilePreloadLimit'
+  },
   studioBundle: {
     defaultUrl: '',
     queryParam: 'studioBundle'
@@ -429,7 +435,10 @@ export const dreamwalkerConfig = {
   },
   robotRoute: {
     defaultUrl: '',
-    queryParam: 'robotRoute'
+    queryParam: 'robotRoute',
+    playbackQueryParam: 'robotRoutePlayback',
+    playbackIntervalQueryParam: 'robotRoutePlaybackMs',
+    playbackLoopQueryParam: 'robotRoutePlaybackLoop'
   },
   robotRouteCatalog: {
     defaultUrl: '/robot-routes/index.json',
