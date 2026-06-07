@@ -378,8 +378,9 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Slow FPS course through an actual shipped outdoor 3DGS splat" in readme
-    assert "Lead GIF: slow FPS movement through an actual shipped `.splat`" in readme
+    assert "Dynamic map loading material rendered from outdoor-demo-dust3r.splat" in readme
+    assert "Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`" in readme
+    assert "the white density is the `.splat` footprint" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
 
