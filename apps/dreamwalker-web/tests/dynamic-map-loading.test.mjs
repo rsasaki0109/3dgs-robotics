@@ -8,6 +8,7 @@ import {
   preloadDynamicMapEntry,
   selectDynamicMapTile
 } from '../src/dynamic-map-loading.js';
+import { resolvePublicUrl } from '../src/public-url.js';
 
 test('collectDynamicMapTargetFragmentIds includes active fragment and known gate target', () => {
   const activeConfig = resolveDreamwalkerConfig('residency');
@@ -16,6 +17,33 @@ test('collectDynamicMapTargetFragmentIds includes active fragment and known gate
     'residency',
     'echo-chamber'
   ]);
+});
+
+test('resolvePublicUrl maps root public assets under a Pages base path', () => {
+  assert.equal(
+    resolvePublicUrl('/manifests/outdoor-production-grid-large-tile-catalog.json', {
+      basePath: '/gs-mapper/dreamwalker/'
+    }),
+    '/gs-mapper/dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json'
+  );
+  assert.equal(
+    resolvePublicUrl('/gs-mapper/dreamwalker/splats/tile.splat', {
+      basePath: '/gs-mapper/dreamwalker/'
+    }),
+    '/gs-mapper/dreamwalker/splats/tile.splat'
+  );
+  assert.equal(
+    resolvePublicUrl('https://cdn.example.test/tile.splat', {
+      basePath: '/gs-mapper/dreamwalker/'
+    }),
+    'https://cdn.example.test/tile.splat'
+  );
+  assert.equal(
+    resolvePublicUrl('robot-routes/local.json', {
+      basePath: '/gs-mapper/dreamwalker/'
+    }),
+    'robot-routes/local.json'
+  );
 });
 
 test('collectDynamicMapTargetFragmentIds can skip gate target and dedupe extras', () => {

@@ -125,6 +125,12 @@ large-scale 3DGS tile catalog を開く場合はこれです。左パネルの
 /?tileCatalog=/manifests/outdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=/robot-routes/outdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
 ```
 
+GitHub Pages では `/dreamwalker/` 配下で同じ demo を開けます。
+
+```text
+https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+```
+
 ## 今の状態
 
 - PlayCanvas React の最小 scene
