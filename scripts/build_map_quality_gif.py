@@ -44,6 +44,16 @@ class SplatPoint:
     rgba: tuple[int, int, int, int]
 
 
+@dataclass(frozen=True, slots=True)
+class RouteMapProjection:
+    axes: tuple[int, int]
+    center: tuple[float, float]
+    direction: tuple[float, float]
+    side: tuple[float, float]
+    progress_bounds: tuple[float, float]
+    lateral_bounds: tuple[float, float]
+
+
 MAP_PROOF_SCENES = (
     MapProofScene(
         asset="outdoor-demo-dust3r.splat",
@@ -473,52 +483,50 @@ def _draw_minimap(
 ) -> None:
     width, height = size
     left, right, bottom, top = bounds
+    projection = _route_map_projection(points, axes=axes, bounds=bounds)
     panel_width, panel_height = MAP_PANEL_SIZE
     x0 = width - panel_width - 18
     y0 = 84
     x1 = x0 + panel_width
     y1 = min(height - 18, y0 + panel_height)
-    map_top = y0 + 48
-    map_bottom = y1 - 54
-    map_box = (x0 + 14, map_top, x1 - 14, map_bottom)
-    label_font = _load_font(13)
-    title_font = _load_font(18)
-    metric_font = _load_font(14)
+    map_top = y0 + 60
+    map_bottom = y1 - 58
+    map_box = (x0 + 16, map_top, x1 - 16, map_bottom)
+    label_font = _load_font(12)
+    title_font = _load_font(17)
+    metric_font = _load_font(13)
+    tile_font = _load_font(10)
 
     draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=(4, 9, 15, 226), outline=(255, 255, 255, 44))
-    draw.text((x0 + 15, y0 + 12), "large-scale tile route map", font=title_font, fill=(244, 249, 255, 255))
-    draw.text((x0 + 17, y0 + 34), "top-down x/z density from actual .splat", font=label_font, fill=(173, 192, 210, 225))
+    draw.text((x0 + 15, y0 + 12), "route-aligned dynamic map", font=title_font, fill=(244, 249, 255, 255))
+    draw.text(
+        (x0 + 17, y0 + 34), "density + residency tiles from actual .splat", font=label_font, fill=(173, 192, 210, 225)
+    )
 
-    for index in range(7):
-        x = map_box[0] + (map_box[2] - map_box[0]) * index / 6
-        y = map_box[1] + (map_box[3] - map_box[1]) * index / 6
-        line_fill = (255, 255, 255, 30 if index in (0, 6) else 14)
-        draw.line((x, map_box[1], x, map_box[3]), fill=line_fill, width=1)
-        draw.line((map_box[0], y, map_box[2], y), fill=line_fill, width=1)
+    draw.rounded_rectangle(map_box, radius=5, fill=(7, 14, 19, 244), outline=(255, 255, 255, 38))
+    _draw_route_tiles(draw, projection=projection, camera=camera, box=map_box, font=tile_font)
 
-    for index in range(1, 3):
-        x = map_box[0] + (map_box[2] - map_box[0]) * index / 3
-        y = map_box[1] + (map_box[3] - map_box[1]) * index / 3
-        draw.line((x, map_box[1], x, map_box[3]), fill=(78, 154, 255, 54), width=2)
-        draw.line((map_box[0], y, map_box[2], y), fill=(78, 154, 255, 54), width=2)
-
-    step = max(1, len(points) // 12_000)
+    step = max(1, len(points) // 18_000)
     for point in points[::step]:
-        x, y = _minimap_xy(point.xyz, axes=axes, bounds=bounds, box=map_box)
-        draw.point((x, y), fill=(*_point_color(point.rgba), 118))
+        x, y = _route_map_xy(point.xyz, projection=projection, box=map_box)
+        color = _point_color(point.rgba)
+        fill = (min(255, color[0] + 14), min(255, color[1] + 18), min(255, color[2] + 22), 88)
+        draw.rectangle((x, y, x + 1, y + 1), fill=fill)
 
-    route_xy = [_minimap_xy(pose.eye, axes=axes, bounds=bounds, box=map_box) for pose in route]
+    route_xy = _dynamic_route_xy(projection=projection, route=route, box=map_box)
     if len(route_xy) > 1:
-        draw.line(route_xy, fill=(31, 84, 168, 210), width=9)
-        draw.line(route_xy, fill=(72, 154, 255, 235), width=5)
+        draw.line(route_xy, fill=(40, 90, 101, 135), width=36, joint="curve")
+        draw.line(route_xy, fill=(12, 29, 36, 235), width=24, joint="curve")
+        draw.line(route_xy, fill=(55, 128, 205, 235), width=8, joint="curve")
+        draw.line(route_xy, fill=(146, 214, 255, 245), width=3, joint="curve")
         for waypoint_x, waypoint_y in route_xy[:: max(1, len(route_xy) // 5)]:
             draw.ellipse(
-                (waypoint_x - 4, waypoint_y - 4, waypoint_x + 4, waypoint_y + 4),
-                fill=(162, 211, 255, 245),
+                (waypoint_x - 5, waypoint_y - 5, waypoint_x + 5, waypoint_y + 5),
+                fill=(162, 211, 255, 235),
             )
 
-    eye_x, eye_y = _minimap_xy(camera.eye, axes=axes, bounds=bounds, box=map_box)
-    target_x, target_y = _minimap_xy(camera.target, axes=axes, bounds=bounds, box=map_box)
+    eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=map_box)
+    target_x, target_y = _route_map_xy(camera.target, projection=projection, box=map_box)
     draw.line((eye_x, eye_y, target_x, target_y), fill=(91, 232, 120, 255), width=5)
     draw.ellipse((eye_x - 8, eye_y - 8, eye_x + 8, eye_y + 8), fill=(91, 232, 120, 255))
     draw.ellipse((eye_x - 13, eye_y - 13, eye_x + 13, eye_y + 13), outline=(91, 232, 120, 160), width=2)
@@ -535,38 +543,218 @@ def _draw_minimap(
     )
     draw.text(
         (scale_x0, scale_y + 7),
-        f"{map_width_m * scale_width / max(1, map_box[2] - map_box[0]):.1f} m",
+        f"{_route_span_meters(projection) * scale_width / max(1, map_box[2] - map_box[0]):.1f} m",
         font=label_font,
         fill=(226, 239, 250, 210),
     )
+    tile_column, tile_row = _active_tile(camera.eye, projection=projection)
     draw.text(
         (x0 + 15, y1 - 42),
-        f"extent {map_width_m:.1f} m x {map_height_m:.1f} m / sampled {len(points) // 1000}k splats",
+        f"footprint {map_width_m:.1f} x {map_height_m:.1f} m / {len(points) // 1000}k splats",
         font=metric_font,
         fill=(204, 223, 238, 235),
     )
     draw.text(
         (x0 + 15, y1 - 22),
-        f"x=[{left:.1f},{right:.1f}]  z=[{bottom:.1f},{top:.1f}]",
+        f"route span {_route_span_meters(projection):.1f} m / active tile C{tile_column + 1} R{tile_row + 1}",
         font=label_font,
         fill=(150, 171, 190, 205),
     )
 
 
-def _minimap_xy(
-    xyz: tuple[float, float, float],
+def _route_map_projection(
+    points: list[SplatPoint],
     *,
     axes: tuple[int, int],
     bounds: tuple[float, float, float, float],
+) -> RouteMapProjection:
+    center = _plane_median(points, axes)
+    direction = _principal_direction(points, axes=axes, bounds=bounds)
+    side = (-direction[1], direction[0])
+    left, right, bottom, top = bounds
+    step = max(1, len(points) // 70_000)
+    route_values: list[tuple[float, float]] = []
+    for point in points[::step]:
+        x = point.xyz[axes[0]]
+        y = point.xyz[axes[1]]
+        if not (left <= x <= right and bottom <= y <= top):
+            continue
+        route_values.append(_route_coords(point.xyz, axes=axes, center=center, direction=direction, side=side))
+
+    if len(route_values) < 2:
+        return RouteMapProjection(
+            axes=axes,
+            center=center,
+            direction=direction,
+            side=side,
+            progress_bounds=(-1.0, 1.0),
+            lateral_bounds=(-1.0, 1.0),
+        )
+
+    progress_values = sorted(value[0] for value in route_values)
+    lateral_values = sorted(value[1] for value in route_values)
+    progress_low, progress_high = _robust_span(progress_values)
+    lateral_low, lateral_high = _robust_span(lateral_values)
+    progress_span = max(1.0, progress_high - progress_low)
+    minimum_lateral_span = max(6.0, progress_span * 0.22)
+    if lateral_high - lateral_low < minimum_lateral_span:
+        lateral_mid = _percentile(lateral_values, 0.50)
+        lateral_low = lateral_mid - minimum_lateral_span / 2.0
+        lateral_high = lateral_mid + minimum_lateral_span / 2.0
+
+    return RouteMapProjection(
+        axes=axes,
+        center=center,
+        direction=direction,
+        side=side,
+        progress_bounds=(progress_low, progress_high),
+        lateral_bounds=(lateral_low, lateral_high),
+    )
+
+
+def _route_coords(
+    xyz: tuple[float, float, float],
+    *,
+    axes: tuple[int, int],
+    center: tuple[float, float],
+    direction: tuple[float, float],
+    side: tuple[float, float],
+) -> tuple[float, float]:
+    delta_x = xyz[axes[0]] - center[0]
+    delta_y = xyz[axes[1]] - center[1]
+    progress = delta_x * direction[0] + delta_y * direction[1]
+    lateral = delta_x * side[0] + delta_y * side[1]
+    return progress, lateral
+
+
+def _route_map_xy(
+    xyz: tuple[float, float, float],
+    *,
+    projection: RouteMapProjection,
     box: tuple[int, int, int, int],
 ) -> tuple[int, int]:
-    left, right, bottom, top = bounds
+    progress, lateral = _route_coords(
+        xyz,
+        axes=projection.axes,
+        center=projection.center,
+        direction=projection.direction,
+        side=projection.side,
+    )
+    return _route_coords_to_xy(progress, lateral, projection=projection, box=box)
+
+
+def _route_coords_to_xy(
+    progress: float,
+    lateral: float,
+    *,
+    projection: RouteMapProjection,
+    box: tuple[int, int, int, int],
+) -> tuple[int, int]:
+    progress_low, progress_high = projection.progress_bounds
+    lateral_low, lateral_high = projection.lateral_bounds
     x0, y0, x1, y1 = box
-    x_ratio = (xyz[axes[0]] - left) / (right - left)
-    y_ratio = (xyz[axes[1]] - bottom) / (top - bottom)
+    x_ratio = (progress - progress_low) / (progress_high - progress_low)
+    y_ratio = (lateral - lateral_low) / (lateral_high - lateral_low)
     x = int(x0 + max(0.0, min(1.0, x_ratio)) * (x1 - x0))
     y = int(y1 - max(0.0, min(1.0, y_ratio)) * (y1 - y0))
     return x, y
+
+
+def _draw_route_tiles(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    box: tuple[int, int, int, int],
+    font: ImageFont.ImageFont,
+) -> None:
+    columns = 6
+    rows = 4
+    x0, y0, x1, y1 = box
+    active_column, active_row = _active_tile(camera.eye, projection=projection, columns=columns, rows=rows)
+    tile_index = 1
+    for column in range(columns):
+        for row in range(rows):
+            left = x0 + (x1 - x0) * column / columns
+            right = x0 + (x1 - x0) * (column + 1) / columns
+            top = y0 + (y1 - y0) * row / rows
+            bottom = y0 + (y1 - y0) * (row + 1) / rows
+            if column == active_column and row == active_row:
+                draw.rectangle(
+                    (left, top, right, bottom),
+                    fill=(91, 232, 120, 32),
+                    outline=(91, 232, 120, 140),
+                    width=2,
+                )
+            else:
+                draw.rectangle((left, top, right, bottom), outline=(78, 154, 255, 42), width=1)
+            if row in (0, rows - 1) and column % 2 == 0:
+                draw.text((left + 5, top + 5), f"T{tile_index:02d}", font=font, fill=(132, 174, 205, 140))
+            tile_index += 1
+
+    for index in range(1, columns):
+        x = x0 + (x1 - x0) * index / columns
+        draw.line((x, y0, x, y1), fill=(78, 154, 255, 52), width=2 if index % 3 == 0 else 1)
+    for index in range(1, rows):
+        y = y0 + (y1 - y0) * index / rows
+        draw.line((x0, y, x1, y), fill=(78, 154, 255, 44), width=1)
+
+
+def _dynamic_route_xy(
+    *,
+    projection: RouteMapProjection,
+    route: list[CameraPose],
+    box: tuple[int, int, int, int],
+) -> list[tuple[int, int]]:
+    progress_low, progress_high = projection.progress_bounds
+    lateral_low, lateral_high = projection.lateral_bounds
+    route_laterals = [
+        _route_coords(
+            pose.eye,
+            axes=projection.axes,
+            center=projection.center,
+            direction=projection.direction,
+            side=projection.side,
+        )[1]
+        for pose in route
+    ]
+    lateral_center = sum(route_laterals) / max(1, len(route_laterals))
+    lateral_swing = (lateral_high - lateral_low) * 0.10
+    points: list[tuple[int, int]] = []
+    for index in range(36):
+        progress = index / 35
+        eased = _ease_in_out(progress)
+        route_progress = progress_low + (progress_high - progress_low) * eased
+        route_lateral = lateral_center + math.sin(progress * math.pi * 1.12) * lateral_swing
+        points.append(_route_coords_to_xy(route_progress, route_lateral, projection=projection, box=box))
+    return points
+
+
+def _route_span_meters(projection: RouteMapProjection) -> float:
+    return projection.progress_bounds[1] - projection.progress_bounds[0]
+
+
+def _active_tile(
+    xyz: tuple[float, float, float],
+    *,
+    projection: RouteMapProjection,
+    columns: int = 6,
+    rows: int = 4,
+) -> tuple[int, int]:
+    progress, lateral = _route_coords(
+        xyz,
+        axes=projection.axes,
+        center=projection.center,
+        direction=projection.direction,
+        side=projection.side,
+    )
+    progress_low, progress_high = projection.progress_bounds
+    lateral_low, lateral_high = projection.lateral_bounds
+    column_ratio = (progress - progress_low) / (progress_high - progress_low)
+    row_ratio = 1.0 - (lateral - lateral_low) / (lateral_high - lateral_low)
+    column = int(max(0, min(columns - 1, math.floor(column_ratio * columns))))
+    row = int(max(0, min(rows - 1, math.floor(row_ratio * rows))))
+    return column, row
 
 
 def _draw_frame_label(
