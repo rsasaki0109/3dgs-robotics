@@ -184,6 +184,31 @@ gs-mapper train --data outputs/autoware_sparse --method gsplat --iterations 3000
 gs-mapper export --model outputs/train/point_cloud.ply --format splat --output outputs/autoware.splat
 ```
 
+For larger routes, preflight the COLMAP sparse model before launching many
+tile jobs:
+
+```bash
+gs-mapper large-scale-3dgs-preflight \
+  --data outputs/autoware_sparse \
+  --output outputs/autoware_large \
+  --axes xy \
+  --tile-sizes 20,30,50 \
+  --target-images-per-chunk 48
+
+gs-mapper large-scale-3dgs-plan \
+  --data outputs/autoware_sparse \
+  --output outputs/autoware_large \
+  --tile-size 30 \
+  --overlap 5 \
+  --axes xy \
+  --materialize
+
+gs-mapper large-scale-3dgs-run --plan outputs/autoware_large/large_scale_3dgs_plan.json
+gs-mapper large-scale-3dgs-catalog \
+  --plan outputs/autoware_large/large_scale_3dgs_plan.json \
+  --run-report outputs/autoware_large/large_scale_3dgs_run_report.json
+```
+
 For MCD GNSS-seeded runs, first verify non-zero GNSS fixes:
 
 ```bash

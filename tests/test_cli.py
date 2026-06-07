@@ -49,6 +49,12 @@ class TestCLIHelp:
             main(["large-scale-3dgs-smoke-data", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_preflight_help(self) -> None:
+        """Running large-scale-3dgs-preflight --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-preflight", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_large_scale_3dgs_run_help(self) -> None:
         """Running large-scale-3dgs-run --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
