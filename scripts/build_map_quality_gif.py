@@ -436,18 +436,26 @@ def _render_map_loading_frame(
         full_material=True,
         source_asset=scene.asset,
         gaussian_count=gaussian_count,
+        labels=False,
     )
     draw = ImageDraw.Draw(frame)
-    chip_font = _load_font(15)
-    chip = (size[0] - 176, 20, size[0] - 24, 54)
-    draw.rounded_rectangle(chip, radius=5, fill=(4, 9, 15, 220), outline=(91, 232, 120, 85))
-    draw.text(
-        (size[0] - 158, 29),
-        f"LOAD {scene_index:02d}/{scene_count:02d}",
-        font=chip_font,
-        fill=(91, 232, 120, 255),
-    )
+    _draw_hero_progress(draw, scene_index=scene_index, scene_count=scene_count, size=size)
     return frame.convert("RGB")
+
+
+def _draw_hero_progress(
+    draw: ImageDraw.ImageDraw, *, scene_index: int, scene_count: int, size: tuple[int, int]
+) -> None:
+    width, height = size
+    bar_width = 132
+    bar_height = 6
+    x0 = width - bar_width - 28
+    y0 = height - 30
+    x1 = x0 + bar_width
+    y1 = y0 + bar_height
+    progress = max(0.0, min(1.0, scene_index / max(1, scene_count)))
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=3, fill=(5, 13, 18, 190))
+    draw.rounded_rectangle((x0, y0, x0 + int(bar_width * progress), y1), radius=3, fill=(91, 232, 120, 230))
 
 
 def _point_color(rgba: tuple[int, int, int, int]) -> tuple[int, int, int]:
@@ -611,13 +619,14 @@ def _render_dynamic_map_material(
     full_material: bool,
     source_asset: str | None = None,
     gaussian_count: int | None = None,
+    labels: bool = True,
 ) -> Image.Image:
     width, height = size
     image = Image.new("RGBA", size, (5, 10, 14, 255))
     draw = ImageDraw.Draw(image)
     _draw_material_background(draw, size)
 
-    if full_material:
+    if full_material and labels:
         map_box = (48, 118, width - 48, height - 96)
         title_font = _load_font(32 if width < 1100 else 34)
         subtitle_font = _load_font(15 if width < 1100 else 17)
@@ -631,21 +640,28 @@ def _render_dynamic_map_material(
             fill=(176, 197, 214, 235),
         )
     else:
-        map_box = (0, 0, width, height)
+        margin = 22 if full_material else 0
+        map_box = (margin, margin, width - margin, height - margin)
 
     draw.rounded_rectangle(
         map_box, radius=8 if full_material else 5, fill=(7, 15, 20, 255), outline=(255, 255, 255, 42)
     )
-    _draw_dynamic_tile_layer(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
-    _draw_density_material(image, points, projection=projection, box=map_box, full_material=full_material)
-    _draw_route_overlay_layer(draw, projection=projection, route=route, box=map_box, full_material=full_material)
-    _draw_load_radius(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
-    _draw_route_material(
-        draw, projection=projection, camera=camera, route=route, box=map_box, full_material=full_material
+    _draw_dynamic_tile_layer(
+        draw, projection=projection, camera=camera, box=map_box, full_material=full_material, labels=labels
     )
-    _draw_material_scale(draw, projection=projection, box=map_box, full_material=full_material)
+    _draw_density_material(image, points, projection=projection, box=map_box, full_material=full_material)
+    _draw_route_overlay_layer(
+        draw, projection=projection, route=route, box=map_box, full_material=full_material, labels=labels
+    )
+    _draw_load_radius(
+        draw, projection=projection, camera=camera, box=map_box, full_material=full_material, labels=labels
+    )
+    _draw_route_material(
+        draw, projection=projection, camera=camera, route=route, box=map_box, full_material=full_material, labels=labels
+    )
+    _draw_material_scale(draw, projection=projection, box=map_box, full_material=full_material, labels=labels)
 
-    if full_material:
+    if full_material and labels:
         _draw_material_legend(draw, box=map_box)
         _draw_map_loading_status_hud(
             draw, projection=projection, camera=camera, box=map_box, gaussian_count=gaussian_count
@@ -679,6 +695,7 @@ def _draw_dynamic_tile_layer(
     camera: CameraPose,
     box: tuple[int, int, int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     loaded_tiles, preload_tiles, active_tile = _tile_residency_sets(camera, projection=projection)
     tile_font = _load_font(13 if full_material else 9)
@@ -698,14 +715,14 @@ def _draw_dynamic_tile_layer(
                 outline = (181, 255, 192, 210)
             draw.rectangle(rect, fill=fill, outline=outline, width=2 if (column, row) == active_tile else 1)
 
-            if full_material or (row in (0, MAP_TILE_ROWS - 1) and column % 2 == 0):
+            if labels and (full_material or (row in (0, MAP_TILE_ROWS - 1) and column % 2 == 0)):
                 label = f"PCD {column + 1}{row + 1}" if full_material else f"P{column + 1}{row + 1}"
                 draw.text((rect[0] + 7, rect[1] + 7), label, font=tile_font, fill=(157, 190, 210, 150))
 
     loaded_bounds = _tile_group_bounds(loaded_tiles, box=box)
     if loaded_bounds is not None:
         draw.rounded_rectangle(loaded_bounds, radius=8, outline=(91, 232, 120, 230), width=3 if full_material else 2)
-        if full_material:
+        if full_material and labels:
             draw.text(
                 (loaded_bounds[0] + 12, loaded_bounds[1] + 10),
                 "RESIDENT TILE WINDOW",
@@ -714,7 +731,7 @@ def _draw_dynamic_tile_layer(
             )
 
     preload_bounds = _tile_group_bounds(preload_tiles, box=box)
-    if full_material and preload_bounds is not None:
+    if full_material and labels and preload_bounds is not None:
         draw.rounded_rectangle(preload_bounds, radius=8, outline=(242, 190, 82, 210), width=2)
         draw.text(
             (preload_bounds[0] + 12, preload_bounds[1] + 10), "PRELOAD", font=_load_font(15), fill=(255, 221, 139, 240)
@@ -728,6 +745,7 @@ def _draw_route_overlay_layer(
     route: list[CameraPose],
     box: tuple[int, int, int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     route_xy = _dynamic_route_xy(projection=projection, route=route, box=box)
     if len(route_xy) < 2:
@@ -748,7 +766,7 @@ def _draw_route_overlay_layer(
     stop_index = min(len(route_xy) - 2, max(1, int(len(route_xy) * 0.72)))
     stop_start, stop_end = _perpendicular_segment(route_xy, stop_index, lane_width * 1.25)
     draw.line((*stop_start, *stop_end), fill=(255, 82, 82, 230), width=4 if full_material else 2)
-    if full_material:
+    if full_material and labels:
         label_x = int((stop_start[0] + stop_end[0]) / 2) + 8
         label_y = int((stop_start[1] + stop_end[1]) / 2) - 24
         draw.text((label_x, label_y), "route / stop marker", font=_load_font(14), fill=(230, 244, 236, 220))
@@ -761,6 +779,7 @@ def _draw_load_radius(
     camera: CameraPose,
     box: tuple[int, int, int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=box)
     radius = int((box[3] - box[1]) * (0.23 if full_material else 0.18))
@@ -775,7 +794,7 @@ def _draw_load_radius(
         outline=(96, 178, 255, 80),
         width=2 if full_material else 1,
     )
-    if full_material:
+    if full_material and labels:
         draw.text((eye_x + radius + 8, eye_y - 10), "load radius", font=_load_font(14), fill=(190, 240, 204, 220))
 
 
@@ -821,6 +840,7 @@ def _draw_route_material(
     route: list[CameraPose],
     box: tuple[int, int, int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     route_xy = _dynamic_route_xy(projection=projection, route=route, box=box)
     if len(route_xy) > 1:
@@ -851,6 +871,7 @@ def _draw_route_material(
         eye=(eye_x, eye_y),
         target=(target_x, target_y),
         full_material=full_material,
+        labels=labels,
     )
 
 
@@ -860,6 +881,7 @@ def _draw_material_scale(
     projection: RouteMapProjection,
     box: tuple[int, int, int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     scale_width = min(180 if full_material else 96, max(54, int((box[2] - box[0]) * 0.18)))
     scale_x0 = box[0] + (28 if full_material else 14)
@@ -872,12 +894,13 @@ def _draw_material_scale(
         fill=(226, 239, 250, 225),
         width=2,
     )
-    draw.text(
-        (scale_x0, scale_y + 10),
-        f"{_route_span_meters(projection) * scale_width / max(1, box[2] - box[0]):.1f} m",
-        font=_load_font(13 if full_material else 10),
-        fill=(226, 239, 250, 210),
-    )
+    if labels:
+        draw.text(
+            (scale_x0, scale_y + 10),
+            f"{_route_span_meters(projection) * scale_width / max(1, box[2] - box[0]):.1f} m",
+            font=_load_font(13 if full_material else 10),
+            fill=(226, 239, 250, 210),
+        )
 
 
 def _offset_polyline(points: list[tuple[int, int]], offset: int) -> list[tuple[int, int]]:
@@ -956,6 +979,7 @@ def _draw_ego_vehicle_marker(
     eye: tuple[int, int],
     target: tuple[int, int],
     full_material: bool,
+    labels: bool,
 ) -> None:
     dx = target[0] - eye[0]
     dy = target[1] - eye[1]
@@ -989,7 +1013,7 @@ def _draw_ego_vehicle_marker(
         fill=(88, 178, 255, 235),
         width=3 if full_material else 2,
     )
-    if full_material:
+    if full_material and labels:
         draw.text((eye[0] + 24, eye[1] - 12), "base_link", font=_load_font(15), fill=(196, 255, 206, 245))
 
 
