@@ -19,7 +19,7 @@ reviewable scenario CI artifacts.
 
 [![Dynamic map loading material rendered from outdoor-demo-dust3r.splat](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`; white is the PCD-like `.splat` footprint, green cells are resident, amber cells are preload, and the vector overlay shows the route layer. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`; white is the PCD-like `.splat` footprint, green cells are resident, amber cells are preload, and the route overlay tracks the loading window. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
