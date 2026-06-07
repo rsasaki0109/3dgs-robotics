@@ -34,11 +34,11 @@ test('buildDynamicMapTileCatalogLaunchUrl wires a large-scale catalog into the c
   const launchUrl = buildDynamicMapTileCatalogLaunchUrl(
     'http://127.0.0.1:4173/?overlay=1&tileId=old#fragment=echo-chamber',
     {
-      tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+      tileCatalogUrl: '/manifests/outdoor-production-grid-large-tile-catalog.json',
       preloadMode: 'cache',
-      tilePreloadLimit: 2,
-      tileResidentLimit: 3,
-      routeUrl: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+      tilePreloadLimit: 4,
+      tileResidentLimit: 6,
+      routeUrl: '/robot-routes/outdoor-production-grid-large-route.json',
       routePlayback: true,
       routePlaybackLoop: true,
       routePlaybackMs: 1200
@@ -50,14 +50,14 @@ test('buildDynamicMapTileCatalogLaunchUrl wires a large-scale catalog into the c
   assert.equal(parsedUrl.hash, '');
   assert.equal(
     parsedUrl.searchParams.get('tileCatalog'),
-    '/manifests/outdoor-demo-dust3r-tile-catalog.json'
+    '/manifests/outdoor-production-grid-large-tile-catalog.json'
   );
   assert.equal(parsedUrl.searchParams.get('tilePreload'), 'cache');
-  assert.equal(parsedUrl.searchParams.get('tilePreloadLimit'), '2');
-  assert.equal(parsedUrl.searchParams.get('tileResidentLimit'), '3');
+  assert.equal(parsedUrl.searchParams.get('tilePreloadLimit'), '4');
+  assert.equal(parsedUrl.searchParams.get('tileResidentLimit'), '6');
   assert.equal(
     parsedUrl.searchParams.get('robotRoute'),
-    '/robot-routes/outdoor-demo-dust3r-tile-loop.json'
+    '/robot-routes/outdoor-production-grid-large-route.json'
   );
   assert.equal(parsedUrl.searchParams.get('robotRoutePlayback'), '1');
   assert.equal(parsedUrl.searchParams.get('robotRoutePlaybackMs'), '1200');

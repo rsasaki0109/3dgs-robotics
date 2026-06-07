@@ -17,9 +17,9 @@ reviewable scenario CI artifacts.
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
 [Physical AI docs](docs/physical-ai-sim.md)
 
-[![Dynamic map loading material rendered from outdoor-demo-dust3r.splat](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+[![Dynamic map loading material rendered from the outdoor production grid](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
 
-Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`; white is the PCD-like `.splat` footprint, green cells are resident, amber cells are preload, and the route overlay tracks the loading window. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: dynamic map loading over the 34-tile outdoor production grid; white is the PCD-like `.splat` footprint, green cells are resident, amber cells are preload, and the route overlay tracks the loading window. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
@@ -37,8 +37,8 @@ What ships:
 
 - Nine public outdoor `.splat` scenes from supervised GNSS/LiDAR, DUSt3R,
   MAST3R, VGGT-SLAM 2.0, MASt3R-SLAM, and Pi3X.
-- Bundled large-scale 3DGS dynamic-map result: a 400k Gaussian DUSt3R
-  outdoor `.splat` split into 4 ready browser tiles with route playback.
+- Bundled large-scale 3DGS dynamic-map fixture: 9 production outdoor `.splat`
+  results composed into a 1.52M-Gaussian, 34-tile browser route.
 - `photos-to-splat` for image-folder to browser `.splat` runs.
 - `splat-inspect` and `splat-filter` for cleaning cloudy browser splats.
 - Route-policy benchmark and scenario CI tooling for Physical AI review bundles.
@@ -73,8 +73,9 @@ Pages hosts multiple viewers over the same production scene list:
 ### Large-scale 3DGS Dynamic Map Result
 
 The repo also ships a browser-ready large-scale dynamic-map fixture in
-`apps/dreamwalker-web/public/`: `outdoor-demo-dust3r.splat` is tiled into a
-2x2 X/Z grid and played back through the DreamWalker robot route UI.
+`apps/dreamwalker-web/public/`: 9 production outdoor `.splat` results are
+sampled into a 3x3 X/Z grid, tiled into 34 ready browser splats, and played
+back through the DreamWalker robot route UI.
 
 [![Large-scale 3DGS dynamic map loading result](docs/images/demo-sweep/map-quality.gif)](docs/images/demo-sweep/map-quality.gif)
 
@@ -86,13 +87,15 @@ the older scene-sweep hero.
 
 | Result | Value |
 | --- | --- |
-| Tile catalog | [`outdoor-demo-dust3r-tile-catalog.json`](apps/dreamwalker-web/public/manifests/outdoor-demo-dust3r-tile-catalog.json) |
-| Route playback | [`outdoor-demo-dust3r-tile-loop.json`](apps/dreamwalker-web/public/robot-routes/outdoor-demo-dust3r-tile-loop.json) |
-| Input splats | 400,000 splats / 12.8 MB source `.splat` |
-| Ready tiles | 4 / 4 ready tiles, 0 missing |
-| Tiled splats | 430,474 splats including overlap |
-| Tiling | `xz`, 10 m tile size, 0.5 m overlap |
-| Tile bytes | 14 MB total across `tile_x000_z000`, `tile_x000_z001`, `tile_x001_z000`, `tile_x001_z001` |
+| Tile catalog | [`outdoor-production-grid-large-tile-catalog.json`](apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json) |
+| Route playback | [`outdoor-production-grid-large-route.json`](apps/dreamwalker-web/public/robot-routes/outdoor-production-grid-large-route.json) |
+| Source scenes | 9 shipped outdoor production `.splat` results |
+| Composite splats | 1,518,073 splats / 48.6 MB generated composite |
+| Ready tiles | 34 / 34 ready tiles, 0 missing |
+| Tiled splats | 2,444,866 splats including overlap |
+| Tiling | `xz`, 8 coordinate-unit tile size, 1.25 overlap |
+| Coverage | tile coverage X -47.1 to 48.9 / Z -47.2 to 48.8; rendered route footprint 170.7 x 96.0 |
+| Tile bytes | 78.2 MB total across 34 browser tile `.splat` files |
 | Runtime view | active / preload / evicted tile residency overlay in Robot Mode |
 
 Run it locally:
@@ -104,7 +107,7 @@ npm --prefix apps/dreamwalker-web run dev -- --host 127.0.0.1 --port 5173
 Then open:
 
 ```text
-http://127.0.0.1:5173/?tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=2&tileResidentLimit=3&robotRoute=%2Frobot-routes%2Foutdoor-demo-dust3r-tile-loop.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+http://127.0.0.1:5173/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
 ```
 
 The scene picker is defined once in [`docs/scenes-list.json`](docs/scenes-list.json)
@@ -241,22 +244,31 @@ gs-mapper large-scale-3dgs-catalog \
   --run-report outputs/autoware_large/large_scale_3dgs_run_report.json
 ```
 
-If you already have a browser `.splat`, tile it directly for dynamic map
-loading:
+For the bundled large fixture, compose the 9 production splats and tile that
+composite:
 
 ```bash
+python3 scripts/build_large_scale_3dgs_fixture.py
 gs-mapper splat-tile-catalog \
-  --input docs/assets/outdoor-demo/outdoor-demo-dust3r.splat \
-  --output apps/dreamwalker-web/public/manifests/outdoor-demo-dust3r-tile-catalog.json \
-  --scene-id outdoor-demo-dust3r-tiled \
-  --tile-size 10 \
-  --overlap 0.5
+  --input outputs/large-scale-3dgs/outdoor-production-grid.splat \
+  --output apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json \
+  --scene-id outdoor-production-grid-large \
+  --label "Outdoor Production Grid Large" \
+  --tile-size 8 \
+  --overlap 1.25 \
+  --min-splats 200
+
+gs-mapper large-scale-3dgs-route \
+  --catalog apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json \
+  --output apps/dreamwalker-web/public/robot-routes/outdoor-production-grid-large-route.json \
+  --label "Outdoor Production Grid Large Route" \
+  --order snake
 ```
 
 Open the bundled large-scale viewer entrypoint:
 
 ```text
-http://localhost:5173/?tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=2&tileResidentLimit=3&robotRoute=%2Frobot-routes%2Foutdoor-demo-dust3r-tile-loop.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+http://localhost:5173/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
 ```
 
 For MCD GNSS-seeded runs, first verify non-zero GNSS fixes:

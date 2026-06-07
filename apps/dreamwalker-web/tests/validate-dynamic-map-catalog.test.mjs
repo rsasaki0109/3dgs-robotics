@@ -342,12 +342,12 @@ test('validateDynamicMapCatalog validates robot route coverage and prints a play
   }
 });
 
-test('validateDynamicMapCatalog validates the bundled outdoor route playback demo', async () => {
+test('validateDynamicMapCatalog validates the bundled large outdoor route playback demo', async () => {
   const result = await validateDynamicMapCatalog(
-    '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+    '/manifests/outdoor-production-grid-large-tile-catalog.json',
     {
       publicRoot: appPublicRoot,
-      routeInput: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+      routeInput: '/robot-routes/outdoor-production-grid-large-route.json',
       routePlayback: true,
       routePlaybackLoop: true,
       routePlaybackMs: 1200,
@@ -357,24 +357,20 @@ test('validateDynamicMapCatalog validates the bundled outdoor route playback dem
 
   assert.equal(result.ok, true);
   assert.equal(result.errorCount, 0);
-  assert.deepEqual(result.routeTileSequence, [
-    'tile_x000_z000',
-    'tile_x000_z001',
-    'tile_x001_z001',
-    'tile_x001_z000',
-    'tile_x000_z000'
-  ]);
+  assert.equal(result.routeTileSequence.length, 34);
+  assert.equal(result.routeTileSequence[0], 'tile_x000_z001');
+  assert.equal(result.routeTileSequence.at(-1), 'tile_x011_z010');
   assert.ok(result.findings.some((finding) =>
     finding.scope === 'route:coverage' &&
     finding.detail.includes('all route points')
   ));
   assert.match(
     result.launchUrl,
-    /tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog\.json/
+    /tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog\.json/
   );
   assert.match(
     result.launchUrl,
-    /robotRoute=%2Frobot-routes%2Foutdoor-demo-dust3r-tile-loop\.json/
+    /robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route\.json/
   );
   assert.match(result.launchUrl, /robotRoutePlayback=1/);
   assert.match(result.launchUrl, /robotRoutePlaybackMs=1200/);

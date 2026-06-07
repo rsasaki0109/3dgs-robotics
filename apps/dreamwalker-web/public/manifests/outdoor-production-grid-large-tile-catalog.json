@@ -1,0 +1,1085 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "sceneId": "outdoor-production-grid-large",
+  "label": "Outdoor Production Grid Large",
+  "planPath": "outputs/large-scale-3dgs/outdoor-production-grid.splat:splat-tiling",
+  "runReportPath": "",
+  "tiling": {
+    "strategy": "existing-splat-axis-grid",
+    "axes": "xz",
+    "tileSize": 8.0,
+    "overlap": 1.25,
+    "minSplats": 200,
+    "worldBounds": {
+      "minX": -47.09987258911133,
+      "maxX": 43.36690139770508,
+      "minZ": -47.16215515136719,
+      "maxZ": 46.490684509277344
+    }
+  },
+  "summary": {
+    "tileCount": 34,
+    "readyTileCount": 34,
+    "missingSplatTileCount": 0,
+    "inputSplatCount": 1518073,
+    "inputBytes": 48578336,
+    "tiledSplatCount": 2444866
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_z001",
+      "label": "tile x000 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x000_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x000_z001.splat",
+      "coreBounds": {
+        "minX": -47.09987258911133,
+        "maxX": -39.09987258911133,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -48.34987258911133,
+        "maxX": -37.84987258911133,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 32599,
+      "coreSplatCount": 1868,
+      "splatCount": 32599
+    },
+    {
+      "id": "tile_x000_z005",
+      "label": "tile x000 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x000_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x000_z005.splat",
+      "coreBounds": {
+        "minX": -47.09987258911133,
+        "maxX": -39.09987258911133,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": -48.34987258911133,
+        "maxX": -37.84987258911133,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 22572,
+      "coreSplatCount": 15879,
+      "splatCount": 22572
+    },
+    {
+      "id": "tile_x000_z006",
+      "label": "tile x000 z006",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x000_z006.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x000_z006.splat",
+      "coreBounds": {
+        "minX": -47.09987258911133,
+        "maxX": -39.09987258911133,
+        "minZ": 0.8378448486328125,
+        "maxZ": 8.837844848632812
+      },
+      "expandedBounds": {
+        "minX": -48.34987258911133,
+        "maxX": -37.84987258911133,
+        "minZ": -0.4121551513671875,
+        "maxZ": 10.087844848632812
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 6
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 25539,
+      "coreSplatCount": 5264,
+      "splatCount": 25539
+    },
+    {
+      "id": "tile_x000_z010",
+      "label": "tile x000 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x000_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x000_z010.splat",
+      "coreBounds": {
+        "minX": -47.09987258911133,
+        "maxX": -39.09987258911133,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -48.34987258911133,
+        "maxX": -37.84987258911133,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 0,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 62342,
+      "coreSplatCount": 13592,
+      "splatCount": 62342
+    },
+    {
+      "id": "tile_x001_z001",
+      "label": "tile x001 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x001_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x001_z001.splat",
+      "coreBounds": {
+        "minX": -39.09987258911133,
+        "maxX": -31.099872589111328,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -40.34987258911133,
+        "maxX": -29.849872589111328,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 79217,
+      "coreSplatCount": 77830,
+      "splatCount": 79217
+    },
+    {
+      "id": "tile_x001_z005",
+      "label": "tile x001 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x001_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x001_z005.splat",
+      "coreBounds": {
+        "minX": -39.09987258911133,
+        "maxX": -31.099872589111328,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": -40.34987258911133,
+        "maxX": -29.849872589111328,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 118250,
+      "coreSplatCount": 96349,
+      "splatCount": 118250
+    },
+    {
+      "id": "tile_x001_z006",
+      "label": "tile x001 z006",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x001_z006.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x001_z006.splat",
+      "coreBounds": {
+        "minX": -39.09987258911133,
+        "maxX": -31.099872589111328,
+        "minZ": 0.8378448486328125,
+        "maxZ": 8.837844848632812
+      },
+      "expandedBounds": {
+        "minX": -40.34987258911133,
+        "maxX": -29.849872589111328,
+        "minZ": -0.4121551513671875,
+        "maxZ": 10.087844848632812
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 6
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 91304,
+      "coreSplatCount": 62508,
+      "splatCount": 91304
+    },
+    {
+      "id": "tile_x001_z010",
+      "label": "tile x001 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x001_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x001_z010.splat",
+      "coreBounds": {
+        "minX": -39.09987258911133,
+        "maxX": -31.099872589111328,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -40.34987258911133,
+        "maxX": -29.849872589111328,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 1,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 178049,
+      "coreSplatCount": 164442,
+      "splatCount": 178049
+    },
+    {
+      "id": "tile_x002_z001",
+      "label": "tile x002 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x002_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x002_z001.splat",
+      "coreBounds": {
+        "minX": -31.099872589111328,
+        "maxX": -23.099872589111328,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -32.34987258911133,
+        "maxX": -21.849872589111328,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 2,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 3044,
+      "coreSplatCount": 295,
+      "splatCount": 3044
+    },
+    {
+      "id": "tile_x004_z000",
+      "label": "tile x004 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x004_z000.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x004_z000.splat",
+      "coreBounds": {
+        "minX": -15.099872589111328,
+        "maxX": -7.099872589111328,
+        "minZ": -47.16215515136719,
+        "maxZ": -39.16215515136719
+      },
+      "expandedBounds": {
+        "minX": -16.349872589111328,
+        "maxX": -5.849872589111328,
+        "minZ": -48.41215515136719,
+        "maxZ": -37.91215515136719
+      },
+      "tileIndex": {
+        "x": 4,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 22330,
+      "coreSplatCount": 10008,
+      "splatCount": 22330
+    },
+    {
+      "id": "tile_x005_z000",
+      "label": "tile x005 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z000.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z000.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": -47.16215515136719,
+        "maxZ": -39.16215515136719
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": -48.41215515136719,
+        "maxZ": -37.91215515136719
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 43367,
+      "coreSplatCount": 12856,
+      "splatCount": 43367
+    },
+    {
+      "id": "tile_x005_z001",
+      "label": "tile x005 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z001.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 113471,
+      "coreSplatCount": 96235,
+      "splatCount": 113471
+    },
+    {
+      "id": "tile_x005_z002",
+      "label": "tile x005 z002",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z002.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z002.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": -31.162155151367188,
+        "maxZ": -23.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": -32.41215515136719,
+        "maxZ": -21.912155151367188
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 2
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 2370,
+      "coreSplatCount": 387,
+      "splatCount": 2370
+    },
+    {
+      "id": "tile_x005_z005",
+      "label": "tile x005 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z005.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 170157,
+      "coreSplatCount": 102786,
+      "splatCount": 170157
+    },
+    {
+      "id": "tile_x005_z006",
+      "label": "tile x005 z006",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z006.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z006.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": 0.8378448486328125,
+        "maxZ": 8.837844848632812
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": -0.4121551513671875,
+        "maxZ": 10.087844848632812
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 6
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 84604,
+      "coreSplatCount": 11014,
+      "splatCount": 84604
+    },
+    {
+      "id": "tile_x005_z009",
+      "label": "tile x005 z009",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z009.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z009.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": 24.837844848632812,
+        "maxZ": 32.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": 23.587844848632812,
+        "maxZ": 34.08784484863281
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 9
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 98768,
+      "coreSplatCount": 70154,
+      "splatCount": 98768
+    },
+    {
+      "id": "tile_x005_z010",
+      "label": "tile x005 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z010.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 112186,
+      "coreSplatCount": 59622,
+      "splatCount": 112186
+    },
+    {
+      "id": "tile_x005_z011",
+      "label": "tile x005 z011",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x005_z011.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x005_z011.splat",
+      "coreBounds": {
+        "minX": -7.099872589111328,
+        "maxX": 0.9001274108886719,
+        "minZ": 40.83784484863281,
+        "maxZ": 48.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -8.349872589111328,
+        "maxX": 2.150127410888672,
+        "minZ": 39.58784484863281,
+        "maxZ": 50.08784484863281
+      },
+      "tileIndex": {
+        "x": 5,
+        "z": 11
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 22799,
+      "coreSplatCount": 4492,
+      "splatCount": 22799
+    },
+    {
+      "id": "tile_x006_z001",
+      "label": "tile x006 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z001.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 69809,
+      "coreSplatCount": 11379,
+      "splatCount": 69809
+    },
+    {
+      "id": "tile_x006_z002",
+      "label": "tile x006 z002",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z002.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z002.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": -31.162155151367188,
+        "maxZ": -23.162155151367188
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": -32.41215515136719,
+        "maxZ": -21.912155151367188
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 2
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 58044,
+      "coreSplatCount": 48982,
+      "splatCount": 58044
+    },
+    {
+      "id": "tile_x006_z005",
+      "label": "tile x006 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z005.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 153271,
+      "coreSplatCount": 66139,
+      "splatCount": 153271
+    },
+    {
+      "id": "tile_x006_z009",
+      "label": "tile x006 z009",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z009.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z009.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": 24.837844848632812,
+        "maxZ": 32.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": 23.587844848632812,
+        "maxZ": 34.08784484863281
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 9
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 19408,
+      "coreSplatCount": 828,
+      "splatCount": 19408
+    },
+    {
+      "id": "tile_x006_z010",
+      "label": "tile x006 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z010.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 70479,
+      "coreSplatCount": 32014,
+      "splatCount": 70479
+    },
+    {
+      "id": "tile_x006_z011",
+      "label": "tile x006 z011",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x006_z011.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x006_z011.splat",
+      "coreBounds": {
+        "minX": 0.9001274108886719,
+        "maxX": 8.900127410888672,
+        "minZ": 40.83784484863281,
+        "maxZ": 48.83784484863281
+      },
+      "expandedBounds": {
+        "minX": -0.3498725891113281,
+        "maxX": 10.150127410888672,
+        "minZ": 39.58784484863281,
+        "maxZ": 50.08784484863281
+      },
+      "tileIndex": {
+        "x": 6,
+        "z": 11
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 30945,
+      "coreSplatCount": 12890,
+      "splatCount": 30945
+    },
+    {
+      "id": "tile_x009_z000",
+      "label": "tile x009 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x009_z000.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x009_z000.splat",
+      "coreBounds": {
+        "minX": 24.900127410888672,
+        "maxX": 32.90012741088867,
+        "minZ": -47.16215515136719,
+        "maxZ": -39.16215515136719
+      },
+      "expandedBounds": {
+        "minX": 23.650127410888672,
+        "maxX": 34.15012741088867,
+        "minZ": -48.41215515136719,
+        "maxZ": -37.91215515136719
+      },
+      "tileIndex": {
+        "x": 9,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 13067,
+      "coreSplatCount": 1231,
+      "splatCount": 13067
+    },
+    {
+      "id": "tile_x009_z001",
+      "label": "tile x009 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x009_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x009_z001.splat",
+      "coreBounds": {
+        "minX": 24.900127410888672,
+        "maxX": 32.90012741088867,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": 23.650127410888672,
+        "maxX": 34.15012741088867,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 9,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 16791,
+      "coreSplatCount": 500,
+      "splatCount": 16791
+    },
+    {
+      "id": "tile_x009_z005",
+      "label": "tile x009 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x009_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x009_z005.splat",
+      "coreBounds": {
+        "minX": 24.900127410888672,
+        "maxX": 32.90012741088867,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": 23.650127410888672,
+        "maxX": 34.15012741088867,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 9,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 64774,
+      "coreSplatCount": 50364,
+      "splatCount": 64774
+    },
+    {
+      "id": "tile_x009_z010",
+      "label": "tile x009 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x009_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x009_z010.splat",
+      "coreBounds": {
+        "minX": 24.900127410888672,
+        "maxX": 32.90012741088867,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": 23.650127410888672,
+        "maxX": 34.15012741088867,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 9,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 57121,
+      "coreSplatCount": 44435,
+      "splatCount": 57121
+    },
+    {
+      "id": "tile_x010_z000",
+      "label": "tile x010 z000",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x010_z000.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x010_z000.splat",
+      "coreBounds": {
+        "minX": 32.90012741088867,
+        "maxX": 40.90012741088867,
+        "minZ": -47.16215515136719,
+        "maxZ": -39.16215515136719
+      },
+      "expandedBounds": {
+        "minX": 31.650127410888672,
+        "maxX": 42.15012741088867,
+        "minZ": -48.41215515136719,
+        "maxZ": -37.91215515136719
+      },
+      "tileIndex": {
+        "x": 10,
+        "z": 0
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 50529,
+      "coreSplatCount": 6831,
+      "splatCount": 50529
+    },
+    {
+      "id": "tile_x010_z001",
+      "label": "tile x010 z001",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x010_z001.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x010_z001.splat",
+      "coreBounds": {
+        "minX": 32.90012741088867,
+        "maxX": 40.90012741088867,
+        "minZ": -39.16215515136719,
+        "maxZ": -31.162155151367188
+      },
+      "expandedBounds": {
+        "minX": 31.650127410888672,
+        "maxX": 42.15012741088867,
+        "minZ": -40.41215515136719,
+        "maxZ": -29.912155151367188
+      },
+      "tileIndex": {
+        "x": 10,
+        "z": 1
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 178767,
+      "coreSplatCount": 171408,
+      "splatCount": 178767
+    },
+    {
+      "id": "tile_x010_z005",
+      "label": "tile x010 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x010_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x010_z005.splat",
+      "coreBounds": {
+        "minX": 32.90012741088867,
+        "maxX": 40.90012741088867,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": 31.650127410888672,
+        "maxX": 42.15012741088867,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 10,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 174435,
+      "coreSplatCount": 129347,
+      "splatCount": 174435
+    },
+    {
+      "id": "tile_x010_z010",
+      "label": "tile x010 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x010_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x010_z010.splat",
+      "coreBounds": {
+        "minX": 32.90012741088867,
+        "maxX": 40.90012741088867,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": 31.650127410888672,
+        "maxX": 42.15012741088867,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 10,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 132888,
+      "coreSplatCount": 102999,
+      "splatCount": 132888
+    },
+    {
+      "id": "tile_x011_z005",
+      "label": "tile x011 z005",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x011_z005.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x011_z005.splat",
+      "coreBounds": {
+        "minX": 40.90012741088867,
+        "maxX": 48.90012741088867,
+        "minZ": -7.1621551513671875,
+        "maxZ": 0.8378448486328125
+      },
+      "expandedBounds": {
+        "minX": 39.65012741088867,
+        "maxX": 50.15012741088867,
+        "minZ": -8.412155151367188,
+        "maxZ": 2.0878448486328125
+      },
+      "tileIndex": {
+        "x": 11,
+        "z": 5
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 20081,
+      "coreSplatCount": 288,
+      "splatCount": 20081
+    },
+    {
+      "id": "tile_x011_z010",
+      "label": "tile x011 z010",
+      "status": "ready",
+      "runStatus": "tiled",
+      "splatUrl": "/splats/outdoor-production-grid-large/tile_x011_z010.splat",
+      "sourceSplat": "outputs/large-scale-3dgs/outdoor-production-grid.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/outdoor-production-grid-large/tile_x011_z010.splat",
+      "coreBounds": {
+        "minX": 40.90012741088867,
+        "maxX": 48.90012741088867,
+        "minZ": 32.83784484863281,
+        "maxZ": 40.83784484863281
+      },
+      "expandedBounds": {
+        "minX": 39.65012741088867,
+        "maxX": 50.15012741088867,
+        "minZ": 31.587844848632812,
+        "maxZ": 42.08784484863281
+      },
+      "tileIndex": {
+        "x": 11,
+        "z": 10
+      },
+      "axes": "xz",
+      "imageCount": 0,
+      "coreImageCount": 0,
+      "pointCount": 51489,
+      "coreSplatCount": 32244,
+      "splatCount": 51489
+    }
+  ]
+}

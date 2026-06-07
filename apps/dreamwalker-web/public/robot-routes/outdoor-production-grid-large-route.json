@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-route/v1",
+  "label": "Outdoor Production Grid Large Route",
+  "description": "snake route through 34 ready tiles across a 3x3 production outdoor 3DGS grid",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "frameId": "dreamwalker_map",
+  "world": {
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "assetLabel": "Outdoor Production Grid Large",
+    "splatUrl": "",
+    "colliderMeshUrl": "",
+    "frameId": "dreamwalker_map",
+    "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+    "usesDemoFallback": false
+  },
+  "pose": {
+    "position": [
+      44.900127,
+      0.0,
+      36.837845
+    ],
+    "yawDegrees": 180
+  },
+  "route": [
+    [
+      -43.099873,
+      0.0,
+      -35.162155
+    ],
+    [
+      -43.099873,
+      0.0,
+      -3.162155
+    ],
+    [
+      -43.099873,
+      0.0,
+      4.837845
+    ],
+    [
+      -43.099873,
+      0.0,
+      36.837845
+    ],
+    [
+      -35.099873,
+      0.0,
+      36.837845
+    ],
+    [
+      -35.099873,
+      0.0,
+      4.837845
+    ],
+    [
+      -35.099873,
+      0.0,
+      -3.162155
+    ],
+    [
+      -35.099873,
+      0.0,
+      -35.162155
+    ],
+    [
+      -27.099873,
+      0.0,
+      -35.162155
+    ],
+    [
+      -11.099873,
+      0.0,
+      -43.162155
+    ],
+    [
+      -3.099873,
+      0.0,
+      -43.162155
+    ],
+    [
+      -3.099873,
+      0.0,
+      -35.162155
+    ],
+    [
+      -3.099873,
+      0.0,
+      -27.162155
+    ],
+    [
+      -3.099873,
+      0.0,
+      -3.162155
+    ],
+    [
+      -3.099873,
+      0.0,
+      4.837845
+    ],
+    [
+      -3.099873,
+      0.0,
+      28.837845
+    ],
+    [
+      -3.099873,
+      0.0,
+      36.837845
+    ],
+    [
+      -3.099873,
+      0.0,
+      44.837845
+    ],
+    [
+      4.900127,
+      0.0,
+      44.837845
+    ],
+    [
+      4.900127,
+      0.0,
+      36.837845
+    ],
+    [
+      4.900127,
+      0.0,
+      28.837845
+    ],
+    [
+      4.900127,
+      0.0,
+      -3.162155
+    ],
+    [
+      4.900127,
+      0.0,
+      -27.162155
+    ],
+    [
+      4.900127,
+      0.0,
+      -35.162155
+    ],
+    [
+      28.900127,
+      0.0,
+      -43.162155
+    ],
+    [
+      28.900127,
+      0.0,
+      -35.162155
+    ],
+    [
+      28.900127,
+      0.0,
+      -3.162155
+    ],
+    [
+      28.900127,
+      0.0,
+      36.837845
+    ],
+    [
+      36.900127,
+      0.0,
+      36.837845
+    ],
+    [
+      36.900127,
+      0.0,
+      -3.162155
+    ],
+    [
+      36.900127,
+      0.0,
+      -35.162155
+    ],
+    [
+      36.900127,
+      0.0,
+      -43.162155
+    ],
+    [
+      44.900127,
+      0.0,
+      -3.162155
+    ],
+    [
+      44.900127,
+      0.0,
+      36.837845
+    ]
+  ],
+  "tileSequence": [
+    "tile_x000_z001",
+    "tile_x000_z005",
+    "tile_x000_z006",
+    "tile_x000_z010",
+    "tile_x001_z010",
+    "tile_x001_z006",
+    "tile_x001_z005",
+    "tile_x001_z001",
+    "tile_x002_z001",
+    "tile_x004_z000",
+    "tile_x005_z000",
+    "tile_x005_z001",
+    "tile_x005_z002",
+    "tile_x005_z005",
+    "tile_x005_z006",
+    "tile_x005_z009",
+    "tile_x005_z010",
+    "tile_x005_z011",
+    "tile_x006_z011",
+    "tile_x006_z010",
+    "tile_x006_z009",
+    "tile_x006_z005",
+    "tile_x006_z002",
+    "tile_x006_z001",
+    "tile_x009_z000",
+    "tile_x009_z001",
+    "tile_x009_z005",
+    "tile_x009_z010",
+    "tile_x010_z010",
+    "tile_x010_z005",
+    "tile_x010_z001",
+    "tile_x010_z000",
+    "tile_x011_z005",
+    "tile_x011_z010"
+  ],
+  "sourceCatalog": {
+    "path": "apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json",
+    "sceneId": "outdoor-production-grid-large",
+    "label": "Outdoor Production Grid Large",
+    "axes": "xz",
+    "order": "snake"
+  }
+}

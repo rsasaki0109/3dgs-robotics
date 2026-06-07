@@ -253,14 +253,26 @@ def _record_in_axis_bounds(
 
 
 def _splat_world_bounds(data: bytes, count: int, axes: tuple[str, str]) -> dict[str, float]:
-    first_values = [_splat_axis_value(data, index, axes[0]) for index in range(count)]
-    second_values = [_splat_axis_value(data, index, axes[1]) for index in range(count)]
+    first_values = _splat_axis_values(data, count, axes[0])
+    second_values = _splat_axis_values(data, count, axes[1])
     return {
-        f"min{axes[0].upper()}": float(min(first_values)),
-        f"max{axes[0].upper()}": float(max(first_values)),
-        f"min{axes[1].upper()}": float(min(second_values)),
-        f"max{axes[1].upper()}": float(max(second_values)),
+        f"min{axes[0].upper()}": float(first_values.min()),
+        f"max{axes[0].upper()}": float(first_values.max()),
+        f"min{axes[1].upper()}": float(second_values.min()),
+        f"max{axes[1].upper()}": float(second_values.max()),
     }
+
+
+def _splat_axis_values(data: bytes, count: int, axis: str) -> Any:
+    import numpy as np
+
+    return np.ndarray(
+        (count,),
+        dtype="<f4",
+        buffer=data,
+        offset=_SPLAT_AXIS_INDEX[axis] * 4,
+        strides=(SPLAT_RECORD_BYTES,),
+    )
 
 
 def splat_to_tile_catalog(
@@ -300,6 +312,11 @@ def splat_to_tile_catalog(
     tile_dir.mkdir(parents=True, exist_ok=True)
     world_bounds = _splat_world_bounds(data, count, split_axes)
     axis_a, axis_b = split_axes
+    axis_a_values = _splat_axis_values(data, count, axis_a)
+    axis_b_values = _splat_axis_values(data, count, axis_b)
+    import numpy as np
+
+    splat_records = np.frombuffer(data, dtype=np.uint8).reshape(count, SPLAT_RECORD_BYTES)
     min_a = world_bounds[f"min{axis_a.upper()}"]
     min_b = world_bounds[f"min{axis_b.upper()}"]
     max_a = world_bounds[f"max{axis_a.upper()}"]
@@ -322,26 +339,26 @@ def splat_to_tile_catalog(
                 f"min{axis_b.upper()}": core_bounds[f"min{axis_b.upper()}"] - overlap,
                 f"max{axis_b.upper()}": core_bounds[f"max{axis_b.upper()}"] + overlap,
             }
-            core_indices = [
-                index
-                for index in range(count)
-                if _record_in_axis_bounds(data, index, axes=split_axes, bounds=core_bounds)
-            ]
-            if len(core_indices) < min_splats:
+            core_mask = (
+                (axis_a_values >= core_bounds[f"min{axis_a.upper()}"])
+                & (axis_a_values <= core_bounds[f"max{axis_a.upper()}"])
+                & (axis_b_values >= core_bounds[f"min{axis_b.upper()}"])
+                & (axis_b_values <= core_bounds[f"max{axis_b.upper()}"])
+            )
+            core_splat_count = int(core_mask.sum())
+            if core_splat_count < min_splats:
                 continue
 
-            expanded_indices = [
-                index
-                for index in range(count)
-                if _record_in_axis_bounds(data, index, axes=split_axes, bounds=expanded_bounds)
-            ]
+            expanded_mask = (
+                (axis_a_values >= expanded_bounds[f"min{axis_a.upper()}"])
+                & (axis_a_values <= expanded_bounds[f"max{axis_a.upper()}"])
+                & (axis_b_values >= expanded_bounds[f"min{axis_b.upper()}"])
+                & (axis_b_values <= expanded_bounds[f"max{axis_b.upper()}"])
+            )
+            expanded_indices = np.flatnonzero(expanded_mask)
             tile_id = f"tile_{axis_a}{tile_a:03d}_{axis_b}{tile_b:03d}"
             tile_path = tile_dir / f"{tile_id}.splat"
-            tile_path.write_bytes(
-                b"".join(
-                    data[index * SPLAT_RECORD_BYTES : (index + 1) * SPLAT_RECORD_BYTES] for index in expanded_indices
-                )
-            )
+            tile_path.write_bytes(splat_records[expanded_indices].copy().tobytes())
             tiles.append(
                 {
                     "id": tile_id,
@@ -364,7 +381,7 @@ def splat_to_tile_catalog(
                     "imageCount": 0,
                     "coreImageCount": 0,
                     "pointCount": len(expanded_indices),
-                    "coreSplatCount": len(core_indices),
+                    "coreSplatCount": core_splat_count,
                     "splatCount": len(expanded_indices),
                 }
             )
