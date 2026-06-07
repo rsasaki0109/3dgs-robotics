@@ -22,7 +22,7 @@ FRAMES_PER_SCENE = 12
 FRAME_DURATION_MS = 260
 MAX_POINTS_PER_SCENE = 170_000
 FOV_DEGREES = 64.0
-MINIMAP_SIZE = (314, 176)
+MAP_PANEL_SIZE = (372, 424)
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,8 +46,8 @@ class SplatPoint:
 
 MAP_PROOF_SCENES = (
     MapProofScene(
-        asset="bag6-pi3x-20-15k.splat",
-        label="slow FPS course through shipped bag6 Pi3X splat",
+        asset="outdoor-demo-dust3r.splat",
+        label="large-scale shipped DUSt3R route",
         axes=(0, 2),
     ),
 )
@@ -231,10 +231,10 @@ def _camera_path(
     side = (-direction[1], direction[0])
     center = _plane_median(points, axes)
     projections = sorted(_plane_projection(point.xyz, axes, center, direction) for point in points)
-    low = _percentile(projections, 0.04)
-    high = _percentile(projections, 0.34)
-    target_low = _percentile(projections, 0.30)
-    target_high = _percentile(projections, 0.58)
+    low = _percentile(projections, 0.05)
+    high = _percentile(projections, 0.54)
+    target_low = _percentile(projections, 0.18)
+    target_high = _percentile(projections, 0.66)
     travel = max(0.3, high - low)
     target_travel = max(0.3, target_high - target_low)
     side_span = max(0.2, min(bounds[1] - bounds[0], bounds[3] - bounds[2]))
@@ -473,35 +473,83 @@ def _draw_minimap(
 ) -> None:
     width, height = size
     left, right, bottom, top = bounds
-    mini_width, mini_height = MINIMAP_SIZE
-    x0 = width - mini_width - 24
-    y0 = height - mini_height - 24
-    x1 = x0 + mini_width
-    y1 = y0 + mini_height
-    draw.rounded_rectangle((x0, y0, x1, y1), radius=6, fill=(4, 9, 15, 205), outline=(255, 255, 255, 36))
-    for index in range(1, 4):
-        x = x0 + mini_width * index / 4
-        y = y0 + mini_height * index / 4
-        draw.line((x, y0, x, y1), fill=(255, 255, 255, 16), width=1)
-        draw.line((x0, y, x1, y), fill=(255, 255, 255, 16), width=1)
-    step = max(1, len(points) // 6500)
-    for point in points[::step]:
-        x, y = _minimap_xy(point.xyz, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
-        draw.point((x, y), fill=(*_point_color(point.rgba), 96))
-    route_xy = [_minimap_xy(pose.eye, axes=axes, bounds=bounds, box=(x0, y0, x1, y1)) for pose in route]
-    if len(route_xy) > 1:
-        draw.line(route_xy, fill=(72, 154, 255, 190), width=4)
-    eye_x, eye_y = _minimap_xy(camera.eye, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
-    target_x, target_y = _minimap_xy(camera.target, axes=axes, bounds=bounds, box=(x0, y0, x1, y1))
-    draw.line((eye_x, eye_y, target_x, target_y), fill=(88, 236, 130, 255), width=4)
-    draw.ellipse((eye_x - 6, eye_y - 6, eye_x + 6, eye_y + 6), fill=(88, 236, 130, 255))
+    panel_width, panel_height = MAP_PANEL_SIZE
+    x0 = width - panel_width - 18
+    y0 = 84
+    x1 = x0 + panel_width
+    y1 = min(height - 18, y0 + panel_height)
+    map_top = y0 + 48
+    map_bottom = y1 - 54
+    map_box = (x0 + 14, map_top, x1 - 14, map_bottom)
     label_font = _load_font(13)
-    draw.text((x0 + 10, y0 + 8), "top-down route + current camera", font=label_font, fill=(213, 230, 244, 230))
+    title_font = _load_font(18)
+    metric_font = _load_font(14)
+
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=(4, 9, 15, 226), outline=(255, 255, 255, 44))
+    draw.text((x0 + 15, y0 + 12), "large-scale tile route map", font=title_font, fill=(244, 249, 255, 255))
+    draw.text((x0 + 17, y0 + 34), "top-down x/z density from actual .splat", font=label_font, fill=(173, 192, 210, 225))
+
+    for index in range(7):
+        x = map_box[0] + (map_box[2] - map_box[0]) * index / 6
+        y = map_box[1] + (map_box[3] - map_box[1]) * index / 6
+        line_fill = (255, 255, 255, 30 if index in (0, 6) else 14)
+        draw.line((x, map_box[1], x, map_box[3]), fill=line_fill, width=1)
+        draw.line((map_box[0], y, map_box[2], y), fill=line_fill, width=1)
+
+    for index in range(1, 3):
+        x = map_box[0] + (map_box[2] - map_box[0]) * index / 3
+        y = map_box[1] + (map_box[3] - map_box[1]) * index / 3
+        draw.line((x, map_box[1], x, map_box[3]), fill=(78, 154, 255, 54), width=2)
+        draw.line((map_box[0], y, map_box[2], y), fill=(78, 154, 255, 54), width=2)
+
+    step = max(1, len(points) // 12_000)
+    for point in points[::step]:
+        x, y = _minimap_xy(point.xyz, axes=axes, bounds=bounds, box=map_box)
+        draw.point((x, y), fill=(*_point_color(point.rgba), 118))
+
+    route_xy = [_minimap_xy(pose.eye, axes=axes, bounds=bounds, box=map_box) for pose in route]
+    if len(route_xy) > 1:
+        draw.line(route_xy, fill=(31, 84, 168, 210), width=9)
+        draw.line(route_xy, fill=(72, 154, 255, 235), width=5)
+        for waypoint_x, waypoint_y in route_xy[:: max(1, len(route_xy) // 5)]:
+            draw.ellipse(
+                (waypoint_x - 4, waypoint_y - 4, waypoint_x + 4, waypoint_y + 4),
+                fill=(162, 211, 255, 245),
+            )
+
+    eye_x, eye_y = _minimap_xy(camera.eye, axes=axes, bounds=bounds, box=map_box)
+    target_x, target_y = _minimap_xy(camera.target, axes=axes, bounds=bounds, box=map_box)
+    draw.line((eye_x, eye_y, target_x, target_y), fill=(91, 232, 120, 255), width=5)
+    draw.ellipse((eye_x - 8, eye_y - 8, eye_x + 8, eye_y + 8), fill=(91, 232, 120, 255))
+    draw.ellipse((eye_x - 13, eye_y - 13, eye_x + 13, eye_y + 13), outline=(91, 232, 120, 160), width=2)
+
+    map_width_m = right - left
+    map_height_m = top - bottom
+    scale_x0 = map_box[0] + 14
+    scale_y = map_box[3] - 18
+    scale_width = min(112, max(48, int((map_box[2] - map_box[0]) * 0.26)))
+    draw.line((scale_x0, scale_y, scale_x0 + scale_width, scale_y), fill=(226, 239, 250, 220), width=3)
+    draw.line((scale_x0, scale_y - 5, scale_x0, scale_y + 5), fill=(226, 239, 250, 220), width=2)
+    draw.line(
+        (scale_x0 + scale_width, scale_y - 5, scale_x0 + scale_width, scale_y + 5), fill=(226, 239, 250, 220), width=2
+    )
     draw.text(
-        (x0 + 10, y1 - 24),
-        f"x=[{left:.1f},{right:.1f}]  y=[{bottom:.1f},{top:.1f}]",
+        (scale_x0, scale_y + 7),
+        f"{map_width_m * scale_width / max(1, map_box[2] - map_box[0]):.1f} m",
         font=label_font,
-        fill=(160, 176, 190, 190),
+        fill=(226, 239, 250, 210),
+    )
+    draw.text(
+        (x0 + 15, y1 - 42),
+        f"extent {map_width_m:.1f} m x {map_height_m:.1f} m / sampled {len(points) // 1000}k splats",
+        font=metric_font,
+        fill=(204, 223, 238, 235),
+    )
+    draw.text(
+        (x0 + 15, y1 - 22),
+        f"x=[{left:.1f},{right:.1f}]  z=[{bottom:.1f},{top:.1f}]",
+        font=label_font,
+        fill=(150, 171, 190, 205),
     )
 
 
@@ -533,17 +581,14 @@ def _draw_frame_label(
     size: tuple[int, int],
 ) -> None:
     width, _ = size
-    title_font = _load_font(28)
-    meta_font = _load_font(17)
+    title_font = _load_font(24)
+    meta_font = _load_font(15)
     chip_font = _load_font(15)
-    draw.rounded_rectangle((18, 16, 760, 96), radius=6, fill=(4, 9, 15, 215), outline=(255, 255, 255, 36))
+    draw.rounded_rectangle((18, 16, 570, 96), radius=6, fill=(4, 9, 15, 215), outline=(255, 255, 255, 36))
     draw.text((34, 29), scene.label, font=title_font, fill=(244, 249, 255, 255))
     draw.text(
         (36, 65),
-        (
-            "actual .splat slow FPS route / "
-            f"{gaussian_count // 1000}k gaussians / {sampled_count // 1000}k sampled / {rendered_count // 1000}k visible"
-        ),
+        (f"actual .splat route / {gaussian_count // 1000}k gaussians / {rendered_count // 1000}k visible"),
         font=meta_font,
         fill=(203, 218, 232, 240),
     )

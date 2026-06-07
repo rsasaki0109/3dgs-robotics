@@ -379,8 +379,8 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
     assert "Slow FPS course through an actual shipped outdoor 3DGS splat" in readme
-    assert "Lead GIF: slow FPS movement along one route through an actual shipped `.splat`" in readme
-    assert "top-down course shown in the corner" in readme
+    assert "Lead GIF: slow FPS movement through an actual shipped `.splat`" in readme
+    assert "larger top-down route map from the same point cloud" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
