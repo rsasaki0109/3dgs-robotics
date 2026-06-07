@@ -423,7 +423,8 @@ export const dreamwalkerConfig = {
     defaultUrl: '',
     queryParam: 'tileCatalog',
     tileQueryParam: 'tileId',
-    preloadLimitQueryParam: 'tilePreloadLimit'
+    preloadLimitQueryParam: 'tilePreloadLimit',
+    residentLimitQueryParam: 'tileResidentLimit'
   },
   studioBundle: {
     defaultUrl: '',

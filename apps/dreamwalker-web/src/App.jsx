@@ -141,6 +141,26 @@ function parseDynamicMapTilePreloadLimitFromSearch() {
   return Math.max(0, Math.min(32, Math.floor(value)));
 }
 
+function parseDynamicMapTileResidentLimitFromSearch(defaultLimit) {
+  const fallbackLimit = Number.isFinite(defaultLimit) ? Math.max(1, Math.floor(defaultLimit)) : 5;
+  if (typeof window === 'undefined') {
+    return fallbackLimit;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const rawValue = searchParams.get(dreamwalkerConfig.tileCatalog.residentLimitQueryParam);
+  if (rawValue === null || rawValue.trim() === '') {
+    return fallbackLimit;
+  }
+
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    return fallbackLimit;
+  }
+
+  return Math.max(1, Math.min(64, Math.floor(value)));
+}
+
 function parseBooleanSearchFlag(value, truthyValues = ['1', 'true', 'yes', 'on']) {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
   return truthyValues.includes(normalized);
@@ -3033,6 +3053,10 @@ export default function App() {
     () => parseDynamicMapTilePreloadLimitFromSearch(),
     []
   );
+  const dynamicMapTileResidentLimit = useMemo(
+    () => parseDynamicMapTileResidentLimitFromSearch(dynamicMapTilePreloadLimit + 1),
+    [dynamicMapTilePreloadLimit]
+  );
   const studioBundleUrl = useMemo(
     () =>
       parseAssetManifestUrlFromSearch(
@@ -3312,6 +3336,7 @@ export default function App() {
     () =>
       buildDynamicMapLoadPlan(activeConfig, assetWorkspaceDraft, {
         currentTileId: selectedTileId ? '' : activeDynamicMapTileId,
+        maxResidentTiles: dynamicMapTileResidentLimit,
         maxTilePreloadCandidates: dynamicMapTilePreloadLimit,
         position: selectedTileId ? null : effectiveMapPositionState.position,
         routePreviewPositions: robotRoutePlaybackPreviewPositions,
@@ -3322,6 +3347,7 @@ export default function App() {
       activeConfig,
       activeDynamicMapTileId,
       assetWorkspaceDraft,
+      dynamicMapTileResidentLimit,
       dynamicMapTilePreloadLimit,
       effectiveMapPositionState.position,
       robotRoutePlaybackPreviewPositions,
@@ -3352,6 +3378,9 @@ export default function App() {
     const preloadEntriesByTileId = new Map(
       dynamicMapLoadPlan.tilePreloadCandidates.map((entry) => [entry.tileId, entry])
     );
+    const evictionEntriesByTileId = new Map(
+      dynamicMapLoadPlan.tileEvictionCandidates.map((entry) => [entry.tileId, entry])
+    );
     const preloadResultsByTileId = new Map(
       tilePreloadState.entries.map((entry, index) => [
         entry.tileId,
@@ -3362,6 +3391,7 @@ export default function App() {
 
     return catalog.tiles.map((tile) => {
       const preloadEntry = preloadEntriesByTileId.get(tile.id);
+      const evictionEntry = evictionEntriesByTileId.get(tile.id);
       const preloadResult = preloadResultsByTileId.get(tile.id);
       const cacheKey = buildDynamicMapTilePreloadCacheKey({
         catalogUrl: tileCatalogState.url,
@@ -3381,11 +3411,15 @@ export default function App() {
       } else if (preloadEntry) {
         residency = isCached ? 'preload cached' : 'preload';
       } else if (isCached) {
-        residency = 'cached';
+        residency = evictionEntry ? 'evicted cached' : 'cached';
+      } else if (evictionEntry) {
+        residency = 'evicted';
       }
 
       return {
         id: tile.id,
+        evictionRole: evictionEntry?.role ?? '',
+        isResident: tile.id === activeTileId || Boolean(preloadEntry),
         preloadRole: preloadEntry?.role ?? '',
         residency,
         tileIndex: Object.entries(tile.tileIndex ?? {})
@@ -3396,6 +3430,7 @@ export default function App() {
   }, [
     activeDynamicMapTile?.id,
     dynamicMapLoadPlan.tileCatalog,
+    dynamicMapLoadPlan.tileEvictionCandidates,
     dynamicMapLoadPlan.tilePreloadCandidates,
     dynamicMapTilePreloadMode,
     tileCatalogState.url,
@@ -3418,7 +3453,8 @@ export default function App() {
     return [
       `active ${counts.active ?? 0}`,
       `preload ${(counts.preload ?? 0) + (counts['preload cached'] ?? 0)}`,
-      `cached ${(counts.cached ?? 0) + (counts['preload cached'] ?? 0)}`,
+      `cached ${(counts.cached ?? 0) + (counts['preload cached'] ?? 0) + (counts['evicted cached'] ?? 0)}`,
+      `evicted ${(counts.evicted ?? 0) + (counts['evicted cached'] ?? 0)}`,
       `ready ${counts.ready ?? 0}`,
       `missing ${counts.missing ?? 0}`
     ].join(' / ');
@@ -3451,6 +3487,13 @@ export default function App() {
       activeTile: serializeDynamicMapDiagnosticsTile(activeDynamicMapTile),
       activeTileId: activeDynamicMapTile?.id ?? '',
       tileCatalog,
+      tileResidentLimit: dynamicMapLoadPlan.maxResidentTiles,
+      tileResidentCandidates: dynamicMapLoadPlan.tileResidentCandidates.map(
+        serializeDynamicMapDiagnosticsEntry
+      ),
+      tileEvictionCandidates: dynamicMapLoadPlan.tileEvictionCandidates.map(
+        serializeDynamicMapDiagnosticsEntry
+      ),
       tilePreloadCandidates: dynamicMapLoadPlan.tilePreloadCandidates.map(
         serializeDynamicMapDiagnosticsEntry
       ),
@@ -3466,6 +3509,9 @@ export default function App() {
     dynamicMapLoadPlan.sourceLabel,
     dynamicMapLoadPlan.strategy,
     dynamicMapLoadPlan.tileCatalog,
+    dynamicMapLoadPlan.tileEvictionCandidates,
+    dynamicMapLoadPlan.tileResidentCandidates,
+    dynamicMapLoadPlan.maxResidentTiles,
     dynamicMapLoadPlan.tilePreloadCandidates,
     robotRoutePlaybackPreviewPositions,
     tileResidencyPreview,
@@ -9840,6 +9886,9 @@ export default function App() {
             Preload limit: {dynamicMapTilePreloadLimit}
           </p>
           <p className="panel-note">
+            Resident limit: {dynamicMapLoadPlan.maxResidentTiles}
+          </p>
+          <p className="panel-note">
             {effectiveMapPositionState.position
               ? `Position ${effectiveMapPositionState.source}: ${effectiveMapPositionState.position.x}, ${effectiveMapPositionState.position.y}, ${effectiveMapPositionState.position.z}`
               : 'position tracking 待機中'}
@@ -9847,6 +9896,13 @@ export default function App() {
           {dynamicMapLoadPlan.tilePreloadCandidates.length > 0 ? (
             <p className="panel-note">
               Preload tiles: {dynamicMapLoadPlan.tilePreloadCandidates
+                .map((entry) => entry.tileId)
+                .join(', ')}
+            </p>
+          ) : null}
+          {dynamicMapLoadPlan.tileEvictionCandidates.length > 0 ? (
+            <p className="panel-note">
+              Evicted tiles: {dynamicMapLoadPlan.tileEvictionCandidates
                 .map((entry) => entry.tileId)
                 .join(', ')}
             </p>
