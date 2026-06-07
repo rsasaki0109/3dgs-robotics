@@ -623,7 +623,7 @@ def _render_dynamic_map_material(
         subtitle_font = _load_font(15 if width < 1100 else 17)
         source_name = source_asset or "actual shipped .splat"
         gaussian_text = f" / {gaussian_count // 1000}k gaussians" if gaussian_count is not None else ""
-        draw.text((48, 32), "Autoware-style dynamic map loading", font=title_font, fill=(245, 250, 255, 255))
+        draw.text((48, 32), "Dynamic map loading", font=title_font, fill=(245, 250, 255, 255))
         draw.text(
             (52, 82),
             f"PCD cells + Lanelet2 vector layer over {source_name} footprint{gaussian_text}",
@@ -647,7 +647,7 @@ def _render_dynamic_map_material(
 
     if full_material:
         _draw_material_legend(draw, box=map_box)
-        _draw_autoware_status_hud(
+        _draw_map_loading_status_hud(
             draw, projection=projection, camera=camera, box=map_box, gaussian_count=gaussian_count
         )
         _draw_material_footer(
@@ -1010,7 +1010,7 @@ def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int
         draw.text((x + 38, yy - 2), label, font=legend_font, fill=(218, 232, 242, 235))
 
 
-def _draw_autoware_status_hud(
+def _draw_map_loading_status_hud(
     draw: ImageDraw.ImageDraw,
     *,
     projection: RouteMapProjection,
@@ -1035,7 +1035,7 @@ def _draw_autoware_status_hud(
         f"loaded {len(loaded_tiles):02d} PCD cells / preload {len(preload_tiles):02d} / src {total}",
         f"active cell pcd_{active_tile[0] + 1:02d}_{active_tile[1] + 1:02d}  frame_id=map -> base_link",
     )
-    draw.text((x0 + 14, y0 + 12), "Autoware map_loader view", font=title_font, fill=(196, 225, 243, 245))
+    draw.text((x0 + 14, y0 + 12), "map_loader debug view", font=title_font, fill=(196, 225, 243, 245))
     for index, line in enumerate(lines):
         draw.text((x0 + 14, y0 + 36 + index * 18), line, font=text_font, fill=(155, 185, 205, 230))
 
@@ -1062,8 +1062,7 @@ def _draw_material_footer(
     else:
         gaussian_text = f"{gaussian_count // 1000}k total gaussians / " if gaussian_count is not None else ""
         source_line = (
-            f"source: {source_name} / {gaussian_text}sampled {len(points) // 1000}k splats / "
-            "Autoware-style partial map loading"
+            f"source: {source_name} / {gaussian_text}sampled {len(points) // 1000}k splats / partial map loading"
         )
     draw.text(
         (box[0], height - 68),
