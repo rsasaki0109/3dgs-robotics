@@ -9,20 +9,24 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 
 REPO = Path(__file__).resolve().parents[1]
 DOCS = REPO / "docs"
 ASSET_DIR = DOCS / "assets" / "outdoor-demo"
 OUTPUT = DOCS / "images" / "demo-sweep" / "map-quality.gif"
+MAP_MATERIAL_OUTPUT = DOCS / "images" / "demo-sweep" / "dynamic-map-material.png"
 FRAME_SIZE = (960, 540)
+MAP_MATERIAL_SIZE = (1280, 720)
 SPLAT_RECORD_BYTES = 32
 FRAMES_PER_SCENE = 12
 FRAME_DURATION_MS = 260
 MAX_POINTS_PER_SCENE = 170_000
 FOV_DEGREES = 64.0
-MAP_PANEL_SIZE = (372, 424)
+MAP_PANEL_SIZE = (424, 468)
+MAP_TILE_COLUMNS = 8
+MAP_TILE_ROWS = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +73,7 @@ def build_map_quality_gif(
     asset_dir: Path = ASSET_DIR,
     size: tuple[int, int] = FRAME_SIZE,
     frames_per_scene: int = FRAMES_PER_SCENE,
+    map_material_output: Path | None = MAP_MATERIAL_OUTPUT,
 ) -> Path:
     """Render a map-inspection GIF from the shipped .splat binaries."""
 
@@ -77,15 +82,28 @@ def build_map_quality_gif(
         path = asset_dir / scene.asset
         points = _read_splat_points(path, max_points=MAX_POINTS_PER_SCENE)
         bounds = _projection_bounds(points, scene.axes, size)
+        projection = _route_map_projection(points, axes=scene.axes, bounds=bounds)
         cameras = _camera_path(points, axes=scene.axes, bounds=bounds, frame_count=frames_per_scene)
+        if scene_index == 1 and map_material_output is not None:
+            material = _render_dynamic_map_material(
+                points,
+                projection=projection,
+                camera=cameras[len(cameras) // 2],
+                route=cameras,
+                size=MAP_MATERIAL_SIZE,
+                bounds=bounds,
+                full_material=True,
+            )
+            map_material_output.parent.mkdir(parents=True, exist_ok=True)
+            material.convert("RGB").save(map_material_output)
         for frame_index, camera in enumerate(cameras, start=1):
             frame = _render_scene_frame(
                 points,
                 scene=scene,
                 scene_index=frame_index,
                 scene_count=len(cameras),
-                axes=scene.axes,
                 bounds=bounds,
+                projection=projection,
                 camera=camera,
                 route=cameras,
                 size=size,
@@ -334,8 +352,8 @@ def _render_scene_frame(
     scene: MapProofScene,
     scene_index: int,
     scene_count: int,
-    axes: tuple[int, int],
     bounds: tuple[float, float, float, float],
+    projection: RouteMapProjection,
     camera: CameraPose,
     route: list[CameraPose],
     size: tuple[int, int],
@@ -369,7 +387,16 @@ def _render_scene_frame(
     overlay = Image.new("RGBA", size, (0, 0, 0, 0))
     overlay_draw = ImageDraw.Draw(overlay)
     _draw_viewer_grid(overlay_draw, size)
-    _draw_minimap(overlay_draw, points, axes=axes, bounds=bounds, camera=camera, route=route, size=size)
+    _draw_minimap(
+        overlay,
+        overlay_draw,
+        points,
+        bounds=bounds,
+        projection=projection,
+        camera=camera,
+        route=route,
+        size=size,
+    )
     _draw_frame_label(
         overlay_draw,
         scene=scene,
@@ -472,93 +499,365 @@ def _draw_viewer_grid(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
 
 
 def _draw_minimap(
+    overlay: Image.Image,
     draw: ImageDraw.ImageDraw,
     points: list[SplatPoint],
     *,
-    axes: tuple[int, int],
     bounds: tuple[float, float, float, float],
+    projection: RouteMapProjection,
     camera: CameraPose,
     route: list[CameraPose],
     size: tuple[int, int],
 ) -> None:
     width, height = size
     left, right, bottom, top = bounds
-    projection = _route_map_projection(points, axes=axes, bounds=bounds)
     panel_width, panel_height = MAP_PANEL_SIZE
     x0 = width - panel_width - 18
-    y0 = 84
+    y0 = 54
     x1 = x0 + panel_width
     y1 = min(height - 18, y0 + panel_height)
-    map_top = y0 + 60
-    map_bottom = y1 - 58
+    map_top = y0 + 64
+    map_bottom = y1 - 66
     map_box = (x0 + 16, map_top, x1 - 16, map_bottom)
     label_font = _load_font(12)
-    title_font = _load_font(17)
+    title_font = _load_font(18)
     metric_font = _load_font(13)
-    tile_font = _load_font(10)
 
     draw.rounded_rectangle((x0, y0, x1, y1), radius=8, fill=(4, 9, 15, 226), outline=(255, 255, 255, 44))
-    draw.text((x0 + 15, y0 + 12), "route-aligned dynamic map", font=title_font, fill=(244, 249, 255, 255))
+    draw.text((x0 + 15, y0 + 12), "dynamic map loading material", font=title_font, fill=(244, 249, 255, 255))
     draw.text(
-        (x0 + 17, y0 + 34), "density + residency tiles from actual .splat", font=label_font, fill=(173, 192, 210, 225)
+        (x0 + 17, y0 + 38),
+        "resident + preload tiles over actual .splat density",
+        font=label_font,
+        fill=(173, 192, 210, 225),
     )
 
-    draw.rounded_rectangle(map_box, radius=5, fill=(7, 14, 19, 244), outline=(255, 255, 255, 38))
-    _draw_route_tiles(draw, projection=projection, camera=camera, box=map_box, font=tile_font)
-
-    step = max(1, len(points) // 18_000)
-    for point in points[::step]:
-        x, y = _route_map_xy(point.xyz, projection=projection, box=map_box)
-        color = _point_color(point.rgba)
-        fill = (min(255, color[0] + 14), min(255, color[1] + 18), min(255, color[2] + 22), 88)
-        draw.rectangle((x, y, x + 1, y + 1), fill=fill)
-
-    route_xy = _dynamic_route_xy(projection=projection, route=route, box=map_box)
-    if len(route_xy) > 1:
-        draw.line(route_xy, fill=(40, 90, 101, 135), width=36, joint="curve")
-        draw.line(route_xy, fill=(12, 29, 36, 235), width=24, joint="curve")
-        draw.line(route_xy, fill=(55, 128, 205, 235), width=8, joint="curve")
-        draw.line(route_xy, fill=(146, 214, 255, 245), width=3, joint="curve")
-        for waypoint_x, waypoint_y in route_xy[:: max(1, len(route_xy) // 5)]:
-            draw.ellipse(
-                (waypoint_x - 5, waypoint_y - 5, waypoint_x + 5, waypoint_y + 5),
-                fill=(162, 211, 255, 235),
-            )
-
-    eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=map_box)
-    target_x, target_y = _route_map_xy(camera.target, projection=projection, box=map_box)
-    draw.line((eye_x, eye_y, target_x, target_y), fill=(91, 232, 120, 255), width=5)
-    draw.ellipse((eye_x - 8, eye_y - 8, eye_x + 8, eye_y + 8), fill=(91, 232, 120, 255))
-    draw.ellipse((eye_x - 13, eye_y - 13, eye_x + 13, eye_y + 13), outline=(91, 232, 120, 160), width=2)
+    map_material = _render_dynamic_map_material(
+        points,
+        projection=projection,
+        camera=camera,
+        route=route,
+        size=(map_box[2] - map_box[0], map_box[3] - map_box[1]),
+        bounds=bounds,
+        full_material=False,
+    )
+    overlay.alpha_composite(map_material, dest=(map_box[0], map_box[1]))
 
     map_width_m = right - left
     map_height_m = top - bottom
-    scale_x0 = map_box[0] + 14
-    scale_y = map_box[3] - 18
-    scale_width = min(112, max(48, int((map_box[2] - map_box[0]) * 0.26)))
-    draw.line((scale_x0, scale_y, scale_x0 + scale_width, scale_y), fill=(226, 239, 250, 220), width=3)
-    draw.line((scale_x0, scale_y - 5, scale_x0, scale_y + 5), fill=(226, 239, 250, 220), width=2)
-    draw.line(
-        (scale_x0 + scale_width, scale_y - 5, scale_x0 + scale_width, scale_y + 5), fill=(226, 239, 250, 220), width=2
-    )
-    draw.text(
-        (scale_x0, scale_y + 7),
-        f"{_route_span_meters(projection) * scale_width / max(1, map_box[2] - map_box[0]):.1f} m",
-        font=label_font,
-        fill=(226, 239, 250, 210),
-    )
     tile_column, tile_row = _active_tile(camera.eye, projection=projection)
     draw.text(
         (x0 + 15, y1 - 42),
-        f"footprint {map_width_m:.1f} x {map_height_m:.1f} m / {len(points) // 1000}k splats",
+        f"footprint {map_width_m:.1f} x {map_height_m:.1f} m / {len(points) // 1000}k real splats",
         font=metric_font,
         fill=(204, 223, 238, 235),
     )
     draw.text(
         (x0 + 15, y1 - 22),
-        f"route span {_route_span_meters(projection):.1f} m / active tile C{tile_column + 1} R{tile_row + 1}",
+        f"loaded window follows route / active tile C{tile_column + 1} R{tile_row + 1}",
         font=label_font,
         fill=(150, 171, 190, 205),
+    )
+
+
+def _render_dynamic_map_material(
+    points: list[SplatPoint],
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    route: list[CameraPose],
+    size: tuple[int, int],
+    bounds: tuple[float, float, float, float],
+    full_material: bool,
+) -> Image.Image:
+    width, height = size
+    image = Image.new("RGBA", size, (5, 10, 14, 255))
+    draw = ImageDraw.Draw(image)
+    _draw_material_background(draw, size)
+
+    if full_material:
+        map_box = (48, 118, width - 48, height - 96)
+        title_font = _load_font(38)
+        subtitle_font = _load_font(18)
+        draw.text((48, 32), "Dynamic 3DGS map loading material", font=title_font, fill=(245, 250, 255, 255))
+        draw.text(
+            (52, 82),
+            "actual .splat density atlas + resident tile window + preloaded route corridor",
+            font=subtitle_font,
+            fill=(176, 197, 214, 235),
+        )
+    else:
+        map_box = (0, 0, width, height)
+
+    draw.rounded_rectangle(
+        map_box, radius=8 if full_material else 5, fill=(7, 15, 20, 255), outline=(255, 255, 255, 42)
+    )
+    _draw_dynamic_tile_layer(draw, projection=projection, camera=camera, box=map_box, full_material=full_material)
+    _draw_density_material(image, points, projection=projection, box=map_box, full_material=full_material)
+    _draw_route_material(
+        draw, projection=projection, camera=camera, route=route, box=map_box, full_material=full_material
+    )
+    _draw_material_scale(draw, projection=projection, box=map_box, full_material=full_material)
+
+    if full_material:
+        _draw_material_legend(draw, box=map_box)
+        _draw_material_footer(draw, points, projection=projection, bounds=bounds, box=map_box, size=size)
+
+    return image
+
+
+def _draw_material_background(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
+    width, height = size
+    for y in range(height):
+        t = y / max(1, height - 1)
+        color = (5 + int(5 * t), 10 + int(7 * t), 15 + int(11 * t), 255)
+        draw.line((0, y, width, y), fill=color)
+
+
+def _draw_dynamic_tile_layer(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    loaded_tiles, preload_tiles, active_tile = _tile_residency_sets(camera, projection=projection)
+    tile_font = _load_font(13 if full_material else 9)
+    for column in range(MAP_TILE_COLUMNS):
+        for row in range(MAP_TILE_ROWS):
+            rect = _tile_rect(column, row, box=box)
+            fill = (5, 13, 18, 176)
+            outline = (80, 147, 190, 55)
+            if (column, row) in preload_tiles:
+                fill = (224, 162, 54, 58)
+                outline = (242, 190, 82, 120)
+            if (column, row) in loaded_tiles:
+                fill = (34, 132, 112, 76)
+                outline = (91, 232, 120, 132)
+            if (column, row) == active_tile:
+                fill = (91, 232, 120, 112)
+                outline = (181, 255, 192, 210)
+            draw.rectangle(rect, fill=fill, outline=outline, width=2 if (column, row) == active_tile else 1)
+
+            if full_material or (row in (0, MAP_TILE_ROWS - 1) and column % 2 == 0):
+                label = f"T{column + 1}{row + 1}"
+                draw.text((rect[0] + 7, rect[1] + 7), label, font=tile_font, fill=(157, 190, 210, 150))
+
+    loaded_bounds = _tile_group_bounds(loaded_tiles, box=box)
+    if loaded_bounds is not None:
+        draw.rounded_rectangle(loaded_bounds, radius=8, outline=(91, 232, 120, 230), width=3 if full_material else 2)
+        if full_material:
+            draw.text(
+                (loaded_bounds[0] + 12, loaded_bounds[1] + 10),
+                "RESIDENT TILE WINDOW",
+                font=_load_font(16),
+                fill=(194, 255, 206, 245),
+            )
+
+    preload_bounds = _tile_group_bounds(preload_tiles, box=box)
+    if full_material and preload_bounds is not None:
+        draw.rounded_rectangle(preload_bounds, radius=8, outline=(242, 190, 82, 210), width=2)
+        draw.text(
+            (preload_bounds[0] + 12, preload_bounds[1] + 10), "PRELOAD", font=_load_font(15), fill=(255, 221, 139, 240)
+        )
+
+
+def _draw_density_material(
+    image: Image.Image,
+    points: list[SplatPoint],
+    *,
+    projection: RouteMapProjection,
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    density = Image.new("L", image.size, 0)
+    density_draw = ImageDraw.Draw(density)
+    step = max(1, len(points) // (70_000 if full_material else 24_000))
+    radius = 2 if full_material else 1
+    for point in points[::step]:
+        x, y = _route_map_xy(point.xyz, projection=projection, box=box)
+        brightness = int(min(230, max(44, (point.rgba[3] * 0.55) + (max(point.rgba[:3]) * 0.35))))
+        density_draw.rectangle((x - radius, y - radius, x + radius, y + radius), fill=brightness)
+
+    blur_radius = 1.6 if full_material else 1.0
+    density = density.filter(ImageFilter.GaussianBlur(blur_radius))
+    density = ImageEnhance.Contrast(density).enhance(2.2 if full_material else 1.8)
+    alpha = density.point(lambda value: min(210, int(value * (0.82 if full_material else 0.72))))
+    colored = ImageOps.colorize(density, black=(8, 16, 18), white=(232, 246, 238)).convert("RGBA")
+    colored.putalpha(alpha)
+    image.alpha_composite(colored)
+
+    crisp_draw = ImageDraw.Draw(image)
+    crisp_step = max(1, len(points) // (20_000 if full_material else 8_500))
+    for point in points[::crisp_step]:
+        x, y = _route_map_xy(point.xyz, projection=projection, box=box)
+        color = _point_color(point.rgba)
+        fill = (min(255, color[0] + 24), min(255, color[1] + 26), min(255, color[2] + 30), 120)
+        crisp_draw.point((x, y), fill=fill)
+
+
+def _draw_route_material(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    route: list[CameraPose],
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    route_xy = _dynamic_route_xy(projection=projection, route=route, box=box)
+    if len(route_xy) > 1:
+        box_height = box[3] - box[1]
+        corridor_width = max(22, int(box_height * (0.13 if full_material else 0.11)))
+        route_width = max(8, int(corridor_width * 0.30))
+        draw.line(route_xy, fill=(22, 65, 75, 168), width=corridor_width, joint="curve")
+        draw.line(route_xy, fill=(10, 25, 32, 235), width=max(16, int(corridor_width * 0.68)), joint="curve")
+        draw.line(route_xy, fill=(47, 137, 221, 245), width=route_width, joint="curve")
+        draw.line(route_xy, fill=(156, 220, 255, 245), width=max(2, route_width // 3), joint="curve")
+        marker_step = max(1, len(route_xy) // 6)
+        marker_radius = 7 if full_material else 4
+        for waypoint_x, waypoint_y in route_xy[::marker_step]:
+            draw.ellipse(
+                (
+                    waypoint_x - marker_radius,
+                    waypoint_y - marker_radius,
+                    waypoint_x + marker_radius,
+                    waypoint_y + marker_radius,
+                ),
+                fill=(162, 211, 255, 245),
+            )
+
+    eye_x, eye_y = _route_map_xy(camera.eye, projection=projection, box=box)
+    target_x, target_y = _route_map_xy(camera.target, projection=projection, box=box)
+    marker_radius = 15 if full_material else 8
+    draw.line((eye_x, eye_y, target_x, target_y), fill=(91, 232, 120, 255), width=7 if full_material else 5)
+    draw.ellipse(
+        (eye_x - marker_radius, eye_y - marker_radius, eye_x + marker_radius, eye_y + marker_radius),
+        fill=(91, 232, 120, 255),
+    )
+    draw.ellipse(
+        (eye_x - marker_radius - 8, eye_y - marker_radius - 8, eye_x + marker_radius + 8, eye_y + marker_radius + 8),
+        outline=(91, 232, 120, 150),
+        width=3 if full_material else 2,
+    )
+    if full_material:
+        draw.text((eye_x + 22, eye_y - 10), "CAMERA", font=_load_font(15), fill=(196, 255, 206, 245))
+
+
+def _draw_material_scale(
+    draw: ImageDraw.ImageDraw,
+    *,
+    projection: RouteMapProjection,
+    box: tuple[int, int, int, int],
+    full_material: bool,
+) -> None:
+    scale_width = min(180 if full_material else 96, max(54, int((box[2] - box[0]) * 0.18)))
+    scale_x0 = box[0] + (28 if full_material else 14)
+    scale_y = box[3] - (32 if full_material else 18)
+    line_width = 4 if full_material else 3
+    draw.line((scale_x0, scale_y, scale_x0 + scale_width, scale_y), fill=(226, 239, 250, 225), width=line_width)
+    draw.line((scale_x0, scale_y - 6, scale_x0, scale_y + 6), fill=(226, 239, 250, 225), width=2)
+    draw.line(
+        (scale_x0 + scale_width, scale_y - 6, scale_x0 + scale_width, scale_y + 6),
+        fill=(226, 239, 250, 225),
+        width=2,
+    )
+    draw.text(
+        (scale_x0, scale_y + 10),
+        f"{_route_span_meters(projection) * scale_width / max(1, box[2] - box[0]):.1f} m",
+        font=_load_font(13 if full_material else 10),
+        fill=(226, 239, 250, 210),
+    )
+
+
+def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int, int]) -> None:
+    legend_font = _load_font(15)
+    x = box[2] - 358
+    y = box[1] + 18
+    items = (
+        ((91, 232, 120, 150), "resident tiles in memory"),
+        ((242, 190, 82, 150), "preload edge"),
+        ((47, 137, 221, 210), "route corridor"),
+        ((232, 246, 238, 165), "3DGS density atlas"),
+    )
+    draw.rounded_rectangle((x - 16, y - 12, box[2] - 18, y + len(items) * 28 + 8), radius=8, fill=(4, 10, 14, 205))
+    for index, (color, label) in enumerate(items):
+        yy = y + index * 28
+        draw.rounded_rectangle((x, yy, x + 26, yy + 14), radius=3, fill=color)
+        draw.text((x + 38, yy - 2), label, font=legend_font, fill=(218, 232, 242, 235))
+
+
+def _draw_material_footer(
+    draw: ImageDraw.ImageDraw,
+    points: list[SplatPoint],
+    *,
+    projection: RouteMapProjection,
+    bounds: tuple[float, float, float, float],
+    box: tuple[int, int, int, int],
+    size: tuple[int, int],
+) -> None:
+    left, right, bottom, top = bounds
+    width, height = size
+    footer_font = _load_font(18)
+    meta_font = _load_font(16)
+    draw.text(
+        (box[0], height - 68),
+        f"footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
+        font=footer_font,
+        fill=(225, 238, 247, 240),
+    )
+    draw.text(
+        (box[0], height - 38),
+        f"source: actual shipped .splat / sampled {len(points) // 1000}k visible gaussians",
+        font=meta_font,
+        fill=(162, 184, 202, 220),
+    )
+
+
+def _tile_residency_sets(
+    camera: CameraPose,
+    *,
+    projection: RouteMapProjection,
+) -> tuple[set[tuple[int, int]], set[tuple[int, int]], tuple[int, int]]:
+    active_column, active_row = _active_tile(
+        camera.eye, projection=projection, columns=MAP_TILE_COLUMNS, rows=MAP_TILE_ROWS
+    )
+    loaded_tiles: set[tuple[int, int]] = set()
+    for column in range(active_column - 1, active_column + 2):
+        for row in range(active_row - 1, active_row + 2):
+            if 0 <= column < MAP_TILE_COLUMNS and 0 <= row < MAP_TILE_ROWS:
+                loaded_tiles.add((column, row))
+
+    preload_tiles: set[tuple[int, int]] = set()
+    for column in (active_column + 2,):
+        for row in range(active_row - 1, active_row + 2):
+            if 0 <= column < MAP_TILE_COLUMNS and 0 <= row < MAP_TILE_ROWS:
+                preload_tiles.add((column, row))
+
+    return loaded_tiles, preload_tiles, (active_column, active_row)
+
+
+def _tile_rect(column: int, row: int, *, box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    x0, y0, x1, y1 = box
+    left = int(x0 + (x1 - x0) * column / MAP_TILE_COLUMNS)
+    right = int(x0 + (x1 - x0) * (column + 1) / MAP_TILE_COLUMNS)
+    top = int(y0 + (y1 - y0) * row / MAP_TILE_ROWS)
+    bottom = int(y0 + (y1 - y0) * (row + 1) / MAP_TILE_ROWS)
+    return left, top, right, bottom
+
+
+def _tile_group_bounds(
+    tiles: set[tuple[int, int]], *, box: tuple[int, int, int, int]
+) -> tuple[int, int, int, int] | None:
+    if not tiles:
+        return None
+    rects = [_tile_rect(column, row, box=box) for column, row in tiles]
+    return (
+        min(rect[0] for rect in rects) + 4,
+        min(rect[1] for rect in rects) + 4,
+        max(rect[2] for rect in rects) - 4,
+        max(rect[3] for rect in rects) - 4,
     )
 
 
@@ -660,46 +959,6 @@ def _route_coords_to_xy(
     return x, y
 
 
-def _draw_route_tiles(
-    draw: ImageDraw.ImageDraw,
-    *,
-    projection: RouteMapProjection,
-    camera: CameraPose,
-    box: tuple[int, int, int, int],
-    font: ImageFont.ImageFont,
-) -> None:
-    columns = 6
-    rows = 4
-    x0, y0, x1, y1 = box
-    active_column, active_row = _active_tile(camera.eye, projection=projection, columns=columns, rows=rows)
-    tile_index = 1
-    for column in range(columns):
-        for row in range(rows):
-            left = x0 + (x1 - x0) * column / columns
-            right = x0 + (x1 - x0) * (column + 1) / columns
-            top = y0 + (y1 - y0) * row / rows
-            bottom = y0 + (y1 - y0) * (row + 1) / rows
-            if column == active_column and row == active_row:
-                draw.rectangle(
-                    (left, top, right, bottom),
-                    fill=(91, 232, 120, 32),
-                    outline=(91, 232, 120, 140),
-                    width=2,
-                )
-            else:
-                draw.rectangle((left, top, right, bottom), outline=(78, 154, 255, 42), width=1)
-            if row in (0, rows - 1) and column % 2 == 0:
-                draw.text((left + 5, top + 5), f"T{tile_index:02d}", font=font, fill=(132, 174, 205, 140))
-            tile_index += 1
-
-    for index in range(1, columns):
-        x = x0 + (x1 - x0) * index / columns
-        draw.line((x, y0, x, y1), fill=(78, 154, 255, 52), width=2 if index % 3 == 0 else 1)
-    for index in range(1, rows):
-        y = y0 + (y1 - y0) * index / rows
-        draw.line((x0, y, x1, y), fill=(78, 154, 255, 44), width=1)
-
-
 def _dynamic_route_xy(
     *,
     projection: RouteMapProjection,
@@ -769,10 +1028,10 @@ def _draw_frame_label(
     size: tuple[int, int],
 ) -> None:
     width, _ = size
-    title_font = _load_font(24)
-    meta_font = _load_font(15)
+    title_font = _load_font(23)
+    meta_font = _load_font(14)
     chip_font = _load_font(15)
-    draw.rounded_rectangle((18, 16, 570, 96), radius=6, fill=(4, 9, 15, 215), outline=(255, 255, 255, 36))
+    draw.rounded_rectangle((18, 16, 512, 96), radius=6, fill=(4, 9, 15, 215), outline=(255, 255, 255, 36))
     draw.text((34, 29), scene.label, font=title_font, fill=(244, 249, 255, 255))
     draw.text(
         (36, 65),
