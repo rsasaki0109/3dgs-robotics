@@ -76,6 +76,14 @@ The repo also ships a browser-ready large-scale dynamic-map fixture in
 `apps/dreamwalker-web/public/`: `outdoor-demo-dust3r.splat` is tiled into a
 2x2 X/Z grid and played back through the DreamWalker robot route UI.
 
+[![Large-scale 3DGS dynamic map loading result](docs/images/demo-sweep/map-quality.gif)](docs/images/demo-sweep/map-quality.gif)
+
+Result media lives in [`docs/images/demo-sweep/`](docs/images/demo-sweep/):
+[`map-quality.gif`](docs/images/demo-sweep/map-quality.gif) is the dynamic-map
+loading GIF, [`dynamic-map-material.png`](docs/images/demo-sweep/dynamic-map-material.png)
+is the standalone still, and [`hero.gif`](docs/images/demo-sweep/hero.gif) is
+the older scene-sweep hero.
+
 | Result | Value |
 | --- | --- |
 | Tile catalog | [`outdoor-demo-dust3r-tile-catalog.json`](apps/dreamwalker-web/public/manifests/outdoor-demo-dust3r-tile-catalog.json) |
