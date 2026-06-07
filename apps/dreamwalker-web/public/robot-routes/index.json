@@ -10,6 +10,14 @@
       "description": "window talk 側へ寄って gate lane へ返す sample loop",
       "fragmentId": "residency",
       "accent": "#85e3e1"
+    },
+    {
+      "id": "smoke-gsplat-grid6-route",
+      "label": "Smoke gsplat Grid 6 Route",
+      "url": "/robot-routes/smoke-gsplat-grid6-route.json",
+      "description": "six-tile large-scale 3DGS smoke route for dynamic map loading playback",
+      "fragmentId": "residency",
+      "accent": "#f4ca72"
     }
   ]
 }

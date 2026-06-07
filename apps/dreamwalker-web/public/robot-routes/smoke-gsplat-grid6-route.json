@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-route/v1",
+  "label": "Smoke gsplat Grid 6 Route",
+  "description": "six-tile large-scale 3DGS smoke route for dynamic map loading playback",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "frameId": "dreamwalker_map",
+  "world": {
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "assetLabel": "Smoke gsplat Grid 6",
+    "splatUrl": "",
+    "colliderMeshUrl": "",
+    "frameId": "dreamwalker_map",
+    "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+    "usesDemoFallback": false
+  },
+  "pose": {
+    "position": [
+      15.75,
+      0.0,
+      7.75
+    ],
+    "yawDegrees": 90
+  },
+  "route": [
+    [
+      7.75,
+      0.0,
+      7.75
+    ],
+    [
+      7.75,
+      0.0,
+      15.75
+    ],
+    [
+      15.75,
+      0.0,
+      15.75
+    ],
+    [
+      23.75,
+      0.0,
+      15.75
+    ],
+    [
+      23.75,
+      0.0,
+      7.75
+    ],
+    [
+      15.75,
+      0.0,
+      7.75
+    ]
+  ]
+}

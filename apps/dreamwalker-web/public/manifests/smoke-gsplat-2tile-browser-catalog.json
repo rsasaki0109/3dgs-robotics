@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "createdAt": "2026-06-06T22:31:38.655157+00:00",
+  "sceneId": "smoke-gsplat-2tile-browser",
+  "label": "Smoke gsplat 2 Tile Browser",
+  "planPath": "outputs/dynamic_map_gsplat_install_smoke/large_scale_3dgs_plan.json",
+  "runReportPath": "outputs/dynamic_map_gsplat_install_smoke/large_scale_3dgs_run_report.json",
+  "tiling": {
+    "strategy": "browser-smoke-fixture",
+    "axes": "xz",
+    "tileSize": 8,
+    "overlap": 2,
+    "minImages": 1,
+    "worldBounds": {
+      "minX": -6,
+      "maxX": 10,
+      "minZ": 0,
+      "maxZ": 12
+    }
+  },
+  "summary": {
+    "tileCount": 2,
+    "readyTileCount": 2,
+    "missingSplatTileCount": 0
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_y000",
+      "label": "Smoke gsplat West",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-2tile/tile_x000_y000.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_install_smoke/splats/tile_x000_y000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-2tile/tile_x000_y000.splat",
+      "axes": "xz",
+      "tileIndex": {
+        "x": 0,
+        "z": 0
+      },
+      "coreBounds": {
+        "minX": -6,
+        "maxX": 2,
+        "minZ": 0,
+        "maxZ": 12
+      },
+      "expandedBounds": {
+        "minX": -8,
+        "maxX": 3.4,
+        "minZ": -2,
+        "maxZ": 14
+      },
+      "imageCount": 1,
+      "coreImageCount": 1,
+      "pointCount": 2
+    },
+    {
+      "id": "tile_x001_y000",
+      "label": "Smoke gsplat East",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-gsplat-2tile/tile_x001_y000.splat",
+      "sourceSplat": "outputs/dynamic_map_gsplat_install_smoke/splats/tile_x001_y000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-gsplat-2tile/tile_x001_y000.splat",
+      "axes": "xz",
+      "tileIndex": {
+        "x": 1,
+        "z": 0
+      },
+      "coreBounds": {
+        "minX": 2,
+        "maxX": 10,
+        "minZ": 0,
+        "maxZ": 12
+      },
+      "expandedBounds": {
+        "minX": 0.6,
+        "maxX": 12,
+        "minZ": -2,
+        "maxZ": 14
+      },
+      "imageCount": 1,
+      "coreImageCount": 1,
+      "pointCount": 2
+    }
+  ]
+}

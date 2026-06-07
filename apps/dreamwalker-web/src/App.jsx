@@ -10,6 +10,11 @@ import {
   resolveBundleWorldHealth
 } from './studio-health.js';
 import {
+  buildDynamicMapLoadPlan,
+  normalizeDynamicMapPreloadMode,
+  preloadDynamicMapEntry
+} from './dynamic-map-loading.js';
+import {
   buildRelayEndpoint,
   loadOverlayState,
   overlayRelayDefaultUrl,
@@ -106,6 +111,153 @@ function parseAssetManifestUrlFromSearch(defaultUrl, queryParam) {
   const searchParams = new URLSearchParams(window.location.search);
   const override = searchParams.get(queryParam)?.trim();
   return override || defaultUrl;
+}
+
+function parseDynamicMapTilePreloadModeFromSearch() {
+  if (typeof window === 'undefined') {
+    return 'metadata';
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return normalizeDynamicMapPreloadMode(searchParams.get('tilePreload'), 'metadata');
+}
+
+function parseDynamicMapTilePreloadLimitFromSearch() {
+  if (typeof window === 'undefined') {
+    return 4;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const rawValue = searchParams.get(dreamwalkerConfig.tileCatalog.preloadLimitQueryParam);
+  if (rawValue === null || rawValue.trim() === '') {
+    return 4;
+  }
+
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    return 4;
+  }
+
+  return Math.max(0, Math.min(32, Math.floor(value)));
+}
+
+function parseBooleanSearchFlag(value, truthyValues = ['1', 'true', 'yes', 'on']) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return truthyValues.includes(normalized);
+}
+
+function parseDynamicMapDiagnosticsEnabledFromSearch() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return parseBooleanSearchFlag(searchParams.get('dynamicMapDiagnostics'));
+}
+
+function serializeDiagnosticMapPosition(positionLike) {
+  const x = Number(positionLike?.x ?? positionLike?.[0]);
+  const y = Number(positionLike?.y ?? positionLike?.[1] ?? 0);
+  const z = Number(positionLike?.z ?? positionLike?.[2]);
+
+  if (![x, y, z].every(Number.isFinite)) {
+    return null;
+  }
+
+  return {
+    x: Number(x.toFixed(2)),
+    y: Number(y.toFixed(2)),
+    z: Number(z.toFixed(2))
+  };
+}
+
+function serializeDynamicMapDiagnosticsTile(tile) {
+  if (!tile || typeof tile !== 'object') {
+    return null;
+  }
+
+  return {
+    id: tile.id ?? '',
+    label: tile.label ?? tile.id ?? '',
+    status: tile.status ?? '',
+    splatUrl: tile.splatUrl ?? '',
+    tileIndex: tile.tileIndex && typeof tile.tileIndex === 'object' ? { ...tile.tileIndex } : {},
+    coreBounds: tile.coreBounds && typeof tile.coreBounds === 'object' ? { ...tile.coreBounds } : null,
+    expandedBounds:
+      tile.expandedBounds && typeof tile.expandedBounds === 'object'
+        ? { ...tile.expandedBounds }
+        : null
+  };
+}
+
+function serializeDynamicMapDiagnosticsEntry(entry, index) {
+  return {
+    index,
+    role: entry.role ?? '',
+    fragmentId: entry.fragmentId ?? '',
+    tileId: entry.tileId ?? '',
+    tileLabel: entry.tileLabel ?? entry.fragmentLabel ?? '',
+    tileStatus: entry.tileStatus ?? '',
+    splatUrl: entry.splatUrl ?? '',
+    colliderMeshUrl: entry.colliderMeshUrl ?? '',
+    preloadCacheKey: entry.preloadCacheKey ?? '',
+    tileCatalogSceneId: entry.tileCatalogSceneId ?? '',
+    sourceTile: serializeDynamicMapDiagnosticsTile(entry.sourceTile)
+  };
+}
+
+function parseRobotRoutePlaybackConfigFromSearch() {
+  const defaultConfig = {
+    enabled: false,
+    intervalMs: 700,
+    loop: false
+  };
+
+  if (typeof window === 'undefined') {
+    return defaultConfig;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const enabled = parseBooleanSearchFlag(
+    searchParams.get(dreamwalkerConfig.robotRoute.playbackQueryParam),
+    ['1', 'true', 'yes', 'on', 'play', 'auto']
+  );
+  const rawInterval = Number(
+    searchParams.get(dreamwalkerConfig.robotRoute.playbackIntervalQueryParam)
+  );
+  const intervalMs = Number.isFinite(rawInterval)
+    ? Math.max(250, Math.min(10_000, Math.floor(rawInterval)))
+    : defaultConfig.intervalMs;
+
+  return {
+    enabled,
+    intervalMs,
+    loop: parseBooleanSearchFlag(
+      searchParams.get(dreamwalkerConfig.robotRoute.playbackLoopQueryParam)
+    )
+  };
+}
+
+const dynamicMapTilePreloadResultCache = new Map();
+
+function buildDynamicMapTilePreloadCacheKey({
+  catalogUrl = '',
+  colliderMeshUrl = '',
+  mode,
+  preloadCacheKey = '',
+  sceneId = '',
+  splatUrl = '',
+  tileId = ''
+}) {
+  return [
+    mode,
+    catalogUrl,
+    preloadCacheKey,
+    sceneId,
+    tileId,
+    splatUrl,
+    colliderMeshUrl
+  ].join('|');
 }
 
 function parseRobotFrameStreamEnabledFromSearch() {
@@ -804,6 +956,20 @@ function getForwardVector(yawDegrees) {
     x: -Math.sin(radians),
     z: -Math.cos(radians)
   };
+}
+
+function yawDegreesFromRouteSegment(currentPosition, nextPosition, fallbackYawDegrees = 0) {
+  if (!Array.isArray(currentPosition) || !Array.isArray(nextPosition)) {
+    return normalizeYawDegrees(fallbackYawDegrees);
+  }
+
+  const dx = Number(nextPosition[0]) - Number(currentPosition[0]);
+  const dz = Number(nextPosition[2]) - Number(currentPosition[2]);
+  if (!Number.isFinite(dx) || !Number.isFinite(dz) || Math.hypot(dx, dz) < 0.0001) {
+    return normalizeYawDegrees(fallbackYawDegrees);
+  }
+
+  return normalizeYawDegrees((Math.atan2(-dx, -dz) * 180) / Math.PI);
 }
 
 function buildRobotPoseFromConfig(config) {
@@ -2827,6 +2993,11 @@ export default function App() {
   const sim2realConfig = useMemo(() => parseSim2realConfigFromSearch(), []);
   const robotFrameStreamEnabled = useMemo(() => parseRobotFrameStreamEnabledFromSearch(), []);
   const robotDepthStreamEnabled = useMemo(() => parseRobotDepthStreamEnabledFromSearch(), []);
+  const robotRoutePlaybackConfig = useMemo(() => parseRobotRoutePlaybackConfigFromSearch(), []);
+  const dynamicMapDiagnosticsEnabled = useMemo(
+    () => parseDynamicMapDiagnosticsEnabledFromSearch(),
+    []
+  );
   const initialAssetWorkspace = useMemo(() => loadAssetWorkspaceManifest(), []);
   const initialSceneWorkspace = useMemo(() => loadSceneWorkspace(), []);
   const initialSemanticZoneWorkspace = useMemo(() => loadSemanticZoneWorkspaceMap(), []);
@@ -2836,6 +3007,30 @@ export default function App() {
         dreamwalkerConfig.assetManifest.defaultUrl,
         dreamwalkerConfig.assetManifest.queryParam
       ),
+    []
+  );
+  const tileCatalogUrl = useMemo(
+    () =>
+      parseAssetManifestUrlFromSearch(
+        dreamwalkerConfig.tileCatalog.defaultUrl,
+        dreamwalkerConfig.tileCatalog.queryParam
+      ),
+    []
+  );
+  const selectedTileId = useMemo(
+    () =>
+      parseAssetManifestUrlFromSearch(
+        '',
+        dreamwalkerConfig.tileCatalog.tileQueryParam
+      ),
+    []
+  );
+  const dynamicMapTilePreloadMode = useMemo(
+    () => parseDynamicMapTilePreloadModeFromSearch(),
+    []
+  );
+  const dynamicMapTilePreloadLimit = useMemo(
+    () => parseDynamicMapTilePreloadLimitFromSearch(),
     []
   );
   const studioBundleUrl = useMemo(
@@ -2949,6 +3144,12 @@ export default function App() {
     error: null,
     url: assetManifestUrl
   }));
+  const [tileCatalogState, setTileCatalogState] = useState(() => ({
+    status: tileCatalogUrl ? 'loading' : 'disabled',
+    catalog: null,
+    error: null,
+    url: tileCatalogUrl
+  }));
   const [studioBundleState, setStudioBundleState] = useState(() => ({
     status: studioBundleUrl ? 'loading' : 'disabled',
     bundle: null,
@@ -3036,6 +3237,28 @@ export default function App() {
     label: 'Checking',
     detail: 'world asset を確認中です。'
   });
+  const [mapRuntimeState, setMapRuntimeState] = useState({
+    status: 'idle',
+    url: '',
+    fragmentId: ''
+  });
+  const [mapPositionState, setMapPositionState] = useState({
+    status: 'idle',
+    source: '',
+    position: null,
+    timestamp: 0
+  });
+  const [diagnosticMapPositionOverride, setDiagnosticMapPositionOverride] = useState(null);
+  const [activeDynamicMapTileId, setActiveDynamicMapTileId] = useState('');
+  const [tilePreloadState, setTilePreloadState] = useState(() => ({
+    status: 'idle',
+    mode: dynamicMapTilePreloadMode,
+    activeTileId: '',
+    entries: [],
+    results: [],
+    error: null
+  }));
+  const [robotRoutePlaybackPreviewPositions, setRobotRoutePlaybackPreviewPositions] = useState([]);
   const [studioBundleShelf, setStudioBundleShelf] = useState(loadStudioBundleShelf);
   const [studioBundleShelfLabel, setStudioBundleShelfLabel] = useState('');
   const [publicStudioBundleHealthMap, setPublicStudioBundleHealthMap] = useState({});
@@ -3058,11 +3281,13 @@ export default function App() {
   const pendingStudioStateRef = useRef(null);
   const pendingRobotRouteRef = useRef(null);
   const pendingRobotMissionStartupRef = useRef(null);
+  const tilePreloadResultCacheRef = useRef(dynamicMapTilePreloadResultCache);
   const appliedStudioBundleUrlRef = useRef('');
   const appliedRobotRouteUrlRef = useRef('');
   const appliedRobotMissionUrlRef = useRef('');
   const robotBridgeSocketRef = useRef(null);
   const robotBridgePayloadRef = useRef('');
+  const robotRoutePlaybackTimerRef = useRef(null);
   const gamepadCommandStateRef = useRef({
     moveAt: 0,
     turnAt: 0,
@@ -3082,10 +3307,233 @@ export default function App() {
     () => resolveDreamwalkerConfig(currentFragmentId),
     [currentFragmentId]
   );
-  const assetBundle = useMemo(
-    () => resolveWorldAssetBundle(activeConfig, assetWorkspaceDraft),
-    [activeConfig, assetWorkspaceDraft]
+  const effectiveMapPositionState = diagnosticMapPositionOverride ?? mapPositionState;
+  const dynamicMapLoadPlan = useMemo(
+    () =>
+      buildDynamicMapLoadPlan(activeConfig, assetWorkspaceDraft, {
+        currentTileId: selectedTileId ? '' : activeDynamicMapTileId,
+        maxTilePreloadCandidates: dynamicMapTilePreloadLimit,
+        position: selectedTileId ? null : effectiveMapPositionState.position,
+        routePreviewPositions: robotRoutePlaybackPreviewPositions,
+        tileCatalog: tileCatalogState.catalog,
+        tileId: selectedTileId
+      }),
+    [
+      activeConfig,
+      activeDynamicMapTileId,
+      assetWorkspaceDraft,
+      dynamicMapTilePreloadLimit,
+      effectiveMapPositionState.position,
+      robotRoutePlaybackPreviewPositions,
+      selectedTileId,
+      tileCatalogState.catalog
+    ]
   );
+  const assetBundle =
+    dynamicMapLoadPlan.active?.assetBundle ??
+    resolveWorldAssetBundle(activeConfig, assetWorkspaceDraft);
+  const nextDynamicMapCandidate = dynamicMapLoadPlan.preloadCandidates[0] ?? null;
+  const activeDynamicMapTile = dynamicMapLoadPlan.activeTile;
+  const hasDynamicMapTileCatalog = Boolean(dynamicMapLoadPlan.tileCatalog);
+  const dynamicMapTilePreloadKey = useMemo(
+    () =>
+      dynamicMapLoadPlan.tilePreloadCandidates
+        .map((entry) => `${entry.tileId}:${entry.splatUrl}`)
+        .join('|'),
+    [dynamicMapLoadPlan.tilePreloadCandidates]
+  );
+  const tileResidencyRows = useMemo(() => {
+    const catalog = dynamicMapLoadPlan.tileCatalog;
+    if (!catalog) {
+      return [];
+    }
+
+    const activeTileId = activeDynamicMapTile?.id ?? '';
+    const preloadEntriesByTileId = new Map(
+      dynamicMapLoadPlan.tilePreloadCandidates.map((entry) => [entry.tileId, entry])
+    );
+    const preloadResultsByTileId = new Map(
+      tilePreloadState.entries.map((entry, index) => [
+        entry.tileId,
+        tilePreloadState.results[index] ?? null
+      ])
+    );
+    const cache = tilePreloadResultCacheRef.current;
+
+    return catalog.tiles.map((tile) => {
+      const preloadEntry = preloadEntriesByTileId.get(tile.id);
+      const preloadResult = preloadResultsByTileId.get(tile.id);
+      const cacheKey = buildDynamicMapTilePreloadCacheKey({
+        catalogUrl: tileCatalogState.url,
+        mode: dynamicMapTilePreloadMode,
+        preloadCacheKey: `${catalog.sceneId}:${tile.id}:${tile.splatUrl}`,
+        sceneId: catalog.sceneId,
+        splatUrl: tile.splatUrl,
+        tileId: tile.id
+      });
+      const isCached = Boolean(preloadResult?.cached || cache.get(cacheKey)?.result);
+      let residency = 'ready';
+
+      if (tile.status === 'missing-splat' || !tile.splatUrl) {
+        residency = 'missing';
+      } else if (tile.id === activeTileId) {
+        residency = 'active';
+      } else if (preloadEntry) {
+        residency = isCached ? 'preload cached' : 'preload';
+      } else if (isCached) {
+        residency = 'cached';
+      }
+
+      return {
+        id: tile.id,
+        preloadRole: preloadEntry?.role ?? '',
+        residency,
+        tileIndex: Object.entries(tile.tileIndex ?? {})
+          .map(([axis, value]) => `${axis}${value}`)
+          .join(' ')
+      };
+    });
+  }, [
+    activeDynamicMapTile?.id,
+    dynamicMapLoadPlan.tileCatalog,
+    dynamicMapLoadPlan.tilePreloadCandidates,
+    dynamicMapTilePreloadMode,
+    tileCatalogState.url,
+    tilePreloadState.entries,
+    tilePreloadState.results
+  ]);
+  const tileResidencySummary = useMemo(() => {
+    if (tileResidencyRows.length === 0) {
+      return '';
+    }
+
+    const counts = tileResidencyRows.reduce(
+      (current, row) => ({
+        ...current,
+        [row.residency]: (current[row.residency] ?? 0) + 1
+      }),
+      {}
+    );
+
+    return [
+      `active ${counts.active ?? 0}`,
+      `preload ${(counts.preload ?? 0) + (counts['preload cached'] ?? 0)}`,
+      `cached ${(counts.cached ?? 0) + (counts['preload cached'] ?? 0)}`,
+      `ready ${counts.ready ?? 0}`,
+      `missing ${counts.missing ?? 0}`
+    ].join(' / ');
+  }, [tileResidencyRows]);
+  const tileResidencyPreview = useMemo(() => {
+    if (tileResidencyRows.length === 0) {
+      return '';
+    }
+
+    const visibleRows = tileResidencyRows.slice(0, 12);
+    const suffix = tileResidencyRows.length > visibleRows.length ? ' / ...' : '';
+    return (
+      visibleRows
+        .map((row) => `${row.id}:${row.residency}${row.tileIndex ? ` (${row.tileIndex})` : ''}`)
+        .join(' / ') + suffix
+    );
+  }, [tileResidencyRows]);
+  const dynamicMapDiagnosticsSnapshot = useMemo(() => {
+    const tileCatalog = dynamicMapLoadPlan.tileCatalog
+      ? {
+          sceneId: dynamicMapLoadPlan.tileCatalog.sceneId,
+          label: dynamicMapLoadPlan.tileCatalog.label,
+          summary: { ...(dynamicMapLoadPlan.tileCatalog.summary ?? {}) }
+        }
+      : null;
+
+    return {
+      tileLoadStrategy: dynamicMapLoadPlan.strategy,
+      sourceLabel: dynamicMapLoadPlan.sourceLabel,
+      activeTile: serializeDynamicMapDiagnosticsTile(activeDynamicMapTile),
+      activeTileId: activeDynamicMapTile?.id ?? '',
+      tileCatalog,
+      tilePreloadCandidates: dynamicMapLoadPlan.tilePreloadCandidates.map(
+        serializeDynamicMapDiagnosticsEntry
+      ),
+      tileResidencyRows,
+      tileResidencySummary,
+      tileResidencyPreview,
+      routePreviewPositions: robotRoutePlaybackPreviewPositions
+        .map(serializeDiagnosticMapPosition)
+        .filter(Boolean)
+    };
+  }, [
+    activeDynamicMapTile,
+    dynamicMapLoadPlan.sourceLabel,
+    dynamicMapLoadPlan.strategy,
+    dynamicMapLoadPlan.tileCatalog,
+    dynamicMapLoadPlan.tilePreloadCandidates,
+    robotRoutePlaybackPreviewPositions,
+    tileResidencyPreview,
+    tileResidencyRows,
+    tileResidencySummary
+  ]);
+  useEffect(() => {
+    if (!dynamicMapDiagnosticsEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    window.__dreamwalkerDynamicMapDiagnostics = {
+      ...(window.__dreamwalkerDynamicMapDiagnostics ?? {}),
+      ...dynamicMapDiagnosticsSnapshot,
+      updatedAt: Date.now()
+    };
+  }, [dynamicMapDiagnosticsEnabled, dynamicMapDiagnosticsSnapshot]);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    if (!dynamicMapDiagnosticsEnabled) {
+      return undefined;
+    }
+
+    const setMapPosition = (positionLike, source = 'diagnostics') => {
+      const x = Number(positionLike?.x ?? positionLike?.[0]);
+      const y = Number(positionLike?.y ?? positionLike?.[1] ?? 0);
+      const z = Number(positionLike?.z ?? positionLike?.[2]);
+
+      if (![x, y, z].every(Number.isFinite)) {
+        return false;
+      }
+
+      setDiagnosticMapPositionOverride({
+        status: 'ready',
+        source,
+        position: {
+          x: Number(x.toFixed(2)),
+          y: Number(y.toFixed(2)),
+          z: Number(z.toFixed(2))
+        },
+        timestamp: Date.now()
+      });
+      return true;
+    };
+    const clearMapPositionOverride = () => {
+      setDiagnosticMapPositionOverride(null);
+      return true;
+    };
+
+    window.__dreamwalkerDynamicMapDiagnostics = {
+      ...(window.__dreamwalkerDynamicMapDiagnostics ?? {}),
+      clearMapPositionOverride,
+      setMapPosition
+    };
+
+    return () => {
+      const diagnostics = window.__dreamwalkerDynamicMapDiagnostics;
+      if (!diagnostics || diagnostics.setMapPosition !== setMapPosition) {
+        return;
+      }
+
+      const { clearMapPositionOverride: _clearMapPositionOverride, setMapPosition: _setMapPosition, ...rest } = diagnostics;
+      window.__dreamwalkerDynamicMapDiagnostics = rest;
+    };
+  }, []);
   const activeWorldConfig = useMemo(
     () => ({
       ...activeConfig,
@@ -3171,6 +3619,37 @@ export default function App() {
     null;
   const effectiveSplatUrl = assetBundle.splatUrl;
   const isUsingDemoSplat = assetBundle.usesDemoFallback;
+  const dynamicMapRuntimeHealth = useMemo(() => {
+    if (mapRuntimeState.status === 'ready') {
+      return {
+        status: 'ready',
+        label: 'Runtime Ready',
+        detail: 'active fragment の splat を表示中です。'
+      };
+    }
+
+    if (mapRuntimeState.status === 'loading') {
+      return {
+        status: 'neutral',
+        label: 'Runtime Loading',
+        detail: 'active fragment の splat を読み込み中です。'
+      };
+    }
+
+    if (mapRuntimeState.status === 'missing') {
+      return {
+        status: 'error',
+        label: 'Runtime Missing',
+        detail: 'active fragment に splat URL がありません。'
+      };
+    }
+
+    return {
+      status: 'neutral',
+      label: 'Runtime Idle',
+      detail: 'map runtime はまだ起動前です。'
+    };
+  }, [mapRuntimeState.status]);
   const assetManifestStatusLabel =
     assetManifestState.status === 'loaded'
       ? 'Loaded'
@@ -3181,6 +3660,110 @@ export default function App() {
           : assetManifestState.status === 'error'
             ? 'Error'
             : 'Disabled';
+  const tileCatalogStatusLabel =
+    tileCatalogState.status === 'loaded'
+      ? 'Loaded'
+      : tileCatalogState.status === 'loading'
+        ? 'Loading'
+        : tileCatalogState.status === 'missing'
+          ? 'Optional / Missing'
+          : tileCatalogState.status === 'error'
+            ? 'Error'
+            : 'Disabled';
+  const tileCatalogHealth = useMemo(() => {
+    if (tileCatalogState.status === 'loaded') {
+      if ((dynamicMapLoadPlan.tileCatalog?.summary.readyTileCount ?? 0) > 0) {
+        return {
+          status: 'ready',
+          label: 'Tile Ready',
+          detail: 'large-scale 3DGS tile catalog を active map に接続しています。'
+        };
+      }
+
+      return {
+        status: 'warning',
+        label: 'No Ready Tile',
+        detail: 'tile catalog に読み込める splat tile がありません。'
+      };
+    }
+
+    if (tileCatalogState.status === 'loading') {
+      return {
+        status: 'neutral',
+        label: 'Tile Loading',
+        detail: 'large-scale 3DGS tile catalog を読み込み中です。'
+      };
+    }
+
+    if (tileCatalogState.status === 'error') {
+      return {
+        status: 'error',
+        label: 'Tile Error',
+        detail: tileCatalogState.error ?? 'tile catalog の読み込みに失敗しました。'
+      };
+    }
+
+    return {
+      status: 'neutral',
+      label: 'Tile Optional',
+      detail: 'tile catalog は未指定です。'
+    };
+  }, [
+    dynamicMapLoadPlan.tileCatalog,
+    tileCatalogState.error,
+    tileCatalogState.status
+  ]);
+  const tilePreloadHealth = useMemo(() => {
+    if (tilePreloadState.status === 'ready') {
+      return {
+        status: 'ready',
+        label: 'Preload Ready',
+        detail: `${tilePreloadState.results.length} tile preload checks passed.`
+      };
+    }
+
+    if (tilePreloadState.status === 'loading') {
+      return {
+        status: 'neutral',
+        label: 'Preloading',
+        detail: 'next tile metadata を確認中です。'
+      };
+    }
+
+    if (tilePreloadState.status === 'warning') {
+      return {
+        status: 'warning',
+        label: 'Preload Warning',
+        detail: '一部のnext tile preloadに失敗しました。'
+      };
+    }
+
+    if (tilePreloadState.status === 'error') {
+      return {
+        status: 'error',
+        label: 'Preload Error',
+        detail: tilePreloadState.error ?? 'tile preload に失敗しました。'
+      };
+    }
+
+    if (tilePreloadState.status === 'skipped') {
+      return {
+        status: 'neutral',
+        label: 'Preload Off',
+        detail: 'tile preload は無効です。'
+      };
+    }
+
+    return {
+      status: 'neutral',
+      label: 'Preload Idle',
+      detail: 'preload候補tileはまだありません。'
+    };
+  }, [
+    tilePreloadState.error,
+    tilePreloadState.results.length,
+    tilePreloadState.status
+  ]);
   const studioBundleStatusLabel =
     studioBundleState.status === 'loaded'
       ? 'Loaded'
@@ -3202,7 +3785,9 @@ export default function App() {
             ? 'Error'
             : 'Disabled';
   const splatAssetSourceLabel =
-    assetBundle.splatSource === 'manifest'
+    assetBundle.splatSource === 'tile-catalog'
+      ? 'Tile Catalog'
+      : assetBundle.splatSource === 'manifest'
       ? 'Manifest Asset'
       : assetBundle.splatSource === 'config'
         ? 'Config Asset'
@@ -3225,6 +3810,14 @@ export default function App() {
           : semanticZoneState.status === 'disabled'
             ? 'Disabled'
             : 'Idle';
+
+  useEffect(() => {
+    setMapRuntimeState({
+      status: effectiveSplatUrl ? 'loading' : 'missing',
+      url: effectiveSplatUrl,
+      fragmentId: activeConfig.fragmentId
+    });
+  }, [activeConfig.fragmentId, effectiveSplatUrl]);
 
   useEffect(() => {
     const zoneMapUrl = effectiveSemanticZoneMapUrl;
@@ -6342,6 +6935,141 @@ export default function App() {
   };
 
   useEffect(() => {
+    const nextTileId = dynamicMapLoadPlan.activeTile?.id ?? '';
+    setActiveDynamicMapTileId((currentTileId) =>
+      currentTileId === nextTileId ? currentTileId : nextTileId
+    );
+  }, [dynamicMapLoadPlan.activeTile?.id]);
+
+  useEffect(() => {
+    const candidates = dynamicMapLoadPlan.tilePreloadCandidates;
+    const activeTileId = dynamicMapLoadPlan.activeTile?.id ?? '';
+
+    if (!hasDynamicMapTileCatalog || candidates.length === 0) {
+      setTilePreloadState({
+        status: 'idle',
+        mode: dynamicMapTilePreloadMode,
+        activeTileId,
+        entries: [],
+        results: [],
+        error: null
+      });
+      return undefined;
+    }
+
+    if (dynamicMapTilePreloadMode === 'off') {
+      setTilePreloadState({
+        status: 'skipped',
+        mode: dynamicMapTilePreloadMode,
+        activeTileId,
+        entries: candidates,
+        results: [],
+        error: null
+      });
+      return undefined;
+    }
+
+    const abortController = new AbortController();
+    setTilePreloadState({
+      status: 'loading',
+      mode: dynamicMapTilePreloadMode,
+      activeTileId,
+      entries: candidates,
+      results: [],
+      error: null
+    });
+
+    const buildCacheKey = (entry) =>
+      buildDynamicMapTilePreloadCacheKey({
+        catalogUrl: tileCatalogState.url,
+        colliderMeshUrl: entry.colliderMeshUrl,
+        mode: dynamicMapTilePreloadMode,
+        preloadCacheKey: entry.preloadCacheKey,
+        sceneId: entry.tileCatalogSceneId,
+        splatUrl: entry.splatUrl,
+        tileId: entry.tileId
+      });
+    const preloadResultCache = tilePreloadResultCacheRef.current;
+
+    Promise.all(
+      candidates.map(async (entry) => {
+        const cacheKey = buildCacheKey(entry);
+        const cached = preloadResultCache.get(cacheKey);
+        if (cached?.result) {
+          return {
+            ...cached.result,
+            cached: true
+          };
+        }
+
+        if (cached?.promise) {
+          const result = await cached.promise;
+          return {
+            ...result,
+            cached: true
+          };
+        }
+
+        const promise = preloadDynamicMapEntry(entry, {
+          includeDemoFallback: true,
+          mode: dynamicMapTilePreloadMode
+        });
+        preloadResultCache.set(cacheKey, { promise });
+        const result = await promise;
+
+        if (['ready', 'skipped'].includes(result.status)) {
+          preloadResultCache.set(cacheKey, { result });
+        } else {
+          preloadResultCache.delete(cacheKey);
+        }
+
+        return result;
+      })
+    )
+      .then((results) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const hasWarning = results.some((result) =>
+          ['warning', 'error'].includes(result.status)
+        );
+        const hasAborted = results.some((result) => result.status === 'aborted');
+
+        setTilePreloadState({
+          status: hasAborted ? 'aborted' : hasWarning ? 'warning' : 'ready',
+          mode: dynamicMapTilePreloadMode,
+          activeTileId,
+          entries: candidates,
+          results,
+          error: null
+        });
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setTilePreloadState({
+          status: 'error',
+          mode: dynamicMapTilePreloadMode,
+          activeTileId,
+          entries: candidates,
+          results: [],
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+
+    return () => abortController.abort();
+  }, [
+    dynamicMapLoadPlan.activeTile?.id,
+    dynamicMapTilePreloadKey,
+    hasDynamicMapTileCatalog,
+    dynamicMapTilePreloadMode,
+    tileCatalogState.url
+  ]);
+
+  useEffect(() => {
     if (assetManifestState.status !== 'loaded') {
       return;
     }
@@ -6429,6 +7157,72 @@ export default function App() {
 
     return () => abortController.abort();
   }, [assetManifestUrl]);
+
+  useEffect(() => {
+    if (!tileCatalogUrl) {
+      setTileCatalogState({
+        status: 'disabled',
+        catalog: null,
+        error: null,
+        url: ''
+      });
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    setTileCatalogState((current) => ({
+      ...current,
+      status: 'loading',
+      error: null,
+      url: tileCatalogUrl
+    }));
+
+    fetch(tileCatalogUrl, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json'
+      },
+      signal: abortController.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setTileCatalogState({
+              status: 'missing',
+              catalog: null,
+              error: null,
+              url: tileCatalogUrl
+            });
+            return;
+          }
+
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const catalog = await response.json();
+        setTileCatalogState({
+          status: 'loaded',
+          catalog,
+          error: null,
+          url: tileCatalogUrl
+        });
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setTileCatalogState({
+          status: 'error',
+          catalog: null,
+          error: error instanceof Error ? error.message : String(error),
+          url: tileCatalogUrl
+        });
+      });
+
+    return () => abortController.abort();
+  }, [tileCatalogUrl]);
 
   useEffect(() => {
     if (!studioBundleUrl) {
@@ -6833,6 +7627,138 @@ export default function App() {
     appliedRobotRouteUrlRef.current = robotRouteState.url;
     applyRobotRoutePayload(nextRoute, `url:${robotRouteState.url}`);
   }, [robotRouteState.route, robotRouteState.status, robotRouteState.url]);
+
+  useEffect(() => {
+    if (robotRoutePlaybackTimerRef.current) {
+      clearTimeout(robotRoutePlaybackTimerRef.current);
+      robotRoutePlaybackTimerRef.current = null;
+    }
+
+    if (
+      !robotRoutePlaybackConfig.enabled ||
+      robotRouteState.status !== 'loaded' ||
+      !robotRouteState.route
+    ) {
+      setRobotRoutePlaybackPreviewPositions([]);
+      return undefined;
+    }
+
+    let route;
+    try {
+      route = normalizeRobotRoutePayload(robotRouteState.route);
+    } catch (error) {
+      setRobotRoutePlaybackPreviewPositions([]);
+      setStatusMessage(
+        `Robot route playback error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return undefined;
+    }
+
+    if (route.fragmentId && route.fragmentId !== activeConfig.fragmentId) {
+      setRobotRoutePlaybackPreviewPositions([]);
+      return undefined;
+    }
+
+    const routePoints = route.route.length > 0
+      ? route.route.map((position) => [...position])
+      : [[...route.pose.position]];
+    if (routePoints.length === 0) {
+      setRobotRoutePlaybackPreviewPositions([]);
+      return undefined;
+    }
+
+    let disposed = false;
+    let routePointIndex = 0;
+    const routeLabel = route.label || route.frameId || 'route';
+
+    setCameraMode((current) => (current === 'walk' ? 'orbit' : current));
+    setMode('robot');
+    setRobotWaypoint(route.waypoint);
+
+    function buildRoutePreviewPositions(currentIndex) {
+      const previewLimit = Math.max(0, dynamicMapTilePreloadLimit);
+      const positions = [];
+
+      for (let offset = 1; offset <= previewLimit; offset += 1) {
+        const nextIndex = currentIndex + offset;
+        if (nextIndex >= routePoints.length && !robotRoutePlaybackConfig.loop) {
+          break;
+        }
+
+        const routePoint = routePoints[nextIndex % routePoints.length];
+        positions.push({
+          x: routePoint[0],
+          y: routePoint[1],
+          z: routePoint[2]
+        });
+      }
+
+      return positions;
+    }
+
+    function applyRoutePlaybackPoint() {
+      if (disposed) {
+        return;
+      }
+
+      const position = routePoints[routePointIndex];
+      const yawDegrees =
+        routePointIndex < routePoints.length - 1
+          ? yawDegreesFromRouteSegment(
+              position,
+              routePoints[routePointIndex + 1],
+              route.pose.yawDegrees
+            )
+          : yawDegreesFromRouteSegment(
+              routePoints[routePointIndex - 1],
+              position,
+              route.pose.yawDegrees
+            );
+
+      setRobotPose({
+        position: [...position],
+        yawDegrees
+      });
+      setRobotTrail(routePoints.slice(0, routePointIndex + 1).map((point) => [...point]));
+      setRobotRoutePlaybackPreviewPositions(buildRoutePreviewPositions(routePointIndex));
+      setStatusMessage(
+        `Robot route playback: ${routeLabel} ${routePointIndex + 1}/${routePoints.length}`
+      );
+
+      routePointIndex += 1;
+      if (routePointIndex >= routePoints.length) {
+        if (!robotRoutePlaybackConfig.loop) {
+          robotRoutePlaybackTimerRef.current = null;
+          return;
+        }
+
+        routePointIndex = 0;
+      }
+
+      robotRoutePlaybackTimerRef.current = setTimeout(
+        applyRoutePlaybackPoint,
+        robotRoutePlaybackConfig.intervalMs
+      );
+    }
+
+    robotRoutePlaybackTimerRef.current = setTimeout(applyRoutePlaybackPoint, 0);
+
+    return () => {
+      disposed = true;
+      if (robotRoutePlaybackTimerRef.current) {
+        clearTimeout(robotRoutePlaybackTimerRef.current);
+        robotRoutePlaybackTimerRef.current = null;
+      }
+    };
+  }, [
+    activeConfig.fragmentId,
+    dynamicMapTilePreloadLimit,
+    robotRoutePlaybackConfig.enabled,
+    robotRoutePlaybackConfig.intervalMs,
+    robotRoutePlaybackConfig.loop,
+    robotRouteState.route,
+    robotRouteState.status
+  ]);
 
   useEffect(() => {
     if (
@@ -8572,6 +9498,45 @@ export default function App() {
     }
   }
 
+  function handleMapPositionChange(nextPositionState) {
+    const nextPosition = nextPositionState?.position;
+    if (!nextPosition) {
+      return;
+    }
+
+    const roundedPosition = {
+      x: Number(Number(nextPosition.x).toFixed(2)),
+      y: Number(Number(nextPosition.y).toFixed(2)),
+      z: Number(Number(nextPosition.z).toFixed(2))
+    };
+
+    if (![roundedPosition.x, roundedPosition.y, roundedPosition.z].every(Number.isFinite)) {
+      return;
+    }
+
+    setMapPositionState((current) => {
+      const currentPosition = current.position;
+      const source = nextPositionState.source ?? 'camera';
+      const unchanged =
+        current.source === source &&
+        currentPosition &&
+        currentPosition.x === roundedPosition.x &&
+        currentPosition.y === roundedPosition.y &&
+        currentPosition.z === roundedPosition.z;
+
+      if (unchanged) {
+        return current;
+      }
+
+      return {
+        status: 'ready',
+        source,
+        position: roundedPosition,
+        timestamp: nextPositionState.timestamp ?? Date.now()
+      };
+    });
+  }
+
   function resetDreamState() {
     setCollectedShardIds([]);
     setActiveModalItem(null);
@@ -8616,6 +9581,11 @@ export default function App() {
             onSemanticZoneSurfacePointsProjected={setProjectedSemanticZoneSurfacePoints}
             onFrame={shouldStreamRobotFrames ? handleRobotFrame : undefined}
             onDepthFrame={shouldStreamRobotDepthFrames ? handleRobotDepthFrame : undefined}
+            dynamicMapPositionTrackingEnabled={
+              Boolean(dynamicMapLoadPlan.tileCatalog) && !selectedTileId
+            }
+            onMapPositionChange={handleMapPositionChange}
+            onSplatStatusChange={setMapRuntimeState}
             splatUrl={effectiveSplatUrl}
           />
         </Suspense>
@@ -8806,6 +9776,107 @@ export default function App() {
           </div>
           <p className={activeWorldHealth.status === 'error' ? 'panel-note panel-note-error' : 'panel-note'}>
             {activeWorldHealth.detail}
+          </p>
+        </div>
+
+        <h2>Dynamic Map Loading</h2>
+        <div className="state-card">
+          <span className="state-label">Runtime Map</span>
+          <div className="status-row">
+            <HealthBadge health={dynamicMapRuntimeHealth} />
+            <strong>{dynamicMapLoadPlan.active?.fragmentLabel ?? activeConfig.fragmentLabel}</strong>
+          </div>
+          <p className="panel-note">{dynamicMapRuntimeHealth.detail}</p>
+          <p className="panel-note">
+            {mapRuntimeState.url
+              ? `runtime splat: ${mapRuntimeState.url}`
+              : 'runtime splat 未設定'}
+          </p>
+        </div>
+        <div className="state-grid">
+          <div className="state-card">
+            <span className="state-label">Active Fragment</span>
+            <strong>{dynamicMapLoadPlan.active?.assetLabel ?? assetBundle.assetLabel}</strong>
+            <span className="panel-note">
+              {dynamicMapLoadPlan.active?.splatAssetKind ?? 'missing'} /{' '}
+              {dynamicMapLoadPlan.active?.splatSource ?? 'missing'}
+            </span>
+          </div>
+          <div className="state-card">
+            <span className="state-label">Gate Candidate</span>
+            <strong>{nextDynamicMapCandidate?.fragmentLabel ?? 'none'}</strong>
+            <span className="panel-note">
+              {nextDynamicMapCandidate
+                ? `${nextDynamicMapCandidate.splatAssetKind} / ${nextDynamicMapCandidate.splatSource}`
+                : 'gate 先 map なし'}
+            </span>
+          </div>
+        </div>
+        <div className="state-card">
+          <span className="state-label">Tile Catalog</span>
+          <div className="status-row">
+            <HealthBadge health={tileCatalogHealth} />
+            <strong>{dynamicMapLoadPlan.tileCatalog?.label ?? 'none'}</strong>
+          </div>
+          <p className="panel-note">
+            {tileCatalogStatusLabel}
+            {tileCatalogState.error ? `: ${tileCatalogState.error}` : ''}
+          </p>
+          <p className="panel-note">
+            {dynamicMapLoadPlan.tileCatalog
+              ? `${dynamicMapLoadPlan.tileCatalog.summary.readyTileCount} ready / ${dynamicMapLoadPlan.tileCatalog.summary.tileCount} tiles`
+              : 'tile catalog 未接続'}
+          </p>
+          {activeDynamicMapTile ? (
+            <p className="panel-note">
+              Active tile: {activeDynamicMapTile.id}
+              {selectedTileId ? ` / requested ${selectedTileId}` : ''}
+            </p>
+          ) : null}
+          <p className="panel-note">
+            Selection: {selectedTileId ? 'manual tileId' : 'auto position'}
+          </p>
+          <p className="panel-note">
+            Preload limit: {dynamicMapTilePreloadLimit}
+          </p>
+          <p className="panel-note">
+            {effectiveMapPositionState.position
+              ? `Position ${effectiveMapPositionState.source}: ${effectiveMapPositionState.position.x}, ${effectiveMapPositionState.position.y}, ${effectiveMapPositionState.position.z}`
+              : 'position tracking 待機中'}
+          </p>
+          {dynamicMapLoadPlan.tilePreloadCandidates.length > 0 ? (
+            <p className="panel-note">
+              Preload tiles: {dynamicMapLoadPlan.tilePreloadCandidates
+                .map((entry) => entry.tileId)
+                .join(', ')}
+            </p>
+          ) : null}
+          {tileResidencySummary ? (
+            <p className="panel-note">
+              Tile residency: {tileResidencySummary}
+            </p>
+          ) : null}
+          {tileResidencyPreview ? (
+            <p className="panel-note">
+              Tile residency list: {tileResidencyPreview}
+            </p>
+          ) : null}
+          <div className="status-row">
+            <HealthBadge health={tilePreloadHealth} />
+            <strong>{tilePreloadState.mode}</strong>
+          </div>
+          <p className="panel-note">{tilePreloadHealth.detail}</p>
+          {tilePreloadState.results.length > 0 ? (
+            <p className="panel-note">
+              Preload status: {tilePreloadState.results
+                .map((result, index) =>
+                  `${tilePreloadState.entries[index]?.tileId ?? result.fragmentLabel ?? result.label}: ${result.status}${result.cached ? ' cached' : ''}`
+                )
+                .join(' / ')}
+            </p>
+          ) : null}
+          <p className="panel-note">
+            {tileCatalogState.url || 'tileCatalog query 未指定'}
           </p>
         </div>
         <p className="panel-note">
@@ -9055,6 +10126,11 @@ export default function App() {
         </p>
         <p className="panel-note">
           {robotRouteState.url || 'robotRoute query 未指定'}
+        </p>
+        <p className="panel-note">
+          Robot route playback: {robotRoutePlaybackConfig.enabled
+            ? `${robotRoutePlaybackConfig.intervalMs} ms${robotRoutePlaybackConfig.loop ? ' / loop' : ''}`
+            : 'off'}
         </p>
         {activeRobotRouteHealth?.detail ? (
           <p

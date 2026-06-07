@@ -365,6 +365,182 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip COLMAP sparse preflight before gsplat training (not recommended)",
     )
 
+    lsgs = subparsers.add_parser(
+        "large-scale-3dgs-smoke-data",
+        help="Generate a deterministic multi-tile COLMAP fixture for large-scale gsplat smoke runs",
+    )
+    lsgs.add_argument(
+        "--output",
+        default="outputs/large_scale_3dgs_smoke_data",
+        help="Output directory for generated COLMAP sparse files and images",
+    )
+    lsgs.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xz",
+        help="Axes used for the generated tile grid",
+    )
+    lsgs.add_argument("--grid-width", type=int, default=3, help="Number of tiles along the first axis")
+    lsgs.add_argument("--grid-height", type=int, default=2, help="Number of tiles along the second axis")
+    lsgs.add_argument("--tile-size", type=float, default=8.0, help="Nominal tile size in scene units")
+    lsgs.add_argument("--images-per-tile", type=int, default=2, help="Generated camera images per tile")
+    lsgs.add_argument("--points-per-tile", type=int, default=12, help="Generated sparse points per tile")
+    lsgs.add_argument("--image-size", type=int, default=48, help="Generated square image size in pixels")
+    lsgs.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the smoke data manifest",
+    )
+
+    # large-scale-3dgs-plan
+    lsg = subparsers.add_parser(
+        "large-scale-3dgs-plan",
+        help="Plan tile/chunk training jobs for a large COLMAP scene before running gsplat",
+    )
+    lsg.add_argument("--data", required=True, help="Preprocessed COLMAP data directory")
+    lsg.add_argument(
+        "--output",
+        default="outputs/large_scale_3dgs",
+        help="Output root for the plan and optional chunk data",
+    )
+    lsg.add_argument("--tile-size", type=float, default=30.0, help="Tile width in scene units/metres")
+    lsg.add_argument("--overlap", type=float, default=5.0, help="Tile overlap in scene units/metres")
+    lsg.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="Horizontal axes used for tiling (default: xy for ENU/COLMAP robotics data)",
+    )
+    lsg.add_argument("--min-images", type=int, default=8, help="Minimum core images for a trainable tile")
+    lsg.add_argument("--iterations", type=int, default=30000, help="Iterations for generated train commands")
+    lsg.add_argument(
+        "--config",
+        default="configs/training_ba.yaml",
+        help="Training config path used in generated train commands",
+    )
+    lsg.add_argument("--export-max-points", type=int, default=400000, help="Max points per exported tile splat")
+    lsg.add_argument("--splat-min-opacity", type=float, default=0.02, help="Opacity filter for tile exports")
+    lsg.add_argument("--splat-max-scale", type=float, default=2.0, help="Max scale filter for tile exports")
+    lsg.add_argument(
+        "--splat-max-scale-percentile",
+        type=float,
+        default=98.0,
+        help="Adaptive max-scale percentile for tile exports",
+    )
+    lsg.add_argument(
+        "--materialize",
+        action="store_true",
+        help="Write per-tile COLMAP sparse files plus image/depth links under --output/chunks",
+    )
+    lsg.add_argument(
+        "--link-mode",
+        choices=["symlink", "copy", "none"],
+        default="symlink",
+        help="How --materialize places images/depth into each tile directory",
+    )
+    lsg.add_argument(
+        "--format",
+        choices=["text", "json", "shell"],
+        default="text",
+        help="Stdout format after writing the plan JSON",
+    )
+
+    lsgr = subparsers.add_parser(
+        "large-scale-3dgs-run",
+        help="Run ready train/export chunks from a large-scale 3DGS plan with resume support",
+    )
+    lsgr.add_argument("--plan", required=True, help="Path to large_scale_3dgs_plan.json")
+    lsgr.add_argument("--report", default=None, help="Optional run report JSON path")
+    lsgr.add_argument("--max-chunks", type=int, default=None, help="Run at most N ready chunks")
+    lsgr.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Do not skip chunks with existing splat outputs or point_cloud.ply",
+    )
+    lsgr.add_argument("--dry-run", action="store_true", help="Write a run report without executing commands")
+    lsgr.add_argument("--no-fail-fast", action="store_true", help="Continue after a chunk command fails")
+    lsgr.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the run report",
+    )
+
+    lsgc = subparsers.add_parser(
+        "large-scale-3dgs-catalog",
+        help="Build a web-facing tile catalog from a large-scale 3DGS plan and generated splats",
+    )
+    lsgc.add_argument("--plan", required=True, help="Path to large_scale_3dgs_plan.json")
+    lsgc.add_argument("--output", default=None, help="Optional tile catalog JSON output path")
+    lsgc.add_argument("--run-report", default=None, help="Optional large_scale_3dgs_run_report.json")
+    lsgc.add_argument("--scene-id", default="large-scale-3dgs", help="Scene id used in catalog URLs")
+    lsgc.add_argument("--label", default="Large-scale 3DGS", help="Human-readable catalog label")
+    lsgc.add_argument(
+        "--public-root",
+        default=None,
+        help="Optional web public root; generated splats are linked or copied below it",
+    )
+    lsgc.add_argument(
+        "--public-url-prefix",
+        default="/splats",
+        help="URL prefix corresponding to --public-root (default: /splats)",
+    )
+    lsgc.add_argument(
+        "--link-mode",
+        choices=["symlink", "copy", "none"],
+        default="symlink",
+        help="How existing splats are placed below --public-root",
+    )
+    lsgc.add_argument(
+        "--require-splats",
+        action="store_true",
+        help="Only include tiles whose .splat output already exists",
+    )
+    lsgc.add_argument(
+        "--web-app-dir",
+        default="apps/dreamwalker-web",
+        help="DreamWalker web app directory used in the printed validation command",
+    )
+    lsgc.add_argument(
+        "--site-url",
+        default="http://localhost:5173/",
+        help="DreamWalker site URL used in the printed launch URL",
+    )
+    lsgc.add_argument(
+        "--tile-preload",
+        choices=["off", "metadata", "cache"],
+        default="metadata",
+        help="Dynamic map tile preload mode used in the printed launch URL",
+    )
+    lsgc.add_argument(
+        "--route",
+        default=None,
+        help="Optional robot route JSON path or public URL for validation and launch URL output",
+    )
+    lsgc.add_argument(
+        "--route-playback",
+        action="store_true",
+        help="Include robotRoutePlayback=1 in the printed launch URL and validation command",
+    )
+    lsgc.add_argument(
+        "--route-playback-ms",
+        type=int,
+        default=None,
+        help="Robot route playback interval in milliseconds for the printed launch URL",
+    )
+    lsgc.add_argument(
+        "--route-playback-loop",
+        action="store_true",
+        help="Include robotRoutePlaybackLoop=1 in the printed launch URL and validation command",
+    )
+    lsgc.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the tile catalog",
+    )
+
     # view
     vw = subparsers.add_parser("view", help="Launch the web viewer")
     vw.add_argument("--model", required=True, help="Path to the .ply file or COLMAP sparse dir")
@@ -2289,6 +2465,141 @@ def cmd_train(args: argparse.Namespace) -> None:
         print(f"\nNerfstudio output at: {output}")
 
 
+def cmd_large_scale_3dgs_smoke_data(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-smoke-data subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSSmokeDataOptions,
+        format_large_scale_3dgs_smoke_data_text,
+        write_large_scale_3dgs_smoke_data,
+    )
+
+    manifest = write_large_scale_3dgs_smoke_data(
+        LargeScale3DGSSmokeDataOptions(
+            output_dir=Path(args.output),
+            axes=args.axes,
+            grid_width=args.grid_width,
+            grid_height=args.grid_height,
+            tile_size=args.tile_size,
+            images_per_tile=args.images_per_tile,
+            points_per_tile=args.points_per_tile,
+            image_size=args.image_size,
+        )
+    )
+
+    if args.format == "json":
+        print(json.dumps(manifest, indent=2))
+    else:
+        print(format_large_scale_3dgs_smoke_data_text(manifest))
+
+
+def cmd_large_scale_3dgs_plan(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-plan subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSOptions,
+        build_large_scale_3dgs_plan,
+        format_large_scale_3dgs_shell,
+        format_large_scale_3dgs_text,
+        write_large_scale_3dgs_plan,
+    )
+
+    options = LargeScale3DGSOptions(
+        data_dir=Path(args.data),
+        output_dir=Path(args.output),
+        tile_size=args.tile_size,
+        overlap=args.overlap,
+        axes=args.axes,
+        min_images=args.min_images,
+        iterations=args.iterations,
+        config=args.config,
+        export_max_points=args.export_max_points,
+        splat_min_opacity=args.splat_min_opacity,
+        splat_max_scale=args.splat_max_scale,
+        splat_max_scale_percentile=args.splat_max_scale_percentile,
+        materialize=args.materialize,
+        link_mode=args.link_mode,
+    )
+    plan = build_large_scale_3dgs_plan(options)
+    plan_path = write_large_scale_3dgs_plan(plan, Path(args.output))
+
+    if args.format == "json":
+        print(json.dumps({**plan, "planPath": str(plan_path)}, indent=2))
+    elif args.format == "shell":
+        print(format_large_scale_3dgs_shell(plan), end="")
+    else:
+        print(format_large_scale_3dgs_text(plan, plan_path))
+
+
+def cmd_large_scale_3dgs_run(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-run subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSRunOptions,
+        format_large_scale_3dgs_run_text,
+        run_large_scale_3dgs_plan,
+    )
+
+    report = run_large_scale_3dgs_plan(
+        LargeScale3DGSRunOptions(
+            plan_path=Path(args.plan),
+            report_path=Path(args.report) if args.report else None,
+            max_chunks=args.max_chunks,
+            resume=not args.no_resume,
+            dry_run=args.dry_run,
+            fail_fast=not args.no_fail_fast,
+        )
+    )
+
+    if args.format == "json":
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_large_scale_3dgs_run_text(report))
+
+
+def cmd_large_scale_3dgs_catalog(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-catalog subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSCatalogOptions,
+        build_large_scale_3dgs_catalog,
+        build_large_scale_3dgs_web_runbook,
+        format_large_scale_3dgs_catalog_text,
+        write_large_scale_3dgs_catalog,
+    )
+
+    options = LargeScale3DGSCatalogOptions(
+        plan_path=Path(args.plan),
+        output_path=Path(args.output) if args.output else None,
+        run_report_path=Path(args.run_report) if args.run_report else None,
+        scene_id=args.scene_id,
+        label=args.label,
+        public_root=Path(args.public_root) if args.public_root else None,
+        public_url_prefix=args.public_url_prefix,
+        link_mode=args.link_mode,
+        require_splats=args.require_splats,
+        web_app_dir=Path(args.web_app_dir) if args.web_app_dir else None,
+        site_url=args.site_url,
+        tile_preload=args.tile_preload,
+        route_path=args.route,
+        route_playback=args.route_playback,
+        route_playback_ms=args.route_playback_ms,
+        route_playback_loop=args.route_playback_loop,
+    )
+    catalog = build_large_scale_3dgs_catalog(options)
+    catalog_path = write_large_scale_3dgs_catalog(catalog, options)
+
+    if args.format == "json":
+        print(
+            json.dumps(
+                {
+                    **catalog,
+                    "catalogPath": str(catalog_path),
+                    "webRunbook": build_large_scale_3dgs_web_runbook(catalog_path, options),
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(format_large_scale_3dgs_catalog_text(catalog, catalog_path, options))
+
+
 def cmd_view(args: argparse.Namespace) -> None:
     """Handle the view subcommand."""
     from gs_sim2real.viewer.web_viewer import GaussianViewer
@@ -3174,6 +3485,10 @@ def main(argv: list[str] | None = None) -> None:
         "download": cmd_download,
         "preprocess": cmd_preprocess,
         "train": cmd_train,
+        "large-scale-3dgs-smoke-data": cmd_large_scale_3dgs_smoke_data,
+        "large-scale-3dgs-plan": cmd_large_scale_3dgs_plan,
+        "large-scale-3dgs-run": cmd_large_scale_3dgs_run,
+        "large-scale-3dgs-catalog": cmd_large_scale_3dgs_catalog,
         "view": cmd_view,
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,

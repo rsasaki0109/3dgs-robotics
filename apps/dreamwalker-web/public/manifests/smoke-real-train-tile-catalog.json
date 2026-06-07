@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "createdAt": "2026-06-06T22:12:43.532848+00:00",
+  "sceneId": "smoke-real-train",
+  "label": "Smoke Real Train",
+  "planPath": "outputs/dynamic_map_real_train_smoke/large/large_scale_3dgs_plan.json",
+  "runReportPath": "outputs/dynamic_map_real_train_smoke/large/large_scale_3dgs_run_report.json",
+  "tiling": {
+    "strategy": "camera-center-grid",
+    "axes": "xy",
+    "tileSize": 8.0,
+    "overlap": 0.0,
+    "minImages": 1,
+    "worldBounds": {
+      "minX": -0.0,
+      "maxX": 12.0,
+      "minY": -0.0,
+      "maxY": -0.0
+    }
+  },
+  "summary": {
+    "tileCount": 1,
+    "readyTileCount": 1,
+    "missingSplatTileCount": 0
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_y000",
+      "label": "tile x000 y000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/smoke-real-train/tile_x000_y000.splat",
+      "sourceSplat": "outputs/dynamic_map_real_train_smoke/large/splats/tile_x000_y000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/smoke-real-train/tile_x000_y000.splat",
+      "coreBounds": {
+        "minX": 0.0,
+        "maxX": 8.0,
+        "minY": 0.0,
+        "maxY": 8.0
+      },
+      "expandedBounds": {
+        "minX": 0.0,
+        "maxX": 8.0,
+        "minY": 0.0,
+        "maxY": 8.0
+      },
+      "tileIndex": {
+        "x": 0,
+        "y": 0
+      },
+      "axes": "xy",
+      "imageCount": 1,
+      "coreImageCount": 1,
+      "pointCount": 2
+    }
+  ]
+}
