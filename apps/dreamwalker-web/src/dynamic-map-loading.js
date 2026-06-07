@@ -379,9 +379,12 @@ export function buildDynamicMapTileCatalogLaunchUrl(baseUrl, options = {}) {
   const normalizedBaseUrl = hasNonEmptyString(baseUrl) ? baseUrl.trim() : '/';
   const launchUrl = new URL(normalizedBaseUrl, 'http://dreamwalker.local');
   const tileCatalogConfig = dreamwalkerConfig.tileCatalog;
+  const robotRouteConfig = dreamwalkerConfig.robotRoute;
   const preloadMode = normalizeDynamicMapPreloadMode(options.preloadMode, 'metadata');
   const preloadLimit = Number(options.tilePreloadLimit);
   const residentLimit = Number(options.tileResidentLimit);
+  const routeUrl = hasNonEmptyString(options.routeUrl) ? options.routeUrl.trim() : '';
+  const routePlaybackMs = Number(options.routePlaybackMs);
 
   launchUrl.searchParams.set(tileCatalogConfig.queryParam, tileCatalogUrl);
   launchUrl.searchParams.delete(tileCatalogConfig.tileQueryParam);
@@ -399,6 +402,25 @@ export function buildDynamicMapTileCatalogLaunchUrl(baseUrl, options = {}) {
       tileCatalogConfig.residentLimitQueryParam,
       String(Math.floor(residentLimit))
     );
+  }
+
+  if (routeUrl) {
+    launchUrl.searchParams.set(robotRouteConfig.queryParam, routeUrl);
+  }
+
+  if (options.routePlayback || options.routePlaybackLoop) {
+    launchUrl.searchParams.set(robotRouteConfig.playbackQueryParam, '1');
+  }
+
+  if (Number.isFinite(routePlaybackMs) && routePlaybackMs > 0) {
+    launchUrl.searchParams.set(
+      robotRouteConfig.playbackIntervalQueryParam,
+      String(Math.floor(routePlaybackMs))
+    );
+  }
+
+  if (options.routePlaybackLoop) {
+    launchUrl.searchParams.set(robotRouteConfig.playbackLoopQueryParam, '1');
   }
 
   if (options.enableDiagnostics) {

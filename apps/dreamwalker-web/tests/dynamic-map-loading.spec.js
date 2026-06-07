@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const outdoorDemoCatalogUrl = '/manifests/outdoor-demo-dust3r-tile-catalog.json';
+const outdoorDemoRouteUrl = '/robot-routes/outdoor-demo-dust3r-tile-loop.json';
 const outdoorDemoTileRoutePattern = '**/splats/outdoor-demo-dust3r-tiled/*.splat';
 
 function buildTileCatalogDataUrl() {
@@ -72,7 +73,11 @@ test('large-scale demo button launches the bundled outdoor tile catalog', async 
   await expect(page).toHaveURL(
     new RegExp(`tileCatalog=.*${encodeURIComponent(outdoorDemoCatalogUrl)}`)
   );
+  await expect(page).toHaveURL(new RegExp(`robotRoute=.*${encodeURIComponent(outdoorDemoRouteUrl)}`));
   await expect(page.getByText('Outdoor Demo DUSt3R Tiled').first()).toBeVisible();
+  await expect(page.getByText('Route Loaded', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Robot route playback: 1200 ms / loop').first()).toBeVisible();
+  await expect(page.locator('.dreamwalker-shell')).toHaveClass(/mode-robot/);
   await expect(page.getByText('4 ready / 4 tiles').first()).toBeVisible();
   await expect(page.getByText('Preload limit: 2').first()).toBeVisible();
   await expect(page.getByText('Resident limit: 3').first()).toBeVisible();

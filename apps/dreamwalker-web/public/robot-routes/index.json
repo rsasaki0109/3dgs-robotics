@@ -12,6 +12,14 @@
       "accent": "#85e3e1"
     },
     {
+      "id": "outdoor-demo-dust3r-tile-loop",
+      "label": "Outdoor Demo DUSt3R Tile Loop",
+      "url": "/robot-routes/outdoor-demo-dust3r-tile-loop.json",
+      "description": "four-tile outdoor 3DGS loop for dynamic map loading playback",
+      "fragmentId": "residency",
+      "accent": "#f4ca72"
+    },
+    {
       "id": "smoke-gsplat-grid6-route",
       "label": "Smoke gsplat Grid 6 Route",
       "url": "/robot-routes/smoke-gsplat-grid6-route.json",

@@ -37,7 +37,11 @@ test('buildDynamicMapTileCatalogLaunchUrl wires a large-scale catalog into the c
       tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
       preloadMode: 'cache',
       tilePreloadLimit: 2,
-      tileResidentLimit: 3
+      tileResidentLimit: 3,
+      routeUrl: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+      routePlayback: true,
+      routePlaybackLoop: true,
+      routePlaybackMs: 1200
     }
   );
   const parsedUrl = new URL(launchUrl);
@@ -51,6 +55,13 @@ test('buildDynamicMapTileCatalogLaunchUrl wires a large-scale catalog into the c
   assert.equal(parsedUrl.searchParams.get('tilePreload'), 'cache');
   assert.equal(parsedUrl.searchParams.get('tilePreloadLimit'), '2');
   assert.equal(parsedUrl.searchParams.get('tileResidentLimit'), '3');
+  assert.equal(
+    parsedUrl.searchParams.get('robotRoute'),
+    '/robot-routes/outdoor-demo-dust3r-tile-loop.json'
+  );
+  assert.equal(parsedUrl.searchParams.get('robotRoutePlayback'), '1');
+  assert.equal(parsedUrl.searchParams.get('robotRoutePlaybackMs'), '1200');
+  assert.equal(parsedUrl.searchParams.get('robotRoutePlaybackLoop'), '1');
   assert.equal(parsedUrl.searchParams.has('tileId'), false);
   assert.equal(parsedUrl.searchParams.has('overlay'), false);
 });

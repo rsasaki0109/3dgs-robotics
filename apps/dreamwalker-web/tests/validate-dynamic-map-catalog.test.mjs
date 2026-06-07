@@ -3,10 +3,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   buildDynamicMapCatalogLaunchUrl,
   validateDynamicMapCatalog
 } from '../tools/validate-dynamic-map-catalog.mjs';
+
+const appPublicRoot = fileURLToPath(new URL('../public', import.meta.url));
 
 async function createPublicRoot() {
   const root = await mkdtemp(path.join(tmpdir(), 'dreamwalker-catalog-'));
@@ -337,6 +340,45 @@ test('validateDynamicMapCatalog validates robot route coverage and prints a play
   } finally {
     await fixture.cleanup();
   }
+});
+
+test('validateDynamicMapCatalog validates the bundled outdoor route playback demo', async () => {
+  const result = await validateDynamicMapCatalog(
+    '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+    {
+      publicRoot: appPublicRoot,
+      routeInput: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+      routePlayback: true,
+      routePlaybackLoop: true,
+      routePlaybackMs: 1200,
+      siteUrl: 'http://127.0.0.1:5173/'
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.errorCount, 0);
+  assert.deepEqual(result.routeTileSequence, [
+    'tile_x000_z000',
+    'tile_x000_z001',
+    'tile_x001_z001',
+    'tile_x001_z000',
+    'tile_x000_z000'
+  ]);
+  assert.ok(result.findings.some((finding) =>
+    finding.scope === 'route:coverage' &&
+    finding.detail.includes('all route points')
+  ));
+  assert.match(
+    result.launchUrl,
+    /tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog\.json/
+  );
+  assert.match(
+    result.launchUrl,
+    /robotRoute=%2Frobot-routes%2Foutdoor-demo-dust3r-tile-loop\.json/
+  );
+  assert.match(result.launchUrl, /robotRoutePlayback=1/);
+  assert.match(result.launchUrl, /robotRoutePlaybackMs=1200/);
+  assert.match(result.launchUrl, /robotRoutePlaybackLoop=1/);
 });
 
 test('validateDynamicMapCatalog fails when a robot route leaves ready tile coverage', async () => {
