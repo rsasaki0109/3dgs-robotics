@@ -378,10 +378,10 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Autoware-style dynamic map loading material rendered from outdoor-demo-dust3r.splat" in readme
-    assert "Lead GIF: Autoware-style dynamic map loading over `outdoor-demo-dust3r.splat`" in readme
+    assert "Dynamic map loading material rendered from outdoor-demo-dust3r.splat" in readme
+    assert "Lead GIF: dynamic map loading over `outdoor-demo-dust3r.splat`" in readme
     assert "white is the PCD-like `.splat` footprint" in readme
-    assert "Lanelet2-style route layer" in readme
+    assert "vector overlay shows the route layer" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
 
