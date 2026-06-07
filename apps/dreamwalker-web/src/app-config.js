@@ -1,3 +1,5 @@
+import { resolvePublicUrl } from './public-url.js';
+
 const defaultRoboticsCameras = [
   {
     id: 'front',
@@ -600,8 +602,8 @@ export function resolveWorldAssetBundle(worldConfig, assetManifest) {
       assetManifest?.note
     ),
     manifestLabel: firstNonEmptyString(assetManifest?.label),
-    splatUrl: configuredSplatUrl || demoSplatUrl,
-    colliderMeshUrl,
+    splatUrl: resolvePublicUrl(configuredSplatUrl || demoSplatUrl),
+    colliderMeshUrl: resolvePublicUrl(colliderMeshUrl),
     expectedSplatUrl: firstNonEmptyString(
       manifestFragment.expectedSplatUrl,
       configAsset.expectedSplatUrl

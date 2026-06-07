@@ -24,6 +24,20 @@ jobs:
       - uses: actions/configure-pages@v6
         with:
           enablement: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dreamwalker-web/package-lock.json
+      - name: Install DreamWalker web dependencies
+        run: npm ci
+        working-directory: apps/dreamwalker-web
+      - name: Build DreamWalker web demo
+        run: npm run build
+        working-directory: apps/dreamwalker-web
+        env:
+          DREAMWALKER_BASE: /gs-mapper/dreamwalker/
+          DREAMWALKER_OUT_DIR: ../../docs/dreamwalker
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/

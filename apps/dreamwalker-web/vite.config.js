@@ -3,8 +3,11 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: process.env.DREAMWALKER_BASE || '/',
   plugins: [react()],
   build: {
+    outDir: process.env.DREAMWALKER_OUT_DIR || 'dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),

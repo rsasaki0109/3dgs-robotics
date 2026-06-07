@@ -3,6 +3,7 @@ import {
   resolveDreamwalkerConfig,
   resolveWorldAssetBundle
 } from './app-config.js';
+import { resolvePublicUrl } from './public-url.js';
 import { normalizeLocalAssetPath } from './studio-health.js';
 
 export const dynamicMapPreloadModes = ['off', 'metadata', 'cache'];
@@ -42,7 +43,7 @@ function classifyAssetUrl(assetUrl) {
 function normalizeCatalogTile(tileLike, index) {
   const tile = tileLike && typeof tileLike === 'object' ? tileLike : {};
   const id = hasNonEmptyString(tile.id) ? tile.id.trim() : `tile-${index + 1}`;
-  const splatUrl = hasNonEmptyString(tile.splatUrl) ? tile.splatUrl.trim() : '';
+  const splatUrl = resolvePublicUrl(hasNonEmptyString(tile.splatUrl) ? tile.splatUrl : '');
   const status = hasNonEmptyString(tile.status)
     ? tile.status.trim()
     : splatUrl

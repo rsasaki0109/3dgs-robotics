@@ -46,6 +46,7 @@ import {
   OverlayStage,
   resolveOverlayBrandingForScene
 } from './overlay-ui.jsx';
+import { resolvePublicUrl } from './public-url.js';
 import Sim2RealPanel from './Sim2RealPanel.jsx';
 
 const captureKey = 'k';
@@ -1731,7 +1732,7 @@ function buildRobotMissionCompatibility(missionPayloadLike, routePayloadLike, cu
 
 async function fetchJsonResource(resourceUrl, options = {}) {
   const { signal } = options;
-  const response = await fetch(resourceUrl, {
+  const response = await fetch(resolvePublicUrl(resourceUrl), {
     cache: 'no-store',
     headers: {
       Accept: 'application/json'
@@ -4145,7 +4146,7 @@ export default function App() {
 
     async function loadSemanticZoneMap() {
       try {
-        const response = await fetch(zoneMapUrl, {
+        const response = await fetch(resolvePublicUrl(zoneMapUrl), {
           signal: abortController.signal
         });
 
@@ -4456,7 +4457,7 @@ export default function App() {
           }
 
           try {
-            const response = await fetch(entry.url, {
+            const response = await fetch(resolvePublicUrl(entry.url), {
               cache: 'no-store',
               headers: {
                 Accept: 'application/json'
@@ -4550,7 +4551,7 @@ export default function App() {
           }
 
           try {
-            const response = await fetch(entry.url, {
+            const response = await fetch(resolvePublicUrl(entry.url), {
               cache: 'no-store',
               headers: {
                 Accept: 'application/json'
@@ -7414,7 +7415,7 @@ export default function App() {
       url: assetManifestUrl
     }));
 
-    fetch(assetManifestUrl, {
+    fetch(resolvePublicUrl(assetManifestUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -7480,7 +7481,7 @@ export default function App() {
       url: tileCatalogUrl
     }));
 
-    fetch(tileCatalogUrl, {
+    fetch(resolvePublicUrl(tileCatalogUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -7547,7 +7548,7 @@ export default function App() {
       url: studioBundleUrl
     }));
 
-    fetch(studioBundleUrl, {
+    fetch(resolvePublicUrl(studioBundleUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -7613,7 +7614,7 @@ export default function App() {
       url: studioBundleCatalogUrl
     }));
 
-    fetch(studioBundleCatalogUrl, {
+    fetch(resolvePublicUrl(studioBundleCatalogUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -7680,7 +7681,7 @@ export default function App() {
       url: robotRouteUrl
     }));
 
-    fetch(robotRouteUrl, {
+    fetch(resolvePublicUrl(robotRouteUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -7746,7 +7747,7 @@ export default function App() {
       url: robotRouteCatalogUrl
     }));
 
-    fetch(robotRouteCatalogUrl, {
+    fetch(resolvePublicUrl(robotRouteCatalogUrl), {
       cache: 'no-store',
       headers: {
         Accept: 'application/json'
@@ -9559,7 +9560,7 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(entry.url, {
+      const response = await fetch(resolvePublicUrl(entry.url), {
         cache: 'no-store',
         headers: {
           Accept: 'application/json'
@@ -9605,7 +9606,7 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(entry.url, {
+      const response = await fetch(resolvePublicUrl(entry.url), {
         cache: 'no-store',
         headers: {
           Accept: 'application/json'
