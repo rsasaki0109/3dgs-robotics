@@ -71,6 +71,19 @@ class LargeScale3DGSRunOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSPreflightOptions:
+    data_dir: Path
+    output_dir: Path
+    axes: str = "xy"
+    tile_sizes: tuple[float, ...] = (20.0, 30.0, 50.0)
+    overlap: float = 5.0
+    min_images: int = 8
+    target_images_per_chunk: int = 48
+    iterations: int = 30000
+    config: str | None = "configs/training_ba.yaml"
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSCatalogOptions:
     plan_path: Path
     output_path: Path | None = None
@@ -262,6 +275,21 @@ def _in_bounds(position: Sequence[float], bounds: dict[str, float], axes: tuple[
 
 def _format_command(parts: Iterable[str | Path | int | float]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts if str(part) != "")
+
+
+def parse_large_scale_3dgs_tile_sizes(value: str | Sequence[float]) -> tuple[float, ...]:
+    """Parse a comma-separated tile-size list for large-scale planning."""
+    if isinstance(value, str):
+        raw_values = [part.strip() for part in value.split(",") if part.strip()]
+    else:
+        raw_values = [str(part).strip() for part in value]
+
+    tile_sizes = tuple(float(part) for part in raw_values)
+    if not tile_sizes:
+        raise ValueError("--tile-sizes must include at least one positive value")
+    if any(tile_size <= 0 for tile_size in tile_sizes):
+        raise ValueError("--tile-sizes must contain only positive values")
+    return tile_sizes
 
 
 def _split_command(command: str) -> list[str]:
@@ -753,6 +781,274 @@ def build_large_scale_3dgs_plan(options: LargeScale3DGSOptions) -> dict[str, Any
         },
         "chunks": chunks,
     }
+
+
+def _percentile(values: Sequence[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+
+    ordered = sorted(float(value) for value in values)
+    if len(ordered) == 1:
+        return ordered[0]
+
+    rank = max(0.0, min(1.0, percentile / 100.0)) * (len(ordered) - 1)
+    lower = math.floor(rank)
+    upper = math.ceil(rank)
+    if lower == upper:
+        return ordered[lower]
+    weight = rank - lower
+    return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+
+def _numeric_stats(values: Sequence[int | float]) -> dict[str, float]:
+    if not values:
+        return {"min": 0.0, "p50": 0.0, "p90": 0.0, "max": 0.0}
+    numeric_values = [float(value) for value in values]
+    return {
+        "min": round(min(numeric_values), 3),
+        "p50": round(_percentile(numeric_values, 50.0), 3),
+        "p90": round(_percentile(numeric_values, 90.0), 3),
+        "max": round(max(numeric_values), 3),
+    }
+
+
+def _image_size_index(data_dir: Path, image_names: Iterable[str]) -> tuple[str, dict[str, int]]:
+    image_root = _find_images_root(data_dir)
+    if image_root is None:
+        return "", {}
+
+    sizes: dict[str, int] = {}
+    for image_name in sorted(set(image_names)):
+        image_path = image_root / image_name
+        sizes[image_name] = image_path.stat().st_size if image_path.exists() else 0
+    return str(image_root), sizes
+
+
+def _format_bytes(value: int | float) -> str:
+    amount = float(value)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if amount < 1024.0 or unit == "TiB":
+            return f"{amount:.1f} {unit}" if unit != "B" else f"{int(amount)} B"
+        amount /= 1024.0
+    return f"{amount:.1f} TiB"
+
+
+def _preflight_candidate_from_plan(
+    plan: dict[str, Any],
+    *,
+    tile_size: float,
+    overlap: float,
+    image_sizes: dict[str, int],
+    target_images_per_chunk: int,
+) -> dict[str, Any]:
+    chunks = list(plan.get("chunks", []))
+    chunk_image_bytes = [
+        sum(image_sizes.get(image_name, 0) for image_name in set(chunk.get("imageNames", []))) for chunk in chunks
+    ]
+    ready_count = int(plan["summary"]["readyChunkCount"])
+    chunk_count = int(plan["summary"]["chunkCount"])
+    ready_ratio = ready_count / chunk_count if chunk_count else 0.0
+    core_stats = _numeric_stats([chunk["coreImageCount"] for chunk in chunks])
+    image_stats = _numeric_stats([chunk["imageCount"] for chunk in chunks])
+    point_stats = _numeric_stats([chunk["pointCount"] for chunk in chunks])
+    byte_stats = _numeric_stats(chunk_image_bytes)
+    target_delta = abs(core_stats["p50"] - float(target_images_per_chunk))
+
+    return {
+        "tileSize": float(tile_size),
+        "overlap": float(overlap),
+        "chunkCount": chunk_count,
+        "readyChunkCount": ready_count,
+        "tooFewImageChunkCount": int(plan["summary"]["tooFewImageChunkCount"]),
+        "readyRatio": round(ready_ratio, 3),
+        "coreImagesPerChunk": core_stats,
+        "imagesPerChunk": image_stats,
+        "pointsPerChunk": point_stats,
+        "sourceImageBytesPerChunk": byte_stats,
+        "targetImagesPerChunkDelta": round(target_delta, 3),
+    }
+
+
+def _recommend_preflight_candidate(candidates: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    if not candidates:
+        raise ValueError("No large-scale 3DGS preflight candidates were generated")
+
+    return min(
+        candidates,
+        key=lambda candidate: (
+            -float(candidate["readyRatio"]),
+            float(candidate["targetImagesPerChunkDelta"]),
+            int(candidate["chunkCount"]),
+            float(candidate["tileSize"]),
+        ),
+    )
+
+
+def _build_preflight_plan_command(options: LargeScale3DGSPreflightOptions, recommendation: dict[str, Any]) -> str:
+    parts: list[str | Path | int | float] = [
+        "gs-mapper",
+        "large-scale-3dgs-plan",
+        "--data",
+        options.data_dir,
+        "--output",
+        options.output_dir,
+        "--tile-size",
+        recommendation["tileSize"],
+        "--overlap",
+        recommendation["overlap"],
+        "--axes",
+        options.axes,
+        "--min-images",
+        options.min_images,
+        "--iterations",
+        options.iterations,
+    ]
+    if options.config:
+        parts.extend(["--config", options.config])
+    parts.extend(["--materialize"])
+    return _format_command(parts)
+
+
+def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) -> dict[str, Any]:
+    """Inspect a COLMAP scene and recommend a large-scale 3DGS tiling setup."""
+    if options.overlap < 0:
+        raise ValueError("--overlap must be >= 0")
+    if options.min_images < 1:
+        raise ValueError("--min-images must be >= 1")
+    if options.target_images_per_chunk < 1:
+        raise ValueError("--target-images-per-chunk must be >= 1")
+
+    tile_sizes = parse_large_scale_3dgs_tile_sizes(options.tile_sizes)
+    data_dir = Path(options.data_dir)
+    output_dir = Path(options.output_dir)
+    axes = _validate_axes(options.axes)
+    sparse_dir = require_colmap_sparse_model(data_dir)
+    image_records = load_colmap_images_text(sparse_dir / "images.txt")
+    point_records = load_colmap_points_text(sparse_dir / "points3D.txt")
+    if not image_records:
+        raise ValueError("No registered images found in COLMAP images.txt")
+
+    image_root, image_sizes = _image_size_index(data_dir, (record.name for record in image_records))
+    world_bounds = _bounds_for_records(image_records, axes)
+    candidates: list[dict[str, Any]] = []
+
+    for tile_size in tile_sizes:
+        plan = build_large_scale_3dgs_plan(
+            LargeScale3DGSOptions(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                tile_size=tile_size,
+                overlap=options.overlap,
+                axes="".join(axes),
+                min_images=options.min_images,
+                iterations=options.iterations,
+                config=options.config,
+                materialize=False,
+            )
+        )
+        candidates.append(
+            _preflight_candidate_from_plan(
+                plan,
+                tile_size=tile_size,
+                overlap=options.overlap,
+                image_sizes=image_sizes,
+                target_images_per_chunk=options.target_images_per_chunk,
+            )
+        )
+
+    recommended = _recommend_preflight_candidate(candidates)
+    candidates = [{**candidate, "recommended": candidate is recommended} for candidate in candidates]
+    recommended = next(candidate for candidate in candidates if candidate["recommended"])
+    plan_path = output_dir / "large_scale_3dgs_plan.json"
+    run_report_path = output_dir / "large_scale_3dgs_run_report.json"
+    plan_command = _build_preflight_plan_command(options, recommended)
+
+    return {
+        "version": 1,
+        "type": "large-scale-3dgs-preflight",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "dataDir": str(data_dir),
+        "sparseDir": str(sparse_dir),
+        "imageRoot": image_root,
+        "outputDir": str(output_dir),
+        "axes": "".join(axes),
+        "targetImagesPerChunk": int(options.target_images_per_chunk),
+        "summary": {
+            "registeredImageCount": len(image_records),
+            "points3DCount": len(point_records),
+            "sourceImageBytes": int(sum(image_sizes.values())),
+            "worldBounds": world_bounds,
+            "worldSpan": {
+                axes[0]: round(world_bounds[f"max{axes[0].upper()}"] - world_bounds[f"min{axes[0].upper()}"], 3),
+                axes[1]: round(world_bounds[f"max{axes[1].upper()}"] - world_bounds[f"min{axes[1].upper()}"], 3),
+            },
+        },
+        "candidates": candidates,
+        "recommendation": {
+            "tileSize": recommended["tileSize"],
+            "overlap": recommended["overlap"],
+            "chunkCount": recommended["chunkCount"],
+            "readyChunkCount": recommended["readyChunkCount"],
+            "coreImagesPerChunk": recommended["coreImagesPerChunk"],
+            "sourceImageBytesPerChunk": recommended["sourceImageBytesPerChunk"],
+        },
+        "next": {
+            "planCommand": plan_command,
+            "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
+            "catalogCommand": _format_command(
+                [
+                    "gs-mapper",
+                    "large-scale-3dgs-catalog",
+                    "--plan",
+                    plan_path,
+                    "--run-report",
+                    run_report_path,
+                ]
+            ),
+        },
+    }
+
+
+def write_large_scale_3dgs_preflight(report: dict[str, Any], output_dir: Path) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / "large_scale_3dgs_preflight.json"
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
+def format_large_scale_3dgs_preflight_text(report: dict[str, Any], report_path: Path | None = None) -> str:
+    summary = report["summary"]
+    recommendation = report["recommendation"]
+    lines = [
+        "Large-scale 3DGS preflight",
+        f"  data: {report['dataDir']}",
+        f"  sparse: {report['sparseDir']}",
+        f"  images: {summary['registeredImageCount']} ({_format_bytes(summary['sourceImageBytes'])})",
+        f"  points3D: {summary['points3DCount']}",
+        f"  span: {report['axes'][0]}={summary['worldSpan'][report['axes'][0]]} / "
+        f"{report['axes'][1]}={summary['worldSpan'][report['axes'][1]]}",
+        f"  recommended: tile_size={recommendation['tileSize']} overlap={recommendation['overlap']} "
+        f"chunks={recommendation['readyChunkCount']}/{recommendation['chunkCount']} ready",
+    ]
+    if report_path is not None:
+        lines.append(f"  report: {report_path}")
+    lines.append("  candidates:")
+    for candidate in report["candidates"]:
+        marker = "*" if candidate.get("recommended") else "-"
+        lines.append(
+            f"    {marker} tile={candidate['tileSize']} overlap={candidate['overlap']} "
+            f"ready={candidate['readyChunkCount']}/{candidate['chunkCount']} "
+            f"core_p50={candidate['coreImagesPerChunk']['p50']} "
+            f"image_bytes_p90={_format_bytes(candidate['sourceImageBytesPerChunk']['p90'])}"
+        )
+    lines.extend(
+        [
+            f"  next plan: {report['next']['planCommand']}",
+            f"  next run: {report['next']['runCommand']}",
+            f"  next catalog: {report['next']['catalogCommand']}",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def write_large_scale_3dgs_plan(plan: dict[str, Any], output_dir: Path) -> Path:

@@ -393,6 +393,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="Stdout format after writing the smoke data manifest",
     )
 
+    lsgp = subparsers.add_parser(
+        "large-scale-3dgs-preflight",
+        help="Inspect a COLMAP scene and recommend tile settings before large-scale gsplat runs",
+    )
+    lsgp.add_argument("--data", required=True, help="Preprocessed COLMAP data directory")
+    lsgp.add_argument(
+        "--output",
+        default="outputs/large_scale_3dgs",
+        help="Output root used for the preflight report and suggested plan",
+    )
+    lsgp.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="Horizontal axes used for candidate tiling",
+    )
+    lsgp.add_argument(
+        "--tile-sizes",
+        default="20,30,50",
+        help="Comma-separated candidate tile sizes in scene units/metres",
+    )
+    lsgp.add_argument("--overlap", type=float, default=5.0, help="Tile overlap in scene units/metres")
+    lsgp.add_argument("--min-images", type=int, default=8, help="Minimum core images for a trainable tile")
+    lsgp.add_argument(
+        "--target-images-per-chunk",
+        type=int,
+        default=48,
+        help="Preferred median core image count used to pick the recommended tile size",
+    )
+    lsgp.add_argument("--iterations", type=int, default=30000, help="Iterations used in the suggested plan command")
+    lsgp.add_argument(
+        "--config",
+        default="configs/training_ba.yaml",
+        help="Training config path used in the suggested plan command",
+    )
+    lsgp.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the preflight report",
+    )
+
     # large-scale-3dgs-plan
     lsg = subparsers.add_parser(
         "large-scale-3dgs-plan",
@@ -2530,6 +2572,36 @@ def cmd_large_scale_3dgs_smoke_data(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_smoke_data_text(manifest))
 
 
+def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-preflight subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSPreflightOptions,
+        build_large_scale_3dgs_preflight,
+        format_large_scale_3dgs_preflight_text,
+        parse_large_scale_3dgs_tile_sizes,
+        write_large_scale_3dgs_preflight,
+    )
+
+    options = LargeScale3DGSPreflightOptions(
+        data_dir=Path(args.data),
+        output_dir=Path(args.output),
+        axes=args.axes,
+        tile_sizes=parse_large_scale_3dgs_tile_sizes(args.tile_sizes),
+        overlap=args.overlap,
+        min_images=args.min_images,
+        target_images_per_chunk=args.target_images_per_chunk,
+        iterations=args.iterations,
+        config=args.config,
+    )
+    report = build_large_scale_3dgs_preflight(options)
+    report_path = write_large_scale_3dgs_preflight(report, Path(args.output))
+
+    if args.format == "json":
+        print(json.dumps({**report, "reportPath": str(report_path)}, indent=2))
+    else:
+        print(format_large_scale_3dgs_preflight_text(report, report_path))
+
+
 def cmd_large_scale_3dgs_plan(args: argparse.Namespace) -> None:
     """Handle the large-scale-3dgs-plan subcommand."""
     from gs_sim2real.train.large_scale_3dgs import (
@@ -3558,6 +3630,7 @@ def main(argv: list[str] | None = None) -> None:
         "preprocess": cmd_preprocess,
         "train": cmd_train,
         "large-scale-3dgs-smoke-data": cmd_large_scale_3dgs_smoke_data,
+        "large-scale-3dgs-preflight": cmd_large_scale_3dgs_preflight,
         "large-scale-3dgs-plan": cmd_large_scale_3dgs_plan,
         "large-scale-3dgs-run": cmd_large_scale_3dgs_run,
         "large-scale-3dgs-catalog": cmd_large_scale_3dgs_catalog,

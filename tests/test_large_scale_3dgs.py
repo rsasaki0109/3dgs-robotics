@@ -7,15 +7,18 @@ from pathlib import Path
 from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSCatalogOptions,
     LargeScale3DGSOptions,
+    LargeScale3DGSPreflightOptions,
     LargeScale3DGSRouteOptions,
     LargeScale3DGSRunOptions,
     LargeScale3DGSSmokeDataOptions,
     _default_command_runner,
     build_large_scale_3dgs_catalog,
     build_large_scale_3dgs_plan,
+    build_large_scale_3dgs_preflight,
     build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
     format_large_scale_3dgs_catalog_text,
+    format_large_scale_3dgs_preflight_text,
     format_large_scale_3dgs_route_text,
     format_large_scale_3dgs_shell,
     format_large_scale_3dgs_smoke_data_text,
@@ -23,6 +26,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     run_large_scale_3dgs_plan,
     write_large_scale_3dgs_catalog,
     write_large_scale_3dgs_plan,
+    write_large_scale_3dgs_preflight,
     write_large_scale_3dgs_route,
     write_large_scale_3dgs_smoke_data,
 )
@@ -141,6 +145,42 @@ def test_write_large_scale_3dgs_smoke_data_feeds_multi_tile_planner(tmp_path: Pa
     assert (Path(plan["chunks"][0]["dataDir"]) / "images").exists()
     assert "next plan: gs-mapper large-scale-3dgs-plan" in text
     assert "--axes xz" in text
+
+
+def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands(tmp_path: Path) -> None:
+    data_dir = _write_sparse_fixture(tmp_path / "data")
+    output_dir = tmp_path / "large"
+
+    report = build_large_scale_3dgs_preflight(
+        LargeScale3DGSPreflightOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            axes="xy",
+            tile_sizes=(10.0, 20.0),
+            overlap=0,
+            min_images=1,
+            target_images_per_chunk=2,
+            iterations=77,
+            config=None,
+        )
+    )
+    report_path = write_large_scale_3dgs_preflight(report, output_dir)
+    text = format_large_scale_3dgs_preflight_text(report, report_path)
+
+    assert report["type"] == "large-scale-3dgs-preflight"
+    assert report["summary"]["registeredImageCount"] == 3
+    assert report["summary"]["points3DCount"] == 3
+    assert report["summary"]["sourceImageBytes"] == 9
+    assert report["recommendation"]["tileSize"] == 20.0
+    assert [candidate["recommended"] for candidate in report["candidates"]] == [False, True]
+    assert "--tile-size 20.0" in report["next"]["planCommand"]
+    assert "--iterations 77" in report["next"]["planCommand"]
+    assert "--config" not in report["next"]["planCommand"]
+    assert str(output_dir / "large_scale_3dgs_plan.json") in report["next"]["runCommand"]
+    assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["tileSize"] == 20.0
+    assert "Large-scale 3DGS preflight" in text
+    assert "recommended: tile_size=20.0" in text
+    assert "next plan: gs-mapper large-scale-3dgs-plan" in text
 
 
 def test_build_large_scale_3dgs_plan_materializes_chunk_sparse_and_images(tmp_path: Path) -> None:
