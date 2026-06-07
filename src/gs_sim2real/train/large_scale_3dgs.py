@@ -91,6 +91,24 @@ class LargeScale3DGSCatalogOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSRouteOptions:
+    catalog_path: Path
+    output_path: Path | None = None
+    label: str | None = None
+    description: str | None = None
+    fragment_id: str = "residency"
+    fragment_label: str = "Residency"
+    frame_id: str = "dreamwalker_map"
+    asset_label: str | None = None
+    zone_map_url: str = "/manifests/robotics-residency.zones.json"
+    world_splat_url: str = ""
+    collider_mesh_url: str = ""
+    default_y: float = 0.0
+    order: str = "spiral"
+    include_missing_splats: bool = False
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSSmokeDataOptions:
     output_dir: Path
     axes: str = "xz"
@@ -1014,6 +1032,243 @@ def write_large_scale_3dgs_catalog(catalog: dict[str, Any], options: LargeScale3
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     return output_path
+
+
+def _catalog_route_axes(catalog: dict[str, Any]) -> tuple[str, str]:
+    tiling = catalog.get("tiling") if isinstance(catalog.get("tiling"), dict) else {}
+    axes = str(tiling.get("axes") or "").strip().lower()
+    if not axes:
+        for tile in catalog.get("tiles", []):
+            axes = str(tile.get("axes") or "").strip().lower()
+            if axes:
+                break
+    return _validate_axes(axes or "xz")
+
+
+def _ready_catalog_route_tiles(catalog: dict[str, Any], *, include_missing_splats: bool) -> list[dict[str, Any]]:
+    tiles = catalog.get("tiles", [])
+    if not isinstance(tiles, list):
+        return []
+
+    ready_tiles: list[dict[str, Any]] = []
+    for tile in tiles:
+        if not isinstance(tile, dict):
+            continue
+        if not include_missing_splats and (tile.get("status") == "missing-splat" or not tile.get("splatUrl")):
+            continue
+        ready_tiles.append(tile)
+    return ready_tiles
+
+
+def _tile_axis_center(tile: dict[str, Any], axis: str) -> float:
+    min_key = f"min{axis.upper()}"
+    max_key = f"max{axis.upper()}"
+    for bounds_key in ("coreBounds", "expandedBounds"):
+        bounds = tile.get(bounds_key)
+        if not isinstance(bounds, dict):
+            continue
+        minimum = bounds.get(min_key)
+        maximum = bounds.get(max_key)
+        if minimum is not None and maximum is not None:
+            return (float(minimum) + float(maximum)) / 2.0
+    raise ValueError(f"tile {tile.get('id', '<unknown>')} is missing {min_key}/{max_key} bounds")
+
+
+def _tile_center_position(tile: dict[str, Any], axes: tuple[str, str], *, default_y: float) -> list[float]:
+    position = [0.0, float(default_y), 0.0]
+    for axis in axes:
+        position[_AXIS_INDEX[axis]] = _tile_axis_center(tile, axis)
+    return [round(float(value), 6) for value in position]
+
+
+def _tile_index_pair(tile: dict[str, Any], axes: tuple[str, str]) -> tuple[int, int] | None:
+    tile_index = tile.get("tileIndex")
+    if not isinstance(tile_index, dict):
+        return None
+
+    values = [tile_index.get(axis) for axis in axes]
+    if not all(isinstance(value, int) for value in values):
+        return None
+    return int(values[0]), int(values[1])
+
+
+def _sort_catalog_tiles_by_center(
+    tiles: list[dict[str, Any]], axes: tuple[str, str], *, default_y: float
+) -> list[dict[str, Any]]:
+    return sorted(
+        tiles,
+        key=lambda tile: (
+            _tile_center_position(tile, axes, default_y=default_y)[_AXIS_INDEX[axes[0]]],
+            _tile_center_position(tile, axes, default_y=default_y)[_AXIS_INDEX[axes[1]]],
+            str(tile.get("id") or ""),
+        ),
+    )
+
+
+def _spiral_tile_index_keys(indexed_tiles: dict[tuple[int, int], dict[str, Any]]) -> list[tuple[int, int]]:
+    first_values = [key[0] for key in indexed_tiles]
+    second_values = [key[1] for key in indexed_tiles]
+    left = min(first_values)
+    right = max(first_values)
+    bottom = min(second_values)
+    top = max(second_values)
+    keys: list[tuple[int, int]] = []
+
+    while left <= right and bottom <= top:
+        for second in range(bottom, top + 1):
+            keys.append((left, second))
+        for first in range(left + 1, right + 1):
+            keys.append((first, top))
+        if left < right:
+            for second in range(top - 1, bottom - 1, -1):
+                keys.append((right, second))
+        if bottom < top:
+            for first in range(right - 1, left, -1):
+                keys.append((first, bottom))
+
+        left += 1
+        right -= 1
+        bottom += 1
+        top -= 1
+
+    return keys
+
+
+def _order_catalog_route_tiles(
+    tiles: list[dict[str, Any]],
+    axes: tuple[str, str],
+    *,
+    default_y: float,
+    order: str,
+) -> list[dict[str, Any]]:
+    indexed_pairs = [(tile, _tile_index_pair(tile, axes)) for tile in tiles]
+    if not all(pair is not None for _, pair in indexed_pairs):
+        return _sort_catalog_tiles_by_center(tiles, axes, default_y=default_y)
+
+    indexed_tiles = {pair: tile for tile, pair in indexed_pairs if pair is not None}
+    if len(indexed_tiles) != len(tiles):
+        return _sort_catalog_tiles_by_center(tiles, axes, default_y=default_y)
+
+    normalized_order = order if order in {"spiral", "snake", "row-major"} else "spiral"
+    first_values = sorted({pair[0] for pair in indexed_tiles})
+    second_values = sorted({pair[1] for pair in indexed_tiles})
+
+    if normalized_order == "row-major":
+        keys = [(first, second) for first in first_values for second in second_values]
+    elif normalized_order == "snake":
+        keys = []
+        for first_index, first in enumerate(first_values):
+            row_seconds = second_values if first_index % 2 == 0 else list(reversed(second_values))
+            keys.extend((first, second) for second in row_seconds)
+    else:
+        keys = _spiral_tile_index_keys(indexed_tiles)
+
+    return [indexed_tiles[key] for key in keys if key in indexed_tiles]
+
+
+def _yaw_degrees_from_segment(
+    current_position: Sequence[float], next_position: Sequence[float], fallback: float = 0.0
+) -> int:
+    dx = float(next_position[0]) - float(current_position[0])
+    dz = float(next_position[2]) - float(current_position[2])
+    if math.hypot(dx, dz) < 1e-6:
+        return int(round(fallback)) % 360
+    return int(round((math.degrees(math.atan2(-dx, -dz))) % 360))
+
+
+def build_large_scale_3dgs_route(options: LargeScale3DGSRouteOptions) -> dict[str, Any]:
+    """Build a DreamWalker robot route through ready tiles in a large-scale 3DGS catalog."""
+    catalog_path = Path(options.catalog_path)
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    axes = _catalog_route_axes(catalog)
+    tiles = _ready_catalog_route_tiles(catalog, include_missing_splats=options.include_missing_splats)
+    if not tiles:
+        raise ValueError("tile catalog has no ready tiles to route through")
+
+    ordered_tiles = _order_catalog_route_tiles(tiles, axes, default_y=options.default_y, order=options.order)
+    route_positions = [_tile_center_position(tile, axes, default_y=options.default_y) for tile in ordered_tiles]
+    pose_position = route_positions[-1]
+    yaw_degrees = _yaw_degrees_from_segment(route_positions[-2], route_positions[-1]) if len(route_positions) > 1 else 0
+    scene_id = str(catalog.get("sceneId") or "large-scale-3dgs")
+    catalog_label = str(catalog.get("label") or scene_id)
+    route_label = options.label or f"{catalog_label} Route"
+    description = options.description or f"auto-generated route through {len(route_positions)} large-scale 3DGS tile(s)"
+    asset_label = options.asset_label or catalog_label
+
+    return {
+        "version": 1,
+        "protocol": "dreamwalker-robot-route/v1",
+        "label": route_label,
+        "description": description,
+        "fragmentId": options.fragment_id,
+        "fragmentLabel": options.fragment_label,
+        "frameId": options.frame_id,
+        "world": {
+            "fragmentId": options.fragment_id,
+            "fragmentLabel": options.fragment_label,
+            "assetLabel": asset_label,
+            "splatUrl": options.world_splat_url,
+            "colliderMeshUrl": options.collider_mesh_url,
+            "frameId": options.frame_id,
+            "zoneMapUrl": options.zone_map_url,
+            "usesDemoFallback": False,
+        },
+        "pose": {
+            "position": pose_position,
+            "yawDegrees": yaw_degrees,
+        },
+        "route": route_positions,
+        "tileSequence": [str(tile.get("id") or "") for tile in ordered_tiles],
+        "sourceCatalog": {
+            "path": str(catalog_path),
+            "sceneId": scene_id,
+            "label": catalog_label,
+            "axes": "".join(axes),
+            "order": options.order,
+        },
+    }
+
+
+def _default_large_scale_3dgs_route_path(route: dict[str, Any], catalog_path: Path) -> Path:
+    source_catalog = route.get("sourceCatalog") if isinstance(route.get("sourceCatalog"), dict) else {}
+    scene_id = _slugify(
+        str(source_catalog.get("sceneId") or route.get("label") or "large-scale-3dgs"), "large-scale-3dgs"
+    )
+    if catalog_path.parent.name == "manifests":
+        return catalog_path.parent.parent / "robot-routes" / f"{scene_id}-route.json"
+    return catalog_path.with_name(f"{scene_id}-route.json")
+
+
+def write_large_scale_3dgs_route(route: dict[str, Any], options: LargeScale3DGSRouteOptions) -> Path:
+    output_path = (
+        Path(options.output_path)
+        if options.output_path is not None
+        else _default_large_scale_3dgs_route_path(
+            route,
+            Path(options.catalog_path),
+        )
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(route, indent=2) + "\n", encoding="utf-8")
+    return output_path
+
+
+def format_large_scale_3dgs_route_text(route: dict[str, Any], route_path: Path) -> str:
+    source_catalog = route.get("sourceCatalog") if isinstance(route.get("sourceCatalog"), dict) else {}
+    tile_sequence = route.get("tileSequence") if isinstance(route.get("tileSequence"), list) else []
+    lines = [
+        "Large-scale 3DGS robot route",
+        f"  label: {route.get('label', '')}",
+        f"  catalog: {source_catalog.get('path', '')}",
+        f"  route: {route_path}",
+        f"  points: {len(route.get('route', []))}",
+    ]
+    if tile_sequence:
+        lines.append(f"  tiles: {' -> '.join(str(tile_id) for tile_id in tile_sequence)}")
+    lines.append(
+        f"  pose: {route.get('pose', {}).get('position', [])} yaw={route.get('pose', {}).get('yawDegrees', 0)}"
+    )
+    return "\n".join(lines)
 
 
 def _path_to_public_url(path: Path, public_root: Path | None) -> str:

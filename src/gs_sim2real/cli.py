@@ -541,6 +541,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Stdout format after writing the tile catalog",
     )
 
+    lsgrt = subparsers.add_parser(
+        "large-scale-3dgs-route",
+        help="Build a DreamWalker robot route from a large-scale 3DGS tile catalog",
+    )
+    lsgrt.add_argument("--catalog", required=True, help="Path to a large-scale 3DGS tile catalog JSON")
+    lsgrt.add_argument("--output", default=None, help="Optional robot route JSON output path")
+    lsgrt.add_argument("--label", default=None, help="Optional robot route label")
+    lsgrt.add_argument("--description", default=None, help="Optional robot route description")
+    lsgrt.add_argument("--fragment-id", default="residency", help="DreamWalker fragment id for the route")
+    lsgrt.add_argument("--fragment-label", default="Residency", help="DreamWalker fragment label for the route")
+    lsgrt.add_argument("--frame-id", default="dreamwalker_map", help="Route coordinate frame id")
+    lsgrt.add_argument("--asset-label", default=None, help="Optional world asset label stored in the route")
+    lsgrt.add_argument(
+        "--zone-map-url",
+        default="/manifests/robotics-residency.zones.json",
+        help="Semantic zone map URL stored in the route world context",
+    )
+    lsgrt.add_argument("--world-splat-url", default="", help="Optional world splat URL stored in the route")
+    lsgrt.add_argument("--collider-mesh-url", default="", help="Optional collider mesh URL stored in the route")
+    lsgrt.add_argument("--default-y", type=float, default=0.0, help="Y coordinate when catalog axes do not include y")
+    lsgrt.add_argument(
+        "--order",
+        choices=["spiral", "snake", "row-major"],
+        default="spiral",
+        help="Tile traversal order for indexed catalogs",
+    )
+    lsgrt.add_argument(
+        "--include-missing-splats",
+        action="store_true",
+        help="Include tiles marked missing-splat in the route",
+    )
+    lsgrt.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the robot route",
+    )
+
     # view
     vw = subparsers.add_parser("view", help="Launch the web viewer")
     vw.add_argument("--model", required=True, help="Path to the .ply file or COLMAP sparse dir")
@@ -2600,6 +2638,40 @@ def cmd_large_scale_3dgs_catalog(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_catalog_text(catalog, catalog_path, options))
 
 
+def cmd_large_scale_3dgs_route(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-route subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSRouteOptions,
+        build_large_scale_3dgs_route,
+        format_large_scale_3dgs_route_text,
+        write_large_scale_3dgs_route,
+    )
+
+    options = LargeScale3DGSRouteOptions(
+        catalog_path=Path(args.catalog),
+        output_path=Path(args.output) if args.output else None,
+        label=args.label,
+        description=args.description,
+        fragment_id=args.fragment_id,
+        fragment_label=args.fragment_label,
+        frame_id=args.frame_id,
+        asset_label=args.asset_label,
+        zone_map_url=args.zone_map_url,
+        world_splat_url=args.world_splat_url,
+        collider_mesh_url=args.collider_mesh_url,
+        default_y=args.default_y,
+        order=args.order,
+        include_missing_splats=args.include_missing_splats,
+    )
+    route = build_large_scale_3dgs_route(options)
+    route_path = write_large_scale_3dgs_route(route, options)
+
+    if args.format == "json":
+        print(json.dumps({**route, "routePath": str(route_path)}, indent=2))
+    else:
+        print(format_large_scale_3dgs_route_text(route, route_path))
+
+
 def cmd_view(args: argparse.Namespace) -> None:
     """Handle the view subcommand."""
     from gs_sim2real.viewer.web_viewer import GaussianViewer
@@ -3489,6 +3561,7 @@ def main(argv: list[str] | None = None) -> None:
         "large-scale-3dgs-plan": cmd_large_scale_3dgs_plan,
         "large-scale-3dgs-run": cmd_large_scale_3dgs_run,
         "large-scale-3dgs-catalog": cmd_large_scale_3dgs_catalog,
+        "large-scale-3dgs-route": cmd_large_scale_3dgs_route,
         "view": cmd_view,
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,

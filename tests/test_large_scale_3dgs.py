@@ -7,19 +7,23 @@ from pathlib import Path
 from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSCatalogOptions,
     LargeScale3DGSOptions,
+    LargeScale3DGSRouteOptions,
     LargeScale3DGSRunOptions,
     LargeScale3DGSSmokeDataOptions,
     _default_command_runner,
     build_large_scale_3dgs_catalog,
     build_large_scale_3dgs_plan,
+    build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
     format_large_scale_3dgs_catalog_text,
+    format_large_scale_3dgs_route_text,
     format_large_scale_3dgs_shell,
     format_large_scale_3dgs_smoke_data_text,
     load_colmap_images_text,
     run_large_scale_3dgs_plan,
     write_large_scale_3dgs_catalog,
     write_large_scale_3dgs_plan,
+    write_large_scale_3dgs_route,
     write_large_scale_3dgs_smoke_data,
 )
 
@@ -389,6 +393,104 @@ def test_build_large_scale_3dgs_catalog_can_require_existing_splats(tmp_path: Pa
 
     assert catalog["summary"]["tileCount"] == 1
     assert [tile["id"] for tile in catalog["tiles"]] == ["tile_x000_y000"]
+
+
+def _write_grid_catalog_fixture(catalog_path: Path) -> None:
+    tiles = []
+    for tile_x, tile_z in [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]:
+        tile_id = f"tile_x{tile_x:03d}_z{tile_z:03d}"
+        min_x = tile_x * 10.0
+        min_z = tile_z * 10.0
+        tiles.append(
+            {
+                "id": tile_id,
+                "label": tile_id,
+                "status": "ready",
+                "runStatus": "done",
+                "splatUrl": f"/splats/demo-grid/{tile_id}.splat",
+                "coreBounds": {
+                    "minX": min_x,
+                    "maxX": min_x + 10.0,
+                    "minZ": min_z,
+                    "maxZ": min_z + 10.0,
+                },
+                "expandedBounds": {
+                    "minX": min_x,
+                    "maxX": min_x + 10.0,
+                    "minZ": min_z,
+                    "maxZ": min_z + 10.0,
+                },
+                "tileIndex": {
+                    "x": tile_x,
+                    "z": tile_z,
+                },
+                "axes": "xz",
+            }
+        )
+
+    catalog_path.parent.mkdir(parents=True)
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "type": "large-scale-3dgs-tile-catalog",
+                "sceneId": "demo-grid",
+                "label": "Demo Grid",
+                "tiling": {
+                    "axes": "xz",
+                    "tileSize": 10,
+                    "overlap": 0,
+                },
+                "summary": {
+                    "tileCount": len(tiles),
+                    "readyTileCount": len(tiles),
+                    "missingSplatTileCount": 0,
+                },
+                "tiles": tiles,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_build_large_scale_3dgs_route_generates_spiral_robot_route(tmp_path: Path) -> None:
+    public_root = tmp_path / "apps" / "dreamwalker-web" / "public"
+    catalog_path = public_root / "manifests" / "demo-grid-catalog.json"
+    _write_grid_catalog_fixture(catalog_path)
+    options = LargeScale3DGSRouteOptions(catalog_path=catalog_path, order="spiral")
+
+    route = build_large_scale_3dgs_route(options)
+    route_path = write_large_scale_3dgs_route(route, options)
+    text = format_large_scale_3dgs_route_text(route, route_path)
+
+    assert route_path == public_root / "robot-routes" / "demo-grid-route.json"
+    assert route["protocol"] == "dreamwalker-robot-route/v1"
+    assert route["label"] == "Demo Grid Route"
+    assert route["route"] == [
+        [5.0, 0.0, 5.0],
+        [5.0, 0.0, 15.0],
+        [15.0, 0.0, 15.0],
+        [25.0, 0.0, 15.0],
+        [25.0, 0.0, 5.0],
+        [15.0, 0.0, 5.0],
+    ]
+    assert route["tileSequence"] == [
+        "tile_x000_z000",
+        "tile_x000_z001",
+        "tile_x001_z001",
+        "tile_x002_z001",
+        "tile_x002_z000",
+        "tile_x001_z000",
+    ]
+    assert route["pose"] == {
+        "position": [15.0, 0.0, 5.0],
+        "yawDegrees": 90,
+    }
+    assert route["sourceCatalog"]["order"] == "spiral"
+    assert json.loads(route_path.read_text(encoding="utf-8"))["tileSequence"] == route["tileSequence"]
+    assert "points: 6" in text
+    assert "tile_x000_z000 -> tile_x000_z001" in text
 
 
 def test_build_large_scale_3dgs_web_runbook_links_catalog_to_dreamwalker(tmp_path: Path) -> None:
