@@ -19,7 +19,7 @@ reviewable scenario CI artifacts.
 
 [![Slow FPS course through an actual shipped outdoor 3DGS splat](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-Lead GIF: slow FPS movement through an actual shipped `.splat`, paired with a route-aligned dynamic map showing point density, residency tiles, and the active camera marker.
+Lead GIF: slow FPS movement through an actual shipped `.splat`, paired with a purpose-built [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png) rendered from the same point cloud.
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git

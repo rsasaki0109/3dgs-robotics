@@ -380,23 +380,29 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
     assert "Slow FPS course through an actual shipped outdoor 3DGS splat" in readme
     assert "Lead GIF: slow FPS movement through an actual shipped `.splat`" in readme
-    assert "route-aligned dynamic map showing point density, residency tiles" in readme
+    assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
     """The linked proof GIF should inspect real .splat coordinates, not browser screenshots."""
     module = _load_script_module(REPO_ROOT / "scripts" / "build_map_quality_gif.py")
     proof_gif = REPO_ROOT / "docs" / "images" / "demo-sweep" / "map-quality.gif"
+    map_material = REPO_ROOT / "docs" / "images" / "demo-sweep" / "dynamic-map-material.png"
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "docs/images/demo-sweep/map-quality.gif" in readme
+    assert "docs/images/demo-sweep/dynamic-map-material.png" in readme
     assert module.FRAME_SIZE == (960, 540)
+    assert module.MAP_MATERIAL_SIZE == (1280, 720)
     assert module.FRAMES_PER_SCENE == 12
     assert proof_gif.stat().st_size > 100_000
+    assert map_material.stat().st_size > 100_000
     for scene in module.MAP_PROOF_SCENES:
         assert (module.ASSET_DIR / scene.asset).is_file()
     with Image.open(proof_gif) as image:
         assert image.size == module.FRAME_SIZE
         assert image.n_frames == len(module.MAP_PROOF_SCENES) * module.FRAMES_PER_SCENE
+    with Image.open(map_material) as image:
+        assert image.size == module.MAP_MATERIAL_SIZE
 
 
 def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
