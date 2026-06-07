@@ -84,6 +84,7 @@ def build_map_quality_gif(
         bounds = _projection_bounds(points, scene.axes, size)
         projection = _route_map_projection(points, axes=scene.axes, bounds=bounds)
         cameras = _camera_path(points, axes=scene.axes, bounds=bounds, frame_count=frames_per_scene)
+        gaussian_count = _gaussian_count(path)
         if scene_index == 1 and map_material_output is not None:
             material = _render_dynamic_map_material(
                 points,
@@ -93,11 +94,13 @@ def build_map_quality_gif(
                 size=MAP_MATERIAL_SIZE,
                 bounds=bounds,
                 full_material=True,
+                source_asset=scene.asset,
+                gaussian_count=gaussian_count,
             )
             map_material_output.parent.mkdir(parents=True, exist_ok=True)
             material.convert("RGB").save(map_material_output)
         for frame_index, camera in enumerate(cameras, start=1):
-            frame = _render_scene_frame(
+            frame = _render_map_loading_frame(
                 points,
                 scene=scene,
                 scene_index=frame_index,
@@ -107,7 +110,7 @@ def build_map_quality_gif(
                 camera=camera,
                 route=cameras,
                 size=size,
-                gaussian_count=_gaussian_count(path),
+                gaussian_count=gaussian_count,
             )
             frames.append(frame.convert("P", palette=Image.Palette.ADAPTIVE, colors=192))
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -410,6 +413,43 @@ def _render_scene_frame(
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
 
+def _render_map_loading_frame(
+    points: list[SplatPoint],
+    *,
+    scene: MapProofScene,
+    scene_index: int,
+    scene_count: int,
+    bounds: tuple[float, float, float, float],
+    projection: RouteMapProjection,
+    camera: CameraPose,
+    route: list[CameraPose],
+    size: tuple[int, int],
+    gaussian_count: int,
+) -> Image.Image:
+    frame = _render_dynamic_map_material(
+        points,
+        projection=projection,
+        camera=camera,
+        route=route,
+        size=size,
+        bounds=bounds,
+        full_material=True,
+        source_asset=scene.asset,
+        gaussian_count=gaussian_count,
+    )
+    draw = ImageDraw.Draw(frame)
+    chip_font = _load_font(15)
+    chip = (size[0] - 176, 20, size[0] - 24, 54)
+    draw.rounded_rectangle(chip, radius=5, fill=(4, 9, 15, 220), outline=(91, 232, 120, 85))
+    draw.text(
+        (size[0] - 158, 29),
+        f"LOAD {scene_index:02d}/{scene_count:02d}",
+        font=chip_font,
+        fill=(91, 232, 120, 255),
+    )
+    return frame.convert("RGB")
+
+
 def _point_color(rgba: tuple[int, int, int, int]) -> tuple[int, int, int]:
     red, green, blue, alpha = rgba
     gain = 0.46 + 0.58 * (alpha / 255.0)
@@ -569,6 +609,8 @@ def _render_dynamic_map_material(
     size: tuple[int, int],
     bounds: tuple[float, float, float, float],
     full_material: bool,
+    source_asset: str | None = None,
+    gaussian_count: int | None = None,
 ) -> Image.Image:
     width, height = size
     image = Image.new("RGBA", size, (5, 10, 14, 255))
@@ -577,12 +619,14 @@ def _render_dynamic_map_material(
 
     if full_material:
         map_box = (48, 118, width - 48, height - 96)
-        title_font = _load_font(38)
-        subtitle_font = _load_font(18)
-        draw.text((48, 32), "Dynamic 3DGS map loading material", font=title_font, fill=(245, 250, 255, 255))
+        title_font = _load_font(32 if width < 1100 else 34)
+        subtitle_font = _load_font(15 if width < 1100 else 17)
+        source_name = source_asset or "actual shipped .splat"
+        gaussian_text = f" / {gaussian_count // 1000}k gaussians" if gaussian_count is not None else ""
+        draw.text((48, 32), "3DGS footprint -> dynamic map tiles", font=title_font, fill=(245, 250, 255, 255))
         draw.text(
             (52, 82),
-            "actual .splat density atlas + resident tile window + preloaded route corridor",
+            f"white = {source_name} footprint{gaussian_text}; green resident, amber preload",
             font=subtitle_font,
             fill=(176, 197, 214, 235),
         )
@@ -601,7 +645,16 @@ def _render_dynamic_map_material(
 
     if full_material:
         _draw_material_legend(draw, box=map_box)
-        _draw_material_footer(draw, points, projection=projection, bounds=bounds, box=map_box, size=size)
+        _draw_material_footer(
+            draw,
+            points,
+            projection=projection,
+            bounds=bounds,
+            box=map_box,
+            size=size,
+            source_asset=source_asset,
+            gaussian_count=gaussian_count,
+        )
 
     return image
 
@@ -779,7 +832,7 @@ def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int
         ((91, 232, 120, 150), "resident tiles in memory"),
         ((242, 190, 82, 150), "preload edge"),
         ((47, 137, 221, 210), "route corridor"),
-        ((232, 246, 238, 165), "3DGS density atlas"),
+        ((232, 246, 238, 165), "actual .splat footprint"),
     )
     draw.rounded_rectangle((x - 16, y - 12, box[2] - 18, y + len(items) * 28 + 8), radius=8, fill=(4, 10, 14, 205))
     for index, (color, label) in enumerate(items):
@@ -796,11 +849,15 @@ def _draw_material_footer(
     bounds: tuple[float, float, float, float],
     box: tuple[int, int, int, int],
     size: tuple[int, int],
+    source_asset: str | None,
+    gaussian_count: int | None,
 ) -> None:
     left, right, bottom, top = bounds
     width, height = size
     footer_font = _load_font(18)
     meta_font = _load_font(16)
+    source_name = source_asset or "actual shipped .splat"
+    gaussian_text = f"{gaussian_count // 1000}k total gaussians / " if gaussian_count is not None else ""
     draw.text(
         (box[0], height - 68),
         f"footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
@@ -809,7 +866,7 @@ def _draw_material_footer(
     )
     draw.text(
         (box[0], height - 38),
-        f"source: actual shipped .splat / sampled {len(points) // 1000}k visible gaussians",
+        f"source: {source_name} / {gaussian_text}sampled {len(points) // 1000}k splats for this material",
         font=meta_font,
         fill=(162, 184, 202, 220),
     )
