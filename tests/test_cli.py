@@ -89,6 +89,12 @@ class TestCLIHelp:
             main(["large-scale-3dgs-route", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_splat_tile_catalog_help(self) -> None:
+        """Running splat-tile-catalog --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["splat-tile-catalog", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_large_scale_3dgs_catalog_route_args(self) -> None:
         """large-scale-3dgs-catalog accepts robot route playback runbook args."""
         args = build_parser().parse_args(
