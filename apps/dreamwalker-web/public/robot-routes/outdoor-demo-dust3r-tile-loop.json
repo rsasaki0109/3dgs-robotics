@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-route/v1",
+  "label": "Outdoor Demo DUSt3R Tile Loop",
+  "description": "four-tile outdoor 3DGS loop for dynamic map loading playback",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "frameId": "dreamwalker_map",
+  "world": {
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "assetLabel": "Outdoor Demo DUSt3R Tiled",
+    "splatUrl": "",
+    "colliderMeshUrl": "",
+    "frameId": "dreamwalker_map",
+    "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+    "usesDemoFallback": false
+  },
+  "pose": {
+    "position": [
+      -3.1,
+      0.0,
+      -3.1
+    ],
+    "yawDegrees": 180
+  },
+  "route": [
+    [
+      -3.1,
+      0.0,
+      -3.1
+    ],
+    [
+      -3.1,
+      0.0,
+      6.9
+    ],
+    [
+      6.9,
+      0.0,
+      6.9
+    ],
+    [
+      6.9,
+      0.0,
+      -3.1
+    ],
+    [
+      -3.1,
+      0.0,
+      -3.1
+    ]
+  ]
+}

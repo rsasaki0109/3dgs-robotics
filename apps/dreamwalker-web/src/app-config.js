@@ -431,7 +431,11 @@ export const dreamwalkerConfig = {
     tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
     preloadMode: 'metadata',
     tilePreloadLimit: 2,
-    tileResidentLimit: 3
+    tileResidentLimit: 3,
+    routeUrl: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+    routePlayback: true,
+    routePlaybackLoop: true,
+    routePlaybackMs: 1200
   },
   studioBundle: {
     defaultUrl: '',
