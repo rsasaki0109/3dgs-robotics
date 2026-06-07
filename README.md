@@ -37,6 +37,8 @@ What ships:
 
 - Nine public outdoor `.splat` scenes from supervised GNSS/LiDAR, DUSt3R,
   MAST3R, VGGT-SLAM 2.0, MASt3R-SLAM, and Pi3X.
+- Bundled large-scale 3DGS dynamic-map result: a 400k Gaussian DUSt3R
+  outdoor `.splat` split into 4 ready browser tiles with route playback.
 - `photos-to-splat` for image-folder to browser `.splat` runs.
 - `splat-inspect` and `splat-filter` for cleaning cloudy browser splats.
 - Route-policy benchmark and scenario CI tooling for Physical AI review bundles.
@@ -67,6 +69,35 @@ Pages hosts multiple viewers over the same production scene list:
 | [`/splat_spark.html`](https://rsasaki0109.github.io/gs-mapper/splat_spark.html) | Spark 2.0 WebGL2 | Mobile, LoD, and WebXR-capable devices |
 | [`/splat_webgpu.html`](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) | WebGPU splat viewer | GPU-sort viewer for modern browsers |
 | [`/`](https://rsasaki0109.github.io/gs-mapper/) | Three.js point viewer | Landing page and Physical AI proof |
+
+### Large-scale 3DGS Dynamic Map Result
+
+The repo also ships a browser-ready large-scale dynamic-map fixture in
+`apps/dreamwalker-web/public/`: `outdoor-demo-dust3r.splat` is tiled into a
+2x2 X/Z grid and played back through the DreamWalker robot route UI.
+
+| Result | Value |
+| --- | --- |
+| Tile catalog | [`outdoor-demo-dust3r-tile-catalog.json`](apps/dreamwalker-web/public/manifests/outdoor-demo-dust3r-tile-catalog.json) |
+| Route playback | [`outdoor-demo-dust3r-tile-loop.json`](apps/dreamwalker-web/public/robot-routes/outdoor-demo-dust3r-tile-loop.json) |
+| Input splats | 400,000 splats / 12.8 MB source `.splat` |
+| Ready tiles | 4 / 4 ready tiles, 0 missing |
+| Tiled splats | 430,474 splats including overlap |
+| Tiling | `xz`, 10 m tile size, 0.5 m overlap |
+| Tile bytes | 14 MB total across `tile_x000_z000`, `tile_x000_z001`, `tile_x001_z000`, `tile_x001_z001` |
+| Runtime view | active / preload / evicted tile residency overlay in Robot Mode |
+
+Run it locally:
+
+```bash
+npm --prefix apps/dreamwalker-web run dev -- --host 127.0.0.1 --port 5173
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5173/?tileCatalog=%2Fmanifests%2Foutdoor-demo-dust3r-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=2&tileResidentLimit=3&robotRoute=%2Frobot-routes%2Foutdoor-demo-dust3r-tile-loop.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+```
 
 The scene picker is defined once in [`docs/scenes-list.json`](docs/scenes-list.json)
 and reused by the viewers, README previews, and GIF scripts.
