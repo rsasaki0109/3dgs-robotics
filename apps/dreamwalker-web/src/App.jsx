@@ -2449,6 +2449,188 @@ function resolveSemanticZoneSurfaceDepthStyle(zDepth, isActive) {
   };
 }
 
+function classifyDynamicMapTileResidency(residency) {
+  if (typeof residency !== 'string') {
+    return 'ready';
+  }
+
+  if (residency === 'active') {
+    return 'active';
+  }
+
+  if (residency.startsWith('preload')) {
+    return 'preload';
+  }
+
+  if (residency.startsWith('evicted')) {
+    return 'evicted';
+  }
+
+  if (residency === 'cached') {
+    return 'cached';
+  }
+
+  if (residency === 'missing') {
+    return 'missing';
+  }
+
+  return 'ready';
+}
+
+function resolveDynamicMapTileAccent(status) {
+  if (status === 'active') {
+    return '#93ffd4';
+  }
+
+  if (status === 'preload') {
+    return '#f4ca72';
+  }
+
+  if (status === 'evicted') {
+    return '#ff8a7a';
+  }
+
+  if (status === 'cached') {
+    return '#85e3e1';
+  }
+
+  if (status === 'missing') {
+    return '#9aa3a8';
+  }
+
+  return '#7bb8c8';
+}
+
+function resolveDynamicMapTileDepthStyle(zDepth, status) {
+  const depth = Number.isFinite(zDepth) ? zDepth : 0;
+  const normalized = clampUnit((depth - 4) / 30);
+  const baseFill =
+    status === 'active'
+      ? 0.3
+      : status === 'preload'
+        ? 0.2
+        : status === 'evicted'
+          ? 0.12
+          : 0.08;
+  const baseStroke =
+    status === 'active'
+      ? 0.96
+      : status === 'preload'
+        ? 0.82
+        : status === 'evicted'
+          ? 0.54
+          : 0.32;
+
+  return {
+    fillOpacity: Number(Math.max(0.04, baseFill - normalized * 0.08).toFixed(3)),
+    strokeOpacity: Number(Math.max(0.18, baseStroke - normalized * 0.18).toFixed(3))
+  };
+}
+
+function readDynamicMapTileXzBounds(tile, boundsName = 'coreBounds') {
+  const bounds = tile?.[boundsName] && typeof tile[boundsName] === 'object'
+    ? tile[boundsName]
+    : {};
+  const minX = Number(bounds.minX);
+  const maxX = Number(bounds.maxX);
+  const minZ = Number(bounds.minZ);
+  const maxZ = Number(bounds.maxZ);
+
+  if (![minX, maxX, minZ, maxZ].every(Number.isFinite) || maxX <= minX || maxZ <= minZ) {
+    return null;
+  }
+
+  return {
+    minX,
+    maxX,
+    minZ,
+    maxZ
+  };
+}
+
+function resolveDynamicMapTileMapBounds(tileCatalog) {
+  if (!tileCatalog?.tiles?.length) {
+    return null;
+  }
+
+  const tilingBounds = tileCatalog.tiling?.worldBounds;
+  const explicitBounds = {
+    minX: Number(tilingBounds?.minX),
+    maxX: Number(tilingBounds?.maxX),
+    minZ: Number(tilingBounds?.minZ),
+    maxZ: Number(tilingBounds?.maxZ)
+  };
+
+  if (
+    [explicitBounds.minX, explicitBounds.maxX, explicitBounds.minZ, explicitBounds.maxZ].every(Number.isFinite) &&
+    explicitBounds.maxX > explicitBounds.minX &&
+    explicitBounds.maxZ > explicitBounds.minZ
+  ) {
+    return explicitBounds;
+  }
+
+  const tileBounds = tileCatalog.tiles
+    .map((tile) => readDynamicMapTileXzBounds(tile, 'coreBounds'))
+    .filter(Boolean);
+
+  if (tileBounds.length === 0) {
+    return null;
+  }
+
+  return {
+    minX: Math.min(...tileBounds.map((bounds) => bounds.minX)),
+    maxX: Math.max(...tileBounds.map((bounds) => bounds.maxX)),
+    minZ: Math.min(...tileBounds.map((bounds) => bounds.minZ)),
+    maxZ: Math.max(...tileBounds.map((bounds) => bounds.maxZ))
+  };
+}
+
+function buildDynamicMapTileOverlayTiles(tileCatalog, tileResidencyRows) {
+  const mapBounds = resolveDynamicMapTileMapBounds(tileCatalog);
+  if (!mapBounds) {
+    return [];
+  }
+
+  const width = Math.max(0.001, mapBounds.maxX - mapBounds.minX);
+  const depth = Math.max(0.001, mapBounds.maxZ - mapBounds.minZ);
+  const residencyByTileId = new Map(tileResidencyRows.map((row) => [row.id, row]));
+
+  return tileCatalog.tiles
+    .map((tile) => {
+      const bounds = readDynamicMapTileXzBounds(tile, 'coreBounds');
+      if (!bounds) {
+        return null;
+      }
+
+      const left = ((bounds.minX - mapBounds.minX) / width) * 100;
+      const right = ((bounds.maxX - mapBounds.minX) / width) * 100;
+      const top = 100 - ((bounds.maxZ - mapBounds.minZ) / depth) * 100;
+      const bottom = 100 - ((bounds.minZ - mapBounds.minZ) / depth) * 100;
+      const row = residencyByTileId.get(tile.id);
+      const status = row?.residencyStatus ?? classifyDynamicMapTileResidency(row?.residency);
+
+      return {
+        id: tile.id,
+        accentColor: resolveDynamicMapTileAccent(status),
+        averageDepth: 0,
+        label: tile.id.replace(/^tile_/, '').replaceAll('_', ' '),
+        labelXPercent: Number(((left + right) / 2).toFixed(2)),
+        labelYPercent: Number(((top + bottom) / 2).toFixed(2)),
+        points: [
+          `${Number(left.toFixed(2))},${Number(top.toFixed(2))}`,
+          `${Number(right.toFixed(2))},${Number(top.toFixed(2))}`,
+          `${Number(right.toFixed(2))},${Number(bottom.toFixed(2))}`,
+          `${Number(left.toFixed(2))},${Number(bottom.toFixed(2))}`
+        ].join(' '),
+        residency: row?.residency ?? 'ready',
+        status,
+        statusLabel: status.toUpperCase()
+      };
+    }
+    )
+    .filter(Boolean);
+}
+
 function RoboticsOverlay({ points }) {
   if (points.length === 0) {
     return null;
@@ -2469,6 +2651,72 @@ function RoboticsOverlay({ points }) {
           <span className="robotics-label">{point.label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function DynamicMapTileOverlay({ tiles }) {
+  if (tiles.length === 0) {
+    return null;
+  }
+
+  const orderedTiles = [...tiles].sort((left, right) => {
+    const leftRank = left.status === 'active' ? 2 : left.status === 'preload' ? 1 : 0;
+    const rightRank = right.status === 'active' ? 2 : right.status === 'preload' ? 1 : 0;
+
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+
+    return right.averageDepth - left.averageDepth;
+  });
+  const residentCount = orderedTiles.filter((tile) =>
+    tile.status === 'active' || tile.status === 'preload'
+  ).length;
+
+  return (
+    <div className="dynamic-map-tile-overlay" aria-hidden="true">
+      <svg
+        className="dynamic-map-tile-svg"
+        preserveAspectRatio="none"
+        viewBox="0 0 100 100">
+        {orderedTiles.map((tile) => {
+          const depthStyle = resolveDynamicMapTileDepthStyle(
+            tile.averageDepth,
+            tile.status
+          );
+
+          return (
+            <polygon
+              key={tile.id}
+              className={`dynamic-map-tile-shape dynamic-map-tile-${tile.status}`}
+              fill={tile.accentColor}
+              fillOpacity={depthStyle.fillOpacity}
+              points={tile.points}
+              stroke={tile.accentColor}
+              strokeOpacity={depthStyle.strokeOpacity}
+            />
+          );
+        })}
+      </svg>
+      {orderedTiles.map((tile) => (
+        <div
+          key={`${tile.id}-label`}
+          className={`dynamic-map-tile-label dynamic-map-tile-label-${tile.status}`}
+          style={{
+            borderColor: tile.accentColor,
+            color: tile.accentColor,
+            left: `${tile.labelXPercent}%`,
+            top: `${tile.labelYPercent}%`
+          }}>
+          <strong>{tile.label}</strong>
+          <span>{tile.statusLabel}</span>
+        </div>
+      ))}
+      <div className="dynamic-map-tile-legend">
+        <span>Dynamic Map Tiles</span>
+        <strong>{residentCount} resident</strong>
+      </div>
     </div>
   );
 }
@@ -3417,12 +3665,15 @@ export default function App() {
         residency = 'evicted';
       }
 
+      const residencyStatus = classifyDynamicMapTileResidency(residency);
+
       return {
         id: tile.id,
         evictionRole: evictionEntry?.role ?? '',
         isResident: tile.id === activeTileId || Boolean(preloadEntry),
         preloadRole: preloadEntry?.role ?? '',
         residency,
+        residencyStatus,
         tileIndex: Object.entries(tile.tileIndex ?? {})
           .map(([axis, value]) => `${axis}${value}`)
           .join(' ')
@@ -3473,6 +3724,10 @@ export default function App() {
         .join(' / ') + suffix
     );
   }, [tileResidencyRows]);
+  const visibleDynamicMapTiles = useMemo(
+    () => buildDynamicMapTileOverlayTiles(dynamicMapLoadPlan.tileCatalog, tileResidencyRows),
+    [dynamicMapLoadPlan.tileCatalog, tileResidencyRows]
+  );
   const dynamicMapDiagnosticsSnapshot = useMemo(() => {
     const tileCatalog = dynamicMapLoadPlan.tileCatalog
       ? {
@@ -9691,6 +9946,10 @@ export default function App() {
             hotspots={visibleLoopItems}
             onActivate={handleLoopItemActivate}
           />
+        ) : null}
+
+        {effectiveSplatUrl && isRobotMode && !isWalkMode ? (
+          <DynamicMapTileOverlay tiles={visibleDynamicMapTiles} />
         ) : null}
 
         {effectiveSplatUrl && isRobotMode && !isWalkMode ? (
