@@ -122,7 +122,7 @@ large-scale 3DGS tile catalog を開く場合はこれです。左パネルの
 `Open Large-scale Demo` からも同じ URL に入れます。
 
 ```text
-/?tileCatalog=/manifests/outdoor-demo-dust3r-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=2&tileResidentLimit=3&robotRoute=/robot-routes/outdoor-demo-dust3r-tile-loop.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+/?tileCatalog=/manifests/outdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=/robot-routes/outdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
 ```
 
 ## 今の状態

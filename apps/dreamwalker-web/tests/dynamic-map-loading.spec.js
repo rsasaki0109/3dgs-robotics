@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-const outdoorDemoCatalogUrl = '/manifests/outdoor-demo-dust3r-tile-catalog.json';
-const outdoorDemoRouteUrl = '/robot-routes/outdoor-demo-dust3r-tile-loop.json';
-const outdoorDemoTileRoutePattern = '**/splats/outdoor-demo-dust3r-tiled/*.splat';
+const outdoorDemoCatalogUrl = '/manifests/outdoor-production-grid-large-tile-catalog.json';
+const outdoorDemoRouteUrl = '/robot-routes/outdoor-production-grid-large-route.json';
+const outdoorDemoTileRoutePattern = '**/splats/outdoor-production-grid-large/*.splat';
 
 function buildTileCatalogDataUrl() {
   const catalog = {
@@ -74,20 +74,20 @@ test('large-scale demo button launches the bundled outdoor tile catalog', async 
     new RegExp(`tileCatalog=.*${encodeURIComponent(outdoorDemoCatalogUrl)}`)
   );
   await expect(page).toHaveURL(new RegExp(`robotRoute=.*${encodeURIComponent(outdoorDemoRouteUrl)}`));
-  await expect(page.getByText('Outdoor Demo DUSt3R Tiled').first()).toBeVisible();
+  await expect(page.getByText('Outdoor Production Grid Large').first()).toBeVisible();
   await expect(page.getByText('Route Loaded', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Robot route playback: 1200 ms / loop').first()).toBeVisible();
   await expect(page.locator('.dreamwalker-shell')).toHaveClass(/mode-robot/);
-  await expect(page.getByText('4 ready / 4 tiles').first()).toBeVisible();
-  await expect(page.getByText('Preload limit: 2').first()).toBeVisible();
-  await expect(page.getByText('Resident limit: 3').first()).toBeVisible();
+  await expect(page.getByText('34 ready / 34 tiles').first()).toBeVisible();
+  await expect(page.getByText('Preload limit: 4').first()).toBeVisible();
+  await expect(page.getByText('Resident limit: 6').first()).toBeVisible();
   await expect(page.locator('.dynamic-map-tile-overlay')).toBeVisible();
   await expect(page.locator('.dynamic-map-tile-active')).toHaveCount(1);
-  await expect(page.locator('.dynamic-map-tile-preload')).toHaveCount(2);
+  await expect(page.locator('.dynamic-map-tile-preload')).toHaveCount(4);
   await expect(page.getByText(/Active tile: tile_x\d{3}_z\d{3}/).first()).toBeVisible();
   await expect(
     page
-      .getByText(/Active splat: \/splats\/outdoor-demo-dust3r-tiled\/tile_x\d{3}_z\d{3}\.splat/)
+      .getByText(/Active splat: \/splats\/outdoor-production-grid-large\/tile_x\d{3}_z\d{3}\.splat/)
       .first()
   ).toBeVisible();
 });

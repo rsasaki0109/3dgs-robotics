@@ -12,6 +12,14 @@
       "accent": "#85e3e1"
     },
     {
+      "id": "outdoor-production-grid-large-route",
+      "label": "Outdoor Production Grid Large Route",
+      "url": "/robot-routes/outdoor-production-grid-large-route.json",
+      "description": "34-tile route across a 3x3 production outdoor 3DGS grid",
+      "fragmentId": "residency",
+      "accent": "#f4ca72"
+    },
+    {
       "id": "outdoor-demo-dust3r-tile-loop",
       "label": "Outdoor Demo DUSt3R Tile Loop",
       "url": "/robot-routes/outdoor-demo-dust3r-tile-loop.json",

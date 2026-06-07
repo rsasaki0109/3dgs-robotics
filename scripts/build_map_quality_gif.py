@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import struct
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ class MapProofScene:
     asset: str
     label: str
     axes: tuple[int, int]
+    catalog: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +62,10 @@ class RouteMapProjection:
 
 MAP_PROOF_SCENES = (
     MapProofScene(
-        asset="outdoor-demo-dust3r.splat",
-        label="large-scale shipped DUSt3R route",
+        asset="outdoor-production-grid-large-tile-catalog.json",
+        label="34-tile outdoor production grid",
         axes=(0, 2),
+        catalog="apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json",
     ),
 )
 
@@ -79,12 +82,19 @@ def build_map_quality_gif(
 
     frames: list[Image.Image] = []
     for scene_index, scene in enumerate(MAP_PROOF_SCENES, start=1):
-        path = asset_dir / scene.asset
-        points = _read_splat_points(path, max_points=MAX_POINTS_PER_SCENE)
+        if scene.catalog is None:
+            path = asset_dir / scene.asset
+            points = _read_splat_points(path, max_points=MAX_POINTS_PER_SCENE)
+            gaussian_count = _gaussian_count(path)
+            source_asset = scene.asset
+        else:
+            path = REPO / scene.catalog
+            points = _read_catalog_splat_points(path, max_points=MAX_POINTS_PER_SCENE)
+            gaussian_count = _catalog_gaussian_count(path)
+            source_asset = Path(scene.catalog).name
         bounds = _projection_bounds(points, scene.axes, size)
         projection = _route_map_projection(points, axes=scene.axes, bounds=bounds)
         cameras = _camera_path(points, axes=scene.axes, bounds=bounds, frame_count=frames_per_scene)
-        gaussian_count = _gaussian_count(path)
         if scene_index == 1 and map_material_output is not None:
             material = _render_dynamic_map_material(
                 points,
@@ -94,7 +104,7 @@ def build_map_quality_gif(
                 size=MAP_MATERIAL_SIZE,
                 bounds=bounds,
                 full_material=True,
-                source_asset=scene.asset,
+                source_asset=source_asset,
                 gaussian_count=gaussian_count,
             )
             map_material_output.parent.mkdir(parents=True, exist_ok=True)
@@ -126,6 +136,41 @@ def build_map_quality_gif(
     return output
 
 
+def _read_catalog_splat_points(catalog_path: Path, *, max_points: int) -> list[SplatPoint]:
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    tiles = [
+        tile for tile in catalog.get("tiles", []) if tile.get("splatUrl") and tile.get("status") != "missing-splat"
+    ]
+    if not tiles:
+        raise ValueError(f"{catalog_path} has no ready splat tiles")
+
+    max_points_per_tile = max(1, math.ceil(max_points / len(tiles)))
+    points: list[SplatPoint] = []
+    for tile in tiles:
+        points.extend(_read_splat_points(_catalog_tile_path(catalog_path, tile), max_points=max_points_per_tile))
+
+    if len(points) > max_points:
+        stride = max(1, math.ceil(len(points) / max_points))
+        points = points[::stride]
+    if not points:
+        raise ValueError(f"{catalog_path} did not yield any renderable splat points")
+    return points
+
+
+def _catalog_tile_path(catalog_path: Path, tile: dict[str, object]) -> Path:
+    public_path = tile.get("publicPath")
+    if isinstance(public_path, str) and public_path:
+        candidate = Path(public_path)
+        return candidate if candidate.is_absolute() else REPO / candidate
+
+    splat_url = tile.get("splatUrl")
+    if isinstance(splat_url, str) and splat_url.startswith("/"):
+        return REPO / "apps" / "dreamwalker-web" / "public" / splat_url.lstrip("/")
+    if isinstance(splat_url, str) and splat_url:
+        return catalog_path.parent / splat_url
+    raise ValueError(f"{catalog_path} tile is missing splatUrl/publicPath")
+
+
 def _read_splat_points(path: Path, *, max_points: int) -> list[SplatPoint]:
     data = path.read_bytes()
     count = len(data) // SPLAT_RECORD_BYTES
@@ -147,6 +192,13 @@ def _read_splat_points(path: Path, *, max_points: int) -> list[SplatPoint]:
 
 def _gaussian_count(path: Path) -> int:
     return path.stat().st_size // SPLAT_RECORD_BYTES
+
+
+def _catalog_gaussian_count(catalog_path: Path) -> int:
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    summary = catalog.get("summary") if isinstance(catalog.get("summary"), dict) else {}
+    count = summary.get("inputSplatCount") or summary.get("tiledSplatCount") or 0
+    return int(count)
 
 
 def _projection_bounds(
@@ -1322,7 +1374,7 @@ def _draw_frame_label(
     draw.text((34, 29), scene.label, font=title_font, fill=(244, 249, 255, 255))
     draw.text(
         (36, 65),
-        (f"actual .splat route / {gaussian_count // 1000}k gaussians / {rendered_count // 1000}k visible"),
+        (f"dynamic map route / {gaussian_count // 1000}k gaussians / {rendered_count // 1000}k visible"),
         font=meta_font,
         fill=(203, 218, 232, 240),
     )

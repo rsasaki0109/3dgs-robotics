@@ -427,12 +427,12 @@ export const dreamwalkerConfig = {
     residentLimitQueryParam: 'tileResidentLimit'
   },
   largeScaleDemo: {
-    label: 'Outdoor Demo DUSt3R Tiled',
-    tileCatalogUrl: '/manifests/outdoor-demo-dust3r-tile-catalog.json',
+    label: 'Outdoor Production Grid Large',
+    tileCatalogUrl: '/manifests/outdoor-production-grid-large-tile-catalog.json',
     preloadMode: 'metadata',
-    tilePreloadLimit: 2,
-    tileResidentLimit: 3,
-    routeUrl: '/robot-routes/outdoor-demo-dust3r-tile-loop.json',
+    tilePreloadLimit: 4,
+    tileResidentLimit: 6,
+    routeUrl: '/robot-routes/outdoor-production-grid-large-route.json',
     routePlayback: true,
     routePlaybackLoop: true,
     routePlaybackMs: 1200
