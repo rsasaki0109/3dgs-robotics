@@ -512,6 +512,12 @@ def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
     assert "images/demo-sweep/mobile_iphone14_webgpu.png" in html
     assert "Outdoor Data Sources" in html
     assert "Outdoor Scene Inspector" in html
+    assert "Input Gallery" not in html
+    assert 'id="gallery-section"' not in html
+    assert "gallery-tab" not in html
+    assert "gallery/street/" not in html
+    assert "gallery/campus/" not in html
+    assert "gallery/indoor/" not in html
     assert "Training metrics simulated" not in html
     assert "Input images from Unsplash" not in html
     assert "Point Cloud Viewer" not in html
@@ -525,4 +531,3 @@ def test_index_outdoor_hero_visuals_are_not_muted_or_mobile_overflow_prone() -> 
     assert "@media (max-width: 880px)" in html
     assert ".scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }" in html
     assert "flex-wrap: wrap;" in html
-    assert ".gallery-tabs { flex-wrap: wrap; }" in html
