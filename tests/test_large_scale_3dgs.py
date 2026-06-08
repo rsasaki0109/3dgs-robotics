@@ -202,13 +202,17 @@ def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands
     assert report["summary"]["sourceImageBytes"] == 9
     assert report["recommendation"]["tileSize"] == 20.0
     assert [candidate["recommended"] for candidate in report["candidates"]] == [False, True]
+    assert "--tile-size 20.0" in report["next"]["pilotCommand"]
+    assert "--pilot-chunks 6" in report["next"]["pilotCommand"]
     assert "--tile-size 20.0" in report["next"]["planCommand"]
     assert "--iterations 77" in report["next"]["planCommand"]
     assert "--config" not in report["next"]["planCommand"]
+    assert str(output_dir / "large_scale_3dgs_pilot_plan.json") in report["next"]["pilotRunCommand"]
     assert str(output_dir / "large_scale_3dgs_plan.json") in report["next"]["runCommand"]
     assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["tileSize"] == 20.0
     assert "Large-scale 3DGS preflight" in text
     assert "recommended: tile_size=20.0" in text
+    assert "next pilot: gs-mapper large-scale-3dgs-pilot" in text
     assert "next plan: gs-mapper large-scale-3dgs-plan" in text
 
 
@@ -239,6 +243,45 @@ def test_build_large_scale_3dgs_preflight_can_write_recommended_plan(tmp_path: P
     assert plan["materialized"] is True
     assert Path(plan["chunks"][0]["dataDir"], "images", "frame_000.jpg").read_bytes() == b"jpg"
     assert f"plan: {plan_path}" in text
+
+
+def test_build_large_scale_3dgs_preflight_can_write_recommended_pilot(tmp_path: Path) -> None:
+    data_dir = _write_route_sparse_fixture(tmp_path / "route_data")
+    output_dir = tmp_path / "large"
+
+    report = build_large_scale_3dgs_preflight(
+        LargeScale3DGSPreflightOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            axes="xy",
+            tile_sizes=(10.0, 20.0),
+            overlap=1,
+            min_images=1,
+            target_images_per_chunk=1,
+            write_pilot=True,
+            pilot_chunks=2,
+            route_start_image=1,
+            iterations=9,
+            config=None,
+            link_mode="copy",
+        )
+    )
+    text = format_large_scale_3dgs_preflight_text(report)
+    pilot_report_path = Path(report["next"]["pilotReportPath"])
+    pilot_plan_path = Path(report["next"]["pilotPlanPath"])
+    pilot_report = json.loads(pilot_report_path.read_text(encoding="utf-8"))
+    pilot_plan = json.loads(pilot_plan_path.read_text(encoding="utf-8"))
+
+    assert report["next"]["pilotWritten"] is True
+    assert pilot_report_path == output_dir / "large_scale_3dgs_pilot.json"
+    assert pilot_plan_path == output_dir / "large_scale_3dgs_pilot_plan.json"
+    assert pilot_report["selection"]["routeStartImage"] == 1
+    assert pilot_report["selection"]["selectedChunkIds"] == ["tile_x001_y000", "tile_x002_y000"]
+    assert pilot_plan["summary"]["chunkCount"] == 2
+    assert pilot_plan["summary"]["sourceChunkCount"] == 8
+    assert "--iterations 9" in pilot_plan["chunks"][0]["trainCommand"]
+    assert Path(pilot_plan["chunks"][0]["dataDir"], "images", "route_001.jpg").read_bytes() == b"jpg"
+    assert f"pilot: {pilot_plan_path}" in text
 
 
 def test_build_large_scale_3dgs_pilot_selects_route_contiguous_ready_chunks(tmp_path: Path) -> None:

@@ -244,25 +244,16 @@ gs-mapper large-scale-3dgs-preflight \
   --axes xy \
   --tile-sizes 20,30,50 \
   --target-images-per-chunk 48 \
+  --write-pilot \
+  --pilot-chunks 6 \
   --write-plan
 ```
 
-Before committing a full regional run, cut a short continuous pilot from the
-COLMAP image order and train those route-adjacent chunks first:
+Before committing a full regional run, train the preflight-generated
+route-adjacent pilot chunks first:
 
 ```bash
-gs-mapper large-scale-3dgs-pilot \
-  --data outputs/autoware_sparse \
-  --output outputs/autoware_real_pilot \
-  --axes xy \
-  --tile-size 20 \
-  --overlap 5 \
-  --min-images 8 \
-  --pilot-chunks 6 \
-  --target-images-per-chunk 48 \
-  --link-mode symlink
-
-gs-mapper large-scale-3dgs-run --plan outputs/autoware_real_pilot/large_scale_3dgs_pilot_plan.json
+gs-mapper large-scale-3dgs-run --plan outputs/autoware_large/large_scale_3dgs_pilot_plan.json
 ```
 
 When the pilot splats look stable, run the full preflight-generated plan and

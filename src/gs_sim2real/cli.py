@@ -434,10 +434,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also write large_scale_3dgs_plan.json using the recommended tile size",
     )
     lsgp.add_argument(
+        "--write-pilot",
+        action="store_true",
+        help="Also write route-contiguous pilot report and plan using the recommended tile size",
+    )
+    lsgp.add_argument("--pilot-chunks", type=int, default=6, help="Ready route chunks to include in --write-pilot")
+    lsgp.add_argument(
+        "--route-start-image",
+        type=int,
+        default=0,
+        help="Zero-based COLMAP image order index where --write-pilot chunk selection starts",
+    )
+    lsgp.add_argument(
         "--link-mode",
         choices=["symlink", "copy", "none"],
         default="symlink",
-        help="How --write-plan materializes images/depth into per-tile directories",
+        help="How --write-plan or --write-pilot materializes images/depth into per-tile directories",
     )
     lsgp.add_argument(
         "--format",
@@ -2688,6 +2700,9 @@ def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
         iterations=args.iterations,
         config=args.config,
         write_plan=args.write_plan,
+        write_pilot=args.write_pilot,
+        pilot_chunks=args.pilot_chunks,
+        route_start_image=args.route_start_image,
         link_mode=args.link_mode,
     )
     report = build_large_scale_3dgs_preflight(options)
