@@ -69,12 +69,20 @@ class TestCLIHelp:
                 "--data",
                 "outputs/sparse",
                 "--write-plan",
+                "--write-pilot",
+                "--pilot-chunks",
+                "5",
+                "--route-start-image",
+                "8",
                 "--link-mode",
                 "copy",
             ]
         )
 
         assert args.write_plan is True
+        assert args.write_pilot is True
+        assert args.pilot_chunks == 5
+        assert args.route_start_image == 8
         assert args.link_mode == "copy"
 
     def test_cli_large_scale_3dgs_pilot_args(self) -> None:

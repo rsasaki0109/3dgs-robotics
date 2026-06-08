@@ -82,6 +82,9 @@ class LargeScale3DGSPreflightOptions:
     iterations: int = 30000
     config: str | None = "configs/training_ba.yaml"
     write_plan: bool = False
+    write_pilot: bool = False
+    pilot_chunks: int = 6
+    route_start_image: int = 0
     link_mode: str = "symlink"
 
 
@@ -931,6 +934,37 @@ def _build_preflight_plan_command(options: LargeScale3DGSPreflightOptions, recom
     return _format_command(parts)
 
 
+def _build_preflight_pilot_command(options: LargeScale3DGSPreflightOptions, recommendation: dict[str, Any]) -> str:
+    parts: list[str | Path | int | float] = [
+        "gs-mapper",
+        "large-scale-3dgs-pilot",
+        "--data",
+        options.data_dir,
+        "--output",
+        options.output_dir,
+        "--tile-size",
+        recommendation["tileSize"],
+        "--overlap",
+        recommendation["overlap"],
+        "--axes",
+        options.axes,
+        "--min-images",
+        options.min_images,
+        "--pilot-chunks",
+        options.pilot_chunks,
+        "--route-start-image",
+        options.route_start_image,
+        "--target-images-per-chunk",
+        options.target_images_per_chunk,
+        "--iterations",
+        options.iterations,
+    ]
+    if options.config:
+        parts.extend(["--config", options.config])
+    parts.extend(["--link-mode", options.link_mode])
+    return _format_command(parts)
+
+
 def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) -> dict[str, Any]:
     """Inspect a COLMAP scene and recommend a large-scale 3DGS tiling setup."""
     if options.overlap < 0:
@@ -939,6 +973,10 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
         raise ValueError("--min-images must be >= 1")
     if options.target_images_per_chunk < 1:
         raise ValueError("--target-images-per-chunk must be >= 1")
+    if options.pilot_chunks < 1:
+        raise ValueError("--pilot-chunks must be >= 1")
+    if options.route_start_image < 0:
+        raise ValueError("--route-start-image must be >= 0")
     if options.link_mode not in {"symlink", "copy", "none"}:
         raise ValueError("--link-mode must be symlink, copy, or none")
 
@@ -985,8 +1023,12 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
     recommended = next(candidate for candidate in candidates if candidate["recommended"])
     plan_path = output_dir / "large_scale_3dgs_plan.json"
     run_report_path = output_dir / "large_scale_3dgs_run_report.json"
+    pilot_plan_path = output_dir / "large_scale_3dgs_pilot_plan.json"
     plan_command = _build_preflight_plan_command(options, recommended)
+    pilot_command = _build_preflight_pilot_command(options, recommended)
     written_plan_path = ""
+    written_pilot_report_path = ""
+    written_pilot_plan_path = ""
     if options.write_plan:
         plan = build_large_scale_3dgs_plan(
             LargeScale3DGSOptions(
@@ -1003,6 +1045,26 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
             )
         )
         written_plan_path = str(write_large_scale_3dgs_plan(plan, output_dir))
+    if options.write_pilot:
+        pilot_report = build_large_scale_3dgs_pilot(
+            LargeScale3DGSPilotOptions(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                tile_size=float(recommended["tileSize"]),
+                overlap=float(recommended["overlap"]),
+                axes="".join(axes),
+                min_images=options.min_images,
+                pilot_chunks=options.pilot_chunks,
+                route_start_image=options.route_start_image,
+                target_images_per_chunk=options.target_images_per_chunk,
+                iterations=options.iterations,
+                config=options.config,
+                link_mode=options.link_mode,
+            )
+        )
+        pilot_paths = write_large_scale_3dgs_pilot(pilot_report, output_dir)
+        written_pilot_report_path = str(pilot_paths[0])
+        written_pilot_plan_path = str(pilot_paths[1])
 
     return {
         "version": 1,
@@ -1036,6 +1098,11 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
         "next": {
             "planWritten": bool(options.write_plan),
             "planPath": written_plan_path,
+            "pilotWritten": bool(options.write_pilot),
+            "pilotReportPath": written_pilot_report_path,
+            "pilotPlanPath": written_pilot_plan_path,
+            "pilotCommand": pilot_command,
+            "pilotRunCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", pilot_plan_path]),
             "planCommand": plan_command,
             "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
             "catalogCommand": _format_command(
@@ -1075,6 +1142,8 @@ def format_large_scale_3dgs_preflight_text(report: dict[str, Any], report_path: 
     ]
     if report_path is not None:
         lines.append(f"  report: {report_path}")
+    if report["next"].get("pilotPlanPath"):
+        lines.append(f"  pilot: {report['next']['pilotPlanPath']}")
     if report["next"].get("planPath"):
         lines.append(f"  plan: {report['next']['planPath']}")
     lines.append("  candidates:")
@@ -1088,6 +1157,8 @@ def format_large_scale_3dgs_preflight_text(report: dict[str, Any], report_path: 
         )
     lines.extend(
         [
+            f"  next pilot: {report['next']['pilotCommand']}",
+            f"  next pilot run: {report['next']['pilotRunCommand']}",
             f"  next plan: {report['next']['planCommand']}",
             f"  next run: {report['next']['runCommand']}",
             f"  next catalog: {report['next']['catalogCommand']}",
