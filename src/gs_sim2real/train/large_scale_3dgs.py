@@ -86,6 +86,26 @@ class LargeScale3DGSPreflightOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSPilotOptions:
+    data_dir: Path
+    output_dir: Path
+    axes: str = "xy"
+    tile_size: float = 30.0
+    overlap: float = 5.0
+    min_images: int = 8
+    pilot_chunks: int = 6
+    route_start_image: int = 0
+    target_images_per_chunk: int = 48
+    iterations: int = 30000
+    config: str | None = "configs/training_ba.yaml"
+    link_mode: str = "symlink"
+    export_max_points: int = 400000
+    splat_min_opacity: float = 0.02
+    splat_max_scale: float | None = 2.0
+    splat_max_scale_percentile: float | None = 98.0
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSCatalogOptions:
     plan_path: Path
     output_path: Path | None = None
@@ -1073,6 +1093,282 @@ def format_large_scale_3dgs_preflight_text(report: dict[str, Any], report_path: 
             f"  next catalog: {report['next']['catalogCommand']}",
         ]
     )
+    return "\n".join(lines)
+
+
+def _materialize_existing_plan_chunk(
+    *,
+    chunk: dict[str, Any],
+    data_dir: Path,
+    sparse_dir: Path,
+    image_records: Sequence[ColmapImageRecord],
+    point_records: Sequence[ColmapPointRecord],
+    axes: tuple[str, str],
+    link_mode: str,
+) -> None:
+    chunk_images = [record for record in image_records if _in_bounds(record.center, chunk["expandedBounds"], axes)]
+    chunk_points = [record for record in point_records if _in_bounds(record.xyz, chunk["expandedBounds"], axes)]
+    _materialize_chunk_data(
+        chunk_dir=Path(chunk["dataDir"]),
+        data_dir=data_dir,
+        sparse_dir=sparse_dir,
+        image_records=chunk_images,
+        point_records=chunk_points,
+        link_mode=link_mode,
+    )
+
+
+def _select_route_pilot_chunks(
+    *,
+    plan: dict[str, Any],
+    image_records: Sequence[ColmapImageRecord],
+    axes: tuple[str, str],
+    route_start_image: int,
+    pilot_chunks: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ready_chunks = [chunk for chunk in plan.get("chunks", []) if chunk.get("status") == "ready"]
+    selected_chunks: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    route_hits: list[dict[str, Any]] = []
+
+    for image_index, record in enumerate(image_records[route_start_image:], start=route_start_image):
+        matching_chunk = next(
+            (chunk for chunk in ready_chunks if _in_bounds(record.center, chunk["coreBounds"], axes)),
+            None,
+        )
+        if matching_chunk is None:
+            continue
+
+        route_hits.append(
+            {
+                "imageIndex": image_index,
+                "imageId": record.image_id,
+                "imageName": record.name,
+                "chunkId": matching_chunk["id"],
+            }
+        )
+        if matching_chunk["id"] in selected_ids:
+            continue
+
+        selected_chunks.append(matching_chunk)
+        selected_ids.add(matching_chunk["id"])
+        if len(selected_chunks) >= pilot_chunks:
+            break
+
+    return selected_chunks, route_hits
+
+
+def _build_pilot_shell_command(options: LargeScale3DGSPilotOptions) -> str:
+    parts: list[str | Path | int | float] = [
+        "gs-mapper",
+        "large-scale-3dgs-pilot",
+        "--data",
+        options.data_dir,
+        "--output",
+        options.output_dir,
+        "--axes",
+        options.axes,
+        "--tile-size",
+        options.tile_size,
+        "--overlap",
+        options.overlap,
+        "--min-images",
+        options.min_images,
+        "--pilot-chunks",
+        options.pilot_chunks,
+        "--route-start-image",
+        options.route_start_image,
+        "--target-images-per-chunk",
+        options.target_images_per_chunk,
+        "--iterations",
+        options.iterations,
+        "--link-mode",
+        options.link_mode,
+        "--export-max-points",
+        options.export_max_points,
+        "--splat-min-opacity",
+        options.splat_min_opacity,
+    ]
+    if options.config:
+        parts.extend(["--config", options.config])
+    if options.splat_max_scale is not None:
+        parts.extend(["--splat-max-scale", options.splat_max_scale])
+    if options.splat_max_scale_percentile is not None:
+        parts.extend(["--splat-max-scale-percentile", options.splat_max_scale_percentile])
+    parts.extend(["--format", "shell"])
+    return _format_command(parts)
+
+
+def build_large_scale_3dgs_pilot(options: LargeScale3DGSPilotOptions) -> dict[str, Any]:
+    """Build a route-contiguous pilot plan before training a full large-scale 3DGS map."""
+    if options.tile_size <= 0:
+        raise ValueError("--tile-size must be > 0")
+    if options.overlap < 0:
+        raise ValueError("--overlap must be >= 0")
+    if options.min_images < 1:
+        raise ValueError("--min-images must be >= 1")
+    if options.pilot_chunks < 1:
+        raise ValueError("--pilot-chunks must be >= 1")
+    if options.route_start_image < 0:
+        raise ValueError("--route-start-image must be >= 0")
+    if options.target_images_per_chunk < 1:
+        raise ValueError("--target-images-per-chunk must be >= 1")
+    if options.link_mode not in {"symlink", "copy", "none"}:
+        raise ValueError("--link-mode must be symlink, copy, or none")
+
+    data_dir = Path(options.data_dir)
+    output_dir = Path(options.output_dir)
+    axes = _validate_axes(options.axes)
+    sparse_dir = require_colmap_sparse_model(data_dir)
+    image_records = load_colmap_images_text(sparse_dir / "images.txt")
+    point_records = load_colmap_points_text(sparse_dir / "points3D.txt")
+    if not image_records:
+        raise ValueError("No registered images found in COLMAP images.txt")
+    if options.route_start_image >= len(image_records):
+        raise ValueError("--route-start-image must be lower than the registered image count")
+
+    source_plan = build_large_scale_3dgs_plan(
+        LargeScale3DGSOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            tile_size=options.tile_size,
+            overlap=options.overlap,
+            axes="".join(axes),
+            min_images=options.min_images,
+            iterations=options.iterations,
+            config=options.config,
+            export_max_points=options.export_max_points,
+            splat_min_opacity=options.splat_min_opacity,
+            splat_max_scale=options.splat_max_scale,
+            splat_max_scale_percentile=options.splat_max_scale_percentile,
+            materialize=False,
+            link_mode=options.link_mode,
+        )
+    )
+    selected_chunks, route_hits = _select_route_pilot_chunks(
+        plan=source_plan,
+        image_records=image_records,
+        axes=axes,
+        route_start_image=options.route_start_image,
+        pilot_chunks=options.pilot_chunks,
+    )
+    if not selected_chunks:
+        raise ValueError("No ready chunks were found along the requested camera route")
+
+    for chunk in selected_chunks:
+        _materialize_existing_plan_chunk(
+            chunk=chunk,
+            data_dir=data_dir,
+            sparse_dir=sparse_dir,
+            image_records=image_records,
+            point_records=point_records,
+            axes=axes,
+            link_mode=options.link_mode,
+        )
+
+    selected_chunk_ids = [chunk["id"] for chunk in selected_chunks]
+    route_hit_ids = [hit["chunkId"] for hit in route_hits]
+    pilot_plan = {
+        **source_plan,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "materialized": True,
+        "summary": {
+            **source_plan["summary"],
+            "chunkCount": len(selected_chunks),
+            "readyChunkCount": len(selected_chunks),
+            "tooFewImageChunkCount": 0,
+            "sourceChunkCount": source_plan["summary"]["chunkCount"],
+            "sourceReadyChunkCount": source_plan["summary"]["readyChunkCount"],
+        },
+        "pilot": {
+            "strategy": "camera-order-ready-chunks",
+            "routeStartImage": int(options.route_start_image),
+            "pilotChunks": int(options.pilot_chunks),
+            "targetImagesPerChunk": int(options.target_images_per_chunk),
+            "selectedChunkIds": selected_chunk_ids,
+            "routeImageHitCount": len(route_hits),
+        },
+        "chunks": [dict(chunk) for chunk in selected_chunks],
+    }
+    plan_path = output_dir / "large_scale_3dgs_pilot_plan.json"
+    report_path = output_dir / "large_scale_3dgs_pilot.json"
+    first_hit = route_hits[0] if route_hits else None
+    last_hit = route_hits[-1] if route_hits else None
+
+    return {
+        "version": 1,
+        "type": "large-scale-3dgs-pilot",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "dataDir": str(data_dir),
+        "sparseDir": str(sparse_dir),
+        "outputDir": str(output_dir),
+        "axes": "".join(axes),
+        "plan": pilot_plan,
+        "summary": {
+            "registeredImageCount": len(image_records),
+            "points3DCount": len(point_records),
+            "sourceChunkCount": source_plan["summary"]["chunkCount"],
+            "sourceReadyChunkCount": source_plan["summary"]["readyChunkCount"],
+            "selectedChunkCount": len(selected_chunks),
+            "materializedChunkCount": len(selected_chunks),
+        },
+        "selection": {
+            "routeStartImage": int(options.route_start_image),
+            "pilotChunks": int(options.pilot_chunks),
+            "targetImagesPerChunk": int(options.target_images_per_chunk),
+            "selectedChunkIds": selected_chunk_ids,
+            "routeHitChunkIds": route_hit_ids,
+            "firstImage": first_hit,
+            "lastImage": last_hit,
+        },
+        "next": {
+            "reportPath": str(report_path),
+            "planPath": str(plan_path),
+            "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
+            "shellCommand": _build_pilot_shell_command(options),
+        },
+    }
+
+
+def write_large_scale_3dgs_pilot(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plan_path = output_dir / "large_scale_3dgs_pilot_plan.json"
+    report_path = output_dir / "large_scale_3dgs_pilot.json"
+    plan_path.write_text(json.dumps(report["plan"], indent=2) + "\n", encoding="utf-8")
+
+    persisted_report = {key: value for key, value in report.items() if key != "plan"}
+    persisted_report["planPath"] = str(plan_path)
+    persisted_report["next"] = {
+        **persisted_report.get("next", {}),
+        "planPath": str(plan_path),
+        "reportPath": str(report_path),
+    }
+    report_path.write_text(json.dumps(persisted_report, indent=2) + "\n", encoding="utf-8")
+    return report_path, plan_path
+
+
+def format_large_scale_3dgs_pilot_text(
+    report: dict[str, Any],
+    report_path: Path | None = None,
+    plan_path: Path | None = None,
+) -> str:
+    summary = report["summary"]
+    selection = report["selection"]
+    lines = [
+        "Real continuous 3DGS pilot",
+        f"  data: {report['dataDir']}",
+        f"  sparse: {report['sparseDir']}",
+        f"  chunks: {summary['selectedChunkCount']} pilot / {summary['sourceReadyChunkCount']} ready / "
+        f"{summary['sourceChunkCount']} total",
+        f"  axes: {report['axes']} start_image={selection['routeStartImage']} "
+        f"target_images_per_chunk={selection['targetImagesPerChunk']}",
+        f"  selected: {', '.join(selection['selectedChunkIds'])}",
+    ]
+    if report_path is not None:
+        lines.append(f"  report: {report_path}")
+    if plan_path is not None:
+        lines.append(f"  plan: {plan_path}")
+    lines.append(f"  next run: {report['next']['runCommand']}")
     return "\n".join(lines)
 
 

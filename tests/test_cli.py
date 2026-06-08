@@ -55,6 +55,12 @@ class TestCLIHelp:
             main(["large-scale-3dgs-preflight", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_pilot_help(self) -> None:
+        """Running large-scale-3dgs-pilot --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-pilot", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_large_scale_3dgs_preflight_write_plan_args(self) -> None:
         """large-scale-3dgs-preflight accepts plan materialization args."""
         args = build_parser().parse_args(
@@ -70,6 +76,35 @@ class TestCLIHelp:
 
         assert args.write_plan is True
         assert args.link_mode == "copy"
+
+    def test_cli_large_scale_3dgs_pilot_args(self) -> None:
+        """large-scale-3dgs-pilot accepts route pilot args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-pilot",
+                "--data",
+                "outputs/sparse",
+                "--output",
+                "outputs/pilot",
+                "--pilot-chunks",
+                "4",
+                "--route-start-image",
+                "12",
+                "--target-images-per-chunk",
+                "24",
+                "--link-mode",
+                "copy",
+                "--format",
+                "shell",
+            ]
+        )
+
+        assert args.output == "outputs/pilot"
+        assert args.pilot_chunks == 4
+        assert args.route_start_image == 12
+        assert args.target_images_per_chunk == 24
+        assert args.link_mode == "copy"
+        assert args.format == "shell"
 
     def test_cli_large_scale_3dgs_run_help(self) -> None:
         """Running large-scale-3dgs-run --help raises SystemExit(0)."""

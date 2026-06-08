@@ -446,6 +446,66 @@ def build_parser() -> argparse.ArgumentParser:
         help="Stdout format after writing the preflight report",
     )
 
+    lsgpilot = subparsers.add_parser(
+        "large-scale-3dgs-pilot",
+        help="Build a route-contiguous pilot plan for a real large-scale COLMAP scene",
+    )
+    lsgpilot.add_argument("--data", required=True, help="Preprocessed COLMAP data directory")
+    lsgpilot.add_argument(
+        "--output",
+        default="outputs/large_scale_3dgs_pilot",
+        help="Output root for the pilot report, plan, and selected chunk data",
+    )
+    lsgpilot.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="Horizontal axes used for tiling",
+    )
+    lsgpilot.add_argument("--tile-size", type=float, default=30.0, help="Tile width in scene units/metres")
+    lsgpilot.add_argument("--overlap", type=float, default=5.0, help="Tile overlap in scene units/metres")
+    lsgpilot.add_argument("--min-images", type=int, default=8, help="Minimum core images for a trainable tile")
+    lsgpilot.add_argument("--pilot-chunks", type=int, default=6, help="Ready route chunks to include in the pilot")
+    lsgpilot.add_argument(
+        "--route-start-image",
+        type=int,
+        default=0,
+        help="Zero-based COLMAP image order index where pilot chunk selection starts",
+    )
+    lsgpilot.add_argument(
+        "--target-images-per-chunk",
+        type=int,
+        default=48,
+        help="Preferred core image count recorded in the pilot report",
+    )
+    lsgpilot.add_argument("--iterations", type=int, default=30000, help="Iterations for generated train commands")
+    lsgpilot.add_argument(
+        "--config",
+        default="configs/training_ba.yaml",
+        help="Training config path used in generated train commands",
+    )
+    lsgpilot.add_argument(
+        "--link-mode",
+        choices=["symlink", "copy", "none"],
+        default="symlink",
+        help="How selected chunks place images/depth below --output/chunks",
+    )
+    lsgpilot.add_argument("--export-max-points", type=int, default=400000, help="Max points per exported tile splat")
+    lsgpilot.add_argument("--splat-min-opacity", type=float, default=0.02, help="Opacity filter for tile exports")
+    lsgpilot.add_argument("--splat-max-scale", type=float, default=2.0, help="Max scale filter for tile exports")
+    lsgpilot.add_argument(
+        "--splat-max-scale-percentile",
+        type=float,
+        default=98.0,
+        help="Adaptive max-scale percentile for tile exports",
+    )
+    lsgpilot.add_argument(
+        "--format",
+        choices=["text", "json", "shell"],
+        default="text",
+        help="Stdout format after writing the pilot report and plan",
+    )
+
     # large-scale-3dgs-plan
     lsg = subparsers.add_parser(
         "large-scale-3dgs-plan",
@@ -2639,6 +2699,46 @@ def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_preflight_text(report, report_path))
 
 
+def cmd_large_scale_3dgs_pilot(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-pilot subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSPilotOptions,
+        build_large_scale_3dgs_pilot,
+        format_large_scale_3dgs_pilot_text,
+        format_large_scale_3dgs_shell,
+        write_large_scale_3dgs_pilot,
+    )
+
+    options = LargeScale3DGSPilotOptions(
+        data_dir=Path(args.data),
+        output_dir=Path(args.output),
+        axes=args.axes,
+        tile_size=args.tile_size,
+        overlap=args.overlap,
+        min_images=args.min_images,
+        pilot_chunks=args.pilot_chunks,
+        route_start_image=args.route_start_image,
+        target_images_per_chunk=args.target_images_per_chunk,
+        iterations=args.iterations,
+        config=args.config,
+        link_mode=args.link_mode,
+        export_max_points=args.export_max_points,
+        splat_min_opacity=args.splat_min_opacity,
+        splat_max_scale=args.splat_max_scale,
+        splat_max_scale_percentile=args.splat_max_scale_percentile,
+    )
+    report = build_large_scale_3dgs_pilot(options)
+    report_path, plan_path = write_large_scale_3dgs_pilot(report, Path(args.output))
+
+    if args.format == "json":
+        printable = {key: value for key, value in report.items() if key != "plan"}
+        print(json.dumps({**printable, "reportPath": str(report_path), "planPath": str(plan_path)}, indent=2))
+    elif args.format == "shell":
+        print(format_large_scale_3dgs_shell(report["plan"]), end="")
+    else:
+        print(format_large_scale_3dgs_pilot_text(report, report_path, plan_path))
+
+
 def cmd_large_scale_3dgs_plan(args: argparse.Namespace) -> None:
     """Handle the large-scale-3dgs-plan subcommand."""
     from gs_sim2real.train.large_scale_3dgs import (
@@ -3696,6 +3796,7 @@ def main(argv: list[str] | None = None) -> None:
         "train": cmd_train,
         "large-scale-3dgs-smoke-data": cmd_large_scale_3dgs_smoke_data,
         "large-scale-3dgs-preflight": cmd_large_scale_3dgs_preflight,
+        "large-scale-3dgs-pilot": cmd_large_scale_3dgs_pilot,
         "large-scale-3dgs-plan": cmd_large_scale_3dgs_plan,
         "large-scale-3dgs-run": cmd_large_scale_3dgs_run,
         "large-scale-3dgs-catalog": cmd_large_scale_3dgs_catalog,

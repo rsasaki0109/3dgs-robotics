@@ -7,6 +7,7 @@ from pathlib import Path
 from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSCatalogOptions,
     LargeScale3DGSOptions,
+    LargeScale3DGSPilotOptions,
     LargeScale3DGSPreflightOptions,
     LargeScale3DGSRouteOptions,
     LargeScale3DGSRunOptions,
@@ -14,10 +15,12 @@ from gs_sim2real.train.large_scale_3dgs import (
     _default_command_runner,
     build_large_scale_3dgs_catalog,
     build_large_scale_3dgs_plan,
+    build_large_scale_3dgs_pilot,
     build_large_scale_3dgs_preflight,
     build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
     format_large_scale_3dgs_catalog_text,
+    format_large_scale_3dgs_pilot_text,
     format_large_scale_3dgs_preflight_text,
     format_large_scale_3dgs_route_text,
     format_large_scale_3dgs_shell,
@@ -26,6 +29,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     run_large_scale_3dgs_plan,
     write_large_scale_3dgs_catalog,
     write_large_scale_3dgs_plan,
+    write_large_scale_3dgs_pilot,
     write_large_scale_3dgs_preflight,
     write_large_scale_3dgs_route,
     write_large_scale_3dgs_smoke_data,
@@ -57,6 +61,31 @@ def _write_sparse_fixture(root: Path) -> Path:
     )
     for index in range(3):
         (images / f"frame_{index:03d}.jpg").write_bytes(b"jpg")
+    return root
+
+
+def _write_route_sparse_fixture(root: Path, image_count: int = 8) -> Path:
+    sparse = root / "sparse" / "0"
+    images = root / "images"
+    sparse.mkdir(parents=True)
+    images.mkdir(parents=True)
+    (sparse / "cameras.txt").write_text(
+        "# Camera list\n1 PINHOLE 640 480 400 400 320 240\n",
+        encoding="utf-8",
+    )
+
+    image_lines = ["# Image list"]
+    point_lines = ["# Point list"]
+    for index in range(image_count):
+        center_x = 2.0 + index * 11.0
+        image_name = f"route_{index:03d}.jpg"
+        image_lines.append(f"{index + 1} 1 0 0 0 {-center_x:.6f} 0 0 1 {image_name}")
+        image_lines.append("")
+        point_lines.append(f"{index + 1} {center_x:.6f} 0 0 255 0 0 0")
+        (images / image_name).write_bytes(b"jpg")
+
+    (sparse / "images.txt").write_text("\n".join(image_lines) + "\n", encoding="utf-8")
+    (sparse / "points3D.txt").write_text("\n".join(point_lines) + "\n", encoding="utf-8")
     return root
 
 
@@ -210,6 +239,48 @@ def test_build_large_scale_3dgs_preflight_can_write_recommended_plan(tmp_path: P
     assert plan["materialized"] is True
     assert Path(plan["chunks"][0]["dataDir"], "images", "frame_000.jpg").read_bytes() == b"jpg"
     assert f"plan: {plan_path}" in text
+
+
+def test_build_large_scale_3dgs_pilot_selects_route_contiguous_ready_chunks(tmp_path: Path) -> None:
+    data_dir = _write_route_sparse_fixture(tmp_path / "route_data")
+    output_dir = tmp_path / "pilot"
+
+    report = build_large_scale_3dgs_pilot(
+        LargeScale3DGSPilotOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            axes="xy",
+            tile_size=10,
+            overlap=1,
+            min_images=1,
+            pilot_chunks=3,
+            route_start_image=2,
+            target_images_per_chunk=1,
+            iterations=11,
+            config=None,
+            link_mode="copy",
+        )
+    )
+    report_path, plan_path = write_large_scale_3dgs_pilot(report, output_dir)
+    text = format_large_scale_3dgs_pilot_text(report, report_path, plan_path)
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    assert report["type"] == "large-scale-3dgs-pilot"
+    assert report["summary"]["selectedChunkCount"] == 3
+    assert report["selection"]["selectedChunkIds"] == ["tile_x002_y000", "tile_x003_y000", "tile_x004_y000"]
+    assert plan["type"] == "large-scale-3dgs-plan"
+    assert plan["summary"]["chunkCount"] == 3
+    assert plan["summary"]["sourceChunkCount"] == 8
+    assert [chunk["id"] for chunk in plan["chunks"]] == report["selection"]["selectedChunkIds"]
+    assert "--iterations 11" in plan["chunks"][0]["trainCommand"]
+    assert "--config" not in plan["chunks"][0]["trainCommand"]
+    assert "--route-start-image 2" in report["next"]["shellCommand"]
+    assert "--tile-size 10" in report["next"]["shellCommand"]
+    assert (output_dir / "chunks" / "tile_x002_y000" / "images" / "route_002.jpg").read_bytes() == b"jpg"
+    assert not (output_dir / "chunks" / "tile_x001_y000").exists()
+    assert json.loads(report_path.read_text(encoding="utf-8"))["selection"]["routeStartImage"] == 2
+    assert "Real continuous 3DGS pilot" in text
+    assert "next run: gs-mapper large-scale-3dgs-run" in text
 
 
 def test_build_large_scale_3dgs_plan_materializes_chunk_sparse_and_images(tmp_path: Path) -> None:
