@@ -234,16 +234,19 @@ gs-mapper train --data outputs/autoware_sparse --method gsplat --iterations 3000
 gs-mapper export --model outputs/train/point_cloud.ply --format splat --output outputs/autoware.splat
 ```
 
-For larger routes, first discover usable COLMAP sparse outputs, unprocessed
-rosbags, and existing splat sets under the workspace:
+For larger routes, bootstrap from the workspace root. This discovers usable
+COLMAP sparse outputs, unprocessed rosbags, and existing splat sets, then
+writes the first route-contiguous pilot plan when a ready sparse model is
+available:
 
 ```bash
-gs-mapper large-scale-3dgs-discover \
+gs-mapper large-scale-3dgs-bootstrap \
   --root . \
-  --output outputs/large_scale_3dgs_discovery.json
+  --pilot-chunks 6
 ```
 
-Then preflight the COLMAP sparse model before launching many tile jobs:
+For manual control, preflight the COLMAP sparse model before launching many
+tile jobs:
 
 ```bash
 gs-mapper large-scale-3dgs-preflight \

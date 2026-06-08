@@ -103,6 +103,27 @@ class LargeScale3DGSDiscoveryOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSBootstrapOptions:
+    root_dir: Path
+    output_dir: Path | None = None
+    report_path: Path | None = None
+    axes: str = "xy"
+    tile_sizes: tuple[float, ...] = (20.0, 30.0, 50.0)
+    overlap: float = 5.0
+    min_images: int = 8
+    target_images_per_chunk: int = 48
+    pilot_chunks: int = 6
+    route_start_image: int = 0
+    iterations: int = 30000
+    config: str | None = "configs/training_ba.yaml"
+    write_plan: bool = False
+    link_mode: str = "symlink"
+    max_depth: int = 8
+    max_results: int = 20
+    include_chunk_models: bool = False
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSPilotOptions:
     data_dir: Path
     output_dir: Path
@@ -976,6 +997,146 @@ def format_large_scale_3dgs_discovery_text(report: dict[str, Any], report_path: 
                 f"    - {scene['dataDir']} images={scene['registeredImageCount']} "
                 f"points={scene['points3DCount']}{span_text}"
             )
+    return "\n".join(lines)
+
+
+def _bootstrap_output_dir(options: LargeScale3DGSBootstrapOptions, data_dir: Path) -> Path:
+    if options.output_dir is not None:
+        return Path(options.output_dir)
+    return _discovery_output_dir_for(data_dir)
+
+
+def build_large_scale_3dgs_bootstrap(options: LargeScale3DGSBootstrapOptions) -> dict[str, Any]:
+    """Discover inputs and write the first route-contiguous 3DGS pilot plan when possible."""
+    if options.overlap < 0:
+        raise ValueError("--overlap must be >= 0")
+    if options.min_images < 1:
+        raise ValueError("--min-images must be >= 1")
+    if options.target_images_per_chunk < 1:
+        raise ValueError("--target-images-per-chunk must be >= 1")
+    if options.pilot_chunks < 1:
+        raise ValueError("--pilot-chunks must be >= 1")
+    if options.route_start_image < 0:
+        raise ValueError("--route-start-image must be >= 0")
+    if options.link_mode not in {"symlink", "copy", "none"}:
+        raise ValueError("--link-mode must be symlink, copy, or none")
+
+    discovery = build_large_scale_3dgs_discovery(
+        LargeScale3DGSDiscoveryOptions(
+            root_dir=options.root_dir,
+            axes=options.axes,
+            tile_sizes=parse_large_scale_3dgs_tile_sizes(options.tile_sizes),
+            target_images_per_chunk=options.target_images_per_chunk,
+            pilot_chunks=options.pilot_chunks,
+            route_start_image=options.route_start_image,
+            max_depth=options.max_depth,
+            max_results=options.max_results,
+            include_chunk_models=options.include_chunk_models,
+        )
+    )
+    recommendation = discovery["recommendation"]
+    status = "needs-input"
+    preflight: dict[str, Any] | None = None
+    preflight_report_path = ""
+    pilot_plan_path = ""
+    full_plan_path = ""
+
+    if recommendation["kind"] == "colmap-scene":
+        data_dir = Path(recommendation["dataDir"])
+        output_dir = _bootstrap_output_dir(options, data_dir)
+        preflight = build_large_scale_3dgs_preflight(
+            LargeScale3DGSPreflightOptions(
+                data_dir=data_dir,
+                output_dir=output_dir,
+                axes=options.axes,
+                tile_sizes=parse_large_scale_3dgs_tile_sizes(options.tile_sizes),
+                overlap=options.overlap,
+                min_images=options.min_images,
+                target_images_per_chunk=options.target_images_per_chunk,
+                iterations=options.iterations,
+                config=options.config,
+                write_plan=options.write_plan,
+                write_pilot=True,
+                pilot_chunks=options.pilot_chunks,
+                route_start_image=options.route_start_image,
+                link_mode=options.link_mode,
+            )
+        )
+        preflight_report_path = str(write_large_scale_3dgs_preflight(preflight, output_dir))
+        pilot_plan_path = str(preflight["next"]["pilotPlanPath"])
+        full_plan_path = str(preflight["next"]["planPath"])
+        status = "pilot-ready"
+    elif recommendation["kind"] == "bag-input":
+        status = "needs-preprocess"
+
+    return {
+        "version": 1,
+        "type": "large-scale-3dgs-bootstrap",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "rootDir": discovery["rootDir"],
+        "status": status,
+        "discovery": discovery,
+        "preflight": preflight,
+        "summary": {
+            "status": status,
+            "readyColmapSceneCount": discovery["summary"]["readyColmapSceneCount"],
+            "bagInputCount": discovery["summary"]["bagInputCount"],
+            "pilotPlanWritten": bool(pilot_plan_path),
+            "fullPlanWritten": bool(full_plan_path),
+        },
+        "next": {
+            "preflightReportPath": preflight_report_path,
+            "pilotPlanPath": pilot_plan_path,
+            "pilotRunCommand": (
+                _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", pilot_plan_path])
+                if pilot_plan_path
+                else ""
+            ),
+            "fullPlanPath": full_plan_path,
+            "fullRunCommand": (
+                _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", full_plan_path])
+                if full_plan_path
+                else ""
+            ),
+            "preprocessCommand": recommendation.get("preprocessCommand", ""),
+        },
+    }
+
+
+def write_large_scale_3dgs_bootstrap(report: dict[str, Any], report_path: Path | None = None) -> Path:
+    if report_path is not None:
+        path = Path(report_path)
+    elif report["next"].get("preflightReportPath"):
+        path = Path(report["next"]["preflightReportPath"]).parent / "large_scale_3dgs_bootstrap.json"
+    else:
+        path = Path("outputs/large_scale_3dgs_bootstrap.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def format_large_scale_3dgs_bootstrap_text(report: dict[str, Any], report_path: Path | None = None) -> str:
+    summary = report["summary"]
+    lines = [
+        "Large-scale 3DGS bootstrap",
+        f"  root: {report['rootDir']}",
+        f"  status: {summary['status']}",
+        f"  COLMAP scenes: {summary['readyColmapSceneCount']} ready",
+        f"  bag inputs: {summary['bagInputCount']}",
+    ]
+    if report_path is not None:
+        lines.append(f"  report: {report_path}")
+    if report["next"].get("preflightReportPath"):
+        lines.append(f"  preflight: {report['next']['preflightReportPath']}")
+    if report["next"].get("pilotPlanPath"):
+        lines.append(f"  pilot plan: {report['next']['pilotPlanPath']}")
+        lines.append(f"  next pilot run: {report['next']['pilotRunCommand']}")
+    if report["next"].get("fullPlanPath"):
+        lines.append(f"  full plan: {report['next']['fullPlanPath']}")
+    if report["next"].get("preprocessCommand"):
+        lines.append(f"  next preprocess: {report['next']['preprocessCommand']}")
+    if summary["status"] == "needs-input":
+        lines.append("  next: add a COLMAP sparse output or rosbag under the root and rerun bootstrap")
     return "\n".join(lines)
 
 

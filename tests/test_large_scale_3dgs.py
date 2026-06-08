@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from gs_sim2real.train.large_scale_3dgs import (
+    LargeScale3DGSBootstrapOptions,
     LargeScale3DGSCatalogOptions,
     LargeScale3DGSDiscoveryOptions,
     LargeScale3DGSOptions,
@@ -14,6 +15,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSRunOptions,
     LargeScale3DGSSmokeDataOptions,
     _default_command_runner,
+    build_large_scale_3dgs_bootstrap,
     build_large_scale_3dgs_catalog,
     build_large_scale_3dgs_discovery,
     build_large_scale_3dgs_plan,
@@ -21,6 +23,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     build_large_scale_3dgs_preflight,
     build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
+    format_large_scale_3dgs_bootstrap_text,
     format_large_scale_3dgs_catalog_text,
     format_large_scale_3dgs_discovery_text,
     format_large_scale_3dgs_pilot_text,
@@ -30,6 +33,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     format_large_scale_3dgs_smoke_data_text,
     load_colmap_images_text,
     run_large_scale_3dgs_plan,
+    write_large_scale_3dgs_bootstrap,
     write_large_scale_3dgs_catalog,
     write_large_scale_3dgs_discovery,
     write_large_scale_3dgs_plan,
@@ -223,6 +227,71 @@ def test_build_large_scale_3dgs_discovery_recommends_preflight_for_colmap_scene(
     assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["kind"] == "colmap-scene"
     assert "Large-scale 3DGS input discovery" in text
     assert "next preflight: gs-mapper large-scale-3dgs-preflight" in text
+
+
+def test_build_large_scale_3dgs_bootstrap_writes_pilot_for_colmap_scene(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    data_dir = _write_route_sparse_fixture(root / "autoware_sparse", image_count=6)
+    output_dir = tmp_path / "autoware_large"
+
+    report = build_large_scale_3dgs_bootstrap(
+        LargeScale3DGSBootstrapOptions(
+            root_dir=root,
+            output_dir=output_dir,
+            axes="xy",
+            tile_sizes=(10.0, 20.0),
+            overlap=1,
+            min_images=1,
+            target_images_per_chunk=1,
+            pilot_chunks=2,
+            route_start_image=1,
+            iterations=7,
+            config=None,
+            link_mode="copy",
+            max_depth=5,
+        )
+    )
+    report_path = write_large_scale_3dgs_bootstrap(report)
+    text = format_large_scale_3dgs_bootstrap_text(report, report_path)
+    pilot_plan_path = output_dir / "large_scale_3dgs_pilot_plan.json"
+    preflight_path = output_dir / "large_scale_3dgs_preflight.json"
+    pilot_plan = json.loads(pilot_plan_path.read_text(encoding="utf-8"))
+
+    assert report["type"] == "large-scale-3dgs-bootstrap"
+    assert report["status"] == "pilot-ready"
+    assert report["summary"]["pilotPlanWritten"] is True
+    assert report["discovery"]["recommendation"]["dataDir"] == str(data_dir)
+    assert report["preflight"]["next"]["pilotWritten"] is True
+    assert preflight_path.exists()
+    assert report_path == output_dir / "large_scale_3dgs_bootstrap.json"
+    assert report["next"]["pilotPlanPath"] == str(pilot_plan_path)
+    assert "gs-mapper large-scale-3dgs-run --plan" in report["next"]["pilotRunCommand"]
+    assert pilot_plan["summary"]["chunkCount"] == 2
+    assert Path(pilot_plan["chunks"][0]["dataDir"], "images", "route_001.jpg").read_bytes() == b"jpg"
+    assert "Large-scale 3DGS bootstrap" in text
+    assert "status: pilot-ready" in text
+
+
+def test_build_large_scale_3dgs_bootstrap_reports_preprocess_when_only_bag_exists(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    bag_dir = root / "rosbag2"
+    bag_dir.mkdir(parents=True)
+    (bag_dir / "route_001.db3").write_bytes(b"sqlite")
+
+    report = build_large_scale_3dgs_bootstrap(
+        LargeScale3DGSBootstrapOptions(
+            root_dir=root,
+            max_depth=4,
+        )
+    )
+    text = format_large_scale_3dgs_bootstrap_text(report)
+
+    assert report["status"] == "needs-preprocess"
+    assert report["summary"]["pilotPlanWritten"] is False
+    assert report["next"]["pilotRunCommand"] == ""
+    assert report["next"]["preprocessCommand"].startswith("gs-mapper preprocess --method colmap")
+    assert str(bag_dir) in report["next"]["preprocessCommand"]
+    assert "next preprocess:" in text
 
 
 def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands(tmp_path: Path) -> None:

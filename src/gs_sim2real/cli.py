@@ -413,6 +413,70 @@ def build_parser() -> argparse.ArgumentParser:
         help="Stdout format after writing the discovery report",
     )
 
+    lsgb = subparsers.add_parser(
+        "large-scale-3dgs-bootstrap",
+        help="Discover inputs and write the first large-scale 3DGS pilot plan when possible",
+    )
+    lsgb.add_argument("--root", default=".", help="Root directory to scan for map inputs")
+    lsgb.add_argument(
+        "--output",
+        default=None,
+        help="Optional output root for generated preflight, pilot, and plan files",
+    )
+    lsgb.add_argument("--report", default=None, help="Optional bootstrap report JSON path")
+    lsgb.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="Axes used for preflight and pilot planning",
+    )
+    lsgb.add_argument("--tile-sizes", default="20,30,50", help="Comma-separated candidate tile sizes")
+    lsgb.add_argument("--overlap", type=float, default=5.0, help="Tile overlap in scene units/metres")
+    lsgb.add_argument("--min-images", type=int, default=8, help="Minimum core images for a trainable tile")
+    lsgb.add_argument(
+        "--target-images-per-chunk",
+        type=int,
+        default=48,
+        help="Preferred median core image count used to pick the recommended tile size",
+    )
+    lsgb.add_argument("--pilot-chunks", type=int, default=6, help="Ready route chunks to include in the pilot")
+    lsgb.add_argument(
+        "--route-start-image",
+        type=int,
+        default=0,
+        help="Zero-based COLMAP image order index where pilot chunk selection starts",
+    )
+    lsgb.add_argument("--iterations", type=int, default=30000, help="Iterations for generated train commands")
+    lsgb.add_argument(
+        "--config",
+        default="configs/training_ba.yaml",
+        help="Training config path used in generated train commands",
+    )
+    lsgb.add_argument(
+        "--write-plan",
+        action="store_true",
+        help="Also write the full large_scale_3dgs_plan.json next to the pilot plan",
+    )
+    lsgb.add_argument(
+        "--link-mode",
+        choices=["symlink", "copy", "none"],
+        default="symlink",
+        help="How selected chunks place images/depth below the output root",
+    )
+    lsgb.add_argument("--max-depth", type=int, default=8, help="Maximum relative directory depth to scan")
+    lsgb.add_argument("--max-results", type=int, default=20, help="Maximum discovery results per input kind")
+    lsgb.add_argument(
+        "--include-chunk-models",
+        action="store_true",
+        help="Include already materialized chunk sparse models in discovery",
+    )
+    lsgb.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the bootstrap report",
+    )
+
     lsgs = subparsers.add_parser(
         "large-scale-3dgs-smoke-data",
         help="Generate a deterministic multi-tile COLMAP fixture for large-scale gsplat smoke runs",
@@ -2758,6 +2822,44 @@ def cmd_large_scale_3dgs_discover(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_discovery_text(report, report_path))
 
 
+def cmd_large_scale_3dgs_bootstrap(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-bootstrap subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSBootstrapOptions,
+        build_large_scale_3dgs_bootstrap,
+        format_large_scale_3dgs_bootstrap_text,
+        parse_large_scale_3dgs_tile_sizes,
+        write_large_scale_3dgs_bootstrap,
+    )
+
+    options = LargeScale3DGSBootstrapOptions(
+        root_dir=Path(args.root),
+        output_dir=Path(args.output) if args.output else None,
+        report_path=Path(args.report) if args.report else None,
+        axes=args.axes,
+        tile_sizes=parse_large_scale_3dgs_tile_sizes(args.tile_sizes),
+        overlap=args.overlap,
+        min_images=args.min_images,
+        target_images_per_chunk=args.target_images_per_chunk,
+        pilot_chunks=args.pilot_chunks,
+        route_start_image=args.route_start_image,
+        iterations=args.iterations,
+        config=args.config,
+        write_plan=args.write_plan,
+        link_mode=args.link_mode,
+        max_depth=args.max_depth,
+        max_results=args.max_results,
+        include_chunk_models=args.include_chunk_models,
+    )
+    report = build_large_scale_3dgs_bootstrap(options)
+    report_path = write_large_scale_3dgs_bootstrap(report, options.report_path)
+
+    if args.format == "json":
+        print(json.dumps({**report, "reportPath": str(report_path)}, indent=2))
+    else:
+        print(format_large_scale_3dgs_bootstrap_text(report, report_path))
+
+
 def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
     """Handle the large-scale-3dgs-preflight subcommand."""
     from gs_sim2real.train.large_scale_3dgs import (
@@ -3889,6 +3991,7 @@ def main(argv: list[str] | None = None) -> None:
         "preprocess": cmd_preprocess,
         "train": cmd_train,
         "large-scale-3dgs-discover": cmd_large_scale_3dgs_discover,
+        "large-scale-3dgs-bootstrap": cmd_large_scale_3dgs_bootstrap,
         "large-scale-3dgs-smoke-data": cmd_large_scale_3dgs_smoke_data,
         "large-scale-3dgs-preflight": cmd_large_scale_3dgs_preflight,
         "large-scale-3dgs-pilot": cmd_large_scale_3dgs_pilot,
