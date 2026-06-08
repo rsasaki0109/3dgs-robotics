@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "type": "large-scale-3dgs-tile-catalog",
+  "createdAt": "2026-06-08T23:23:03.550360+00:00",
+  "sceneId": "istanbul-bag6-pilot",
+  "label": "Istanbul Bag6 3DGS Pilot",
+  "planPath": "outputs/istanbul_bag6_large/large_scale_3dgs_pilot_plan.json",
+  "runReportPath": "outputs/istanbul_bag6_large/large_scale_3dgs_run_report.json",
+  "tiling": {
+    "strategy": "camera-center-grid",
+    "axes": "xy",
+    "tileSize": 30.0,
+    "overlap": 5.0,
+    "minImages": 8,
+    "worldBounds": {
+      "minX": 3.999924864610902,
+      "maxX": 81.23896322862228,
+      "minY": -96.71822928494967,
+      "maxY": -4.803967652717926
+    }
+  },
+  "summary": {
+    "tileCount": 6,
+    "readyTileCount": 6,
+    "missingSplatTileCount": 0
+  },
+  "tiles": [
+    {
+      "id": "tile_x000_y003",
+      "label": "tile x000 y003",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y003.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y003.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y003.splat",
+      "coreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minY": -6.718229284949672,
+        "maxY": 23.281770715050328
+      },
+      "expandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minY": -11.718229284949672,
+        "maxY": 28.281770715050328
+      },
+      "tileIndex": {
+        "x": 0,
+        "y": 3
+      },
+      "axes": "xy",
+      "imageCount": 33,
+      "coreImageCount": 11,
+      "pointCount": 7638
+    },
+    {
+      "id": "tile_x000_y002",
+      "label": "tile x000 y002",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y002.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y002.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y002.splat",
+      "coreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minY": -36.71822928494967,
+        "maxY": -6.718229284949672
+      },
+      "expandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minY": -41.71822928494967,
+        "maxY": -1.7182292849496719
+      },
+      "tileIndex": {
+        "x": 0,
+        "y": 2
+      },
+      "axes": "xy",
+      "imageCount": 117,
+      "coreImageCount": 91,
+      "pointCount": 16848
+    },
+    {
+      "id": "tile_x000_y001",
+      "label": "tile x000 y001",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y001.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y001.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y001.splat",
+      "coreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minY": -66.71822928494967,
+        "maxY": -36.71822928494967
+      },
+      "expandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minY": -71.71822928494967,
+        "maxY": -31.718229284949672
+      },
+      "tileIndex": {
+        "x": 0,
+        "y": 1
+      },
+      "axes": "xy",
+      "imageCount": 41,
+      "coreImageCount": 10,
+      "pointCount": 10602
+    },
+    {
+      "id": "tile_x001_y001",
+      "label": "tile x001 y001",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y001.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x001_y001.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y001.splat",
+      "coreBounds": {
+        "minX": 33.999924864610904,
+        "maxX": 63.999924864610904,
+        "minY": -66.71822928494967,
+        "maxY": -36.71822928494967
+      },
+      "expandedBounds": {
+        "minX": 28.999924864610904,
+        "maxX": 68.9999248646109,
+        "minY": -71.71822928494967,
+        "maxY": -31.718229284949672
+      },
+      "tileIndex": {
+        "x": 1,
+        "y": 1
+      },
+      "axes": "xy",
+      "imageCount": 88,
+      "coreImageCount": 63,
+      "pointCount": 20137
+    },
+    {
+      "id": "tile_x001_y000",
+      "label": "tile x001 y000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y000.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x001_y000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y000.splat",
+      "coreBounds": {
+        "minX": 33.999924864610904,
+        "maxX": 63.999924864610904,
+        "minY": -96.71822928494967,
+        "maxY": -66.71822928494967
+      },
+      "expandedBounds": {
+        "minX": 28.999924864610904,
+        "maxX": 68.9999248646109,
+        "minY": -101.71822928494967,
+        "maxY": -61.71822928494967
+      },
+      "tileIndex": {
+        "x": 1,
+        "y": 0
+      },
+      "axes": "xy",
+      "imageCount": 46,
+      "coreImageCount": 18,
+      "pointCount": 14621
+    },
+    {
+      "id": "tile_x002_y000",
+      "label": "tile x002 y000",
+      "status": "ready",
+      "runStatus": "done",
+      "splatUrl": "/splats/istanbul-bag6-pilot/tile_x002_y000.splat",
+      "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x002_y000.splat",
+      "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x002_y000.splat",
+      "coreBounds": {
+        "minX": 63.999924864610904,
+        "maxX": 93.9999248646109,
+        "minY": -96.71822928494967,
+        "maxY": -66.71822928494967
+      },
+      "expandedBounds": {
+        "minX": 58.999924864610904,
+        "maxX": 98.9999248646109,
+        "minY": -101.71822928494967,
+        "maxY": -61.71822928494967
+      },
+      "tileIndex": {
+        "x": 2,
+        "y": 0
+      },
+      "axes": "xy",
+      "imageCount": 112,
+      "coreImageCount": 98,
+      "pointCount": 28808
+    }
+  ]
+}

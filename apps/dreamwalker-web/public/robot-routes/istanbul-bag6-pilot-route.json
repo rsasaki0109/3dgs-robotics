@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-route/v1",
+  "label": "Istanbul Bag6 3DGS Pilot Route",
+  "description": "auto-generated route through 6 large-scale 3DGS tile(s)",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "frameId": "dreamwalker_map",
+  "world": {
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "assetLabel": "Istanbul Bag6 3DGS Pilot",
+    "splatUrl": "",
+    "colliderMeshUrl": "",
+    "frameId": "dreamwalker_map",
+    "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+    "usesDemoFallback": false
+  },
+  "pose": {
+    "position": [
+      78.999925,
+      -81.718229,
+      0.0
+    ],
+    "yawDegrees": 270
+  },
+  "route": [
+    [
+      18.999925,
+      -51.718229,
+      0.0
+    ],
+    [
+      18.999925,
+      -21.718229,
+      0.0
+    ],
+    [
+      18.999925,
+      8.281771,
+      0.0
+    ],
+    [
+      48.999925,
+      -51.718229,
+      0.0
+    ],
+    [
+      48.999925,
+      -81.718229,
+      0.0
+    ],
+    [
+      78.999925,
+      -81.718229,
+      0.0
+    ]
+  ],
+  "tileSequence": [
+    "tile_x000_y001",
+    "tile_x000_y002",
+    "tile_x000_y003",
+    "tile_x001_y001",
+    "tile_x001_y000",
+    "tile_x002_y000"
+  ],
+  "sourceCatalog": {
+    "path": "apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json",
+    "sceneId": "istanbul-bag6-pilot",
+    "label": "Istanbul Bag6 3DGS Pilot",
+    "axes": "xy",
+    "order": "snake"
+  }
+}

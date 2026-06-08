@@ -106,6 +106,27 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 | Tile bytes | 86.3 MB total across 87 browser tile `.splat` files |
 | Runtime view | active / preload / evicted tile residency overlay in Robot Mode |
 
+### Real Rosbag2 3DGS Pilot Result
+
+An Istanbul `rosbag2` capture is also staged as a real-input 3DGS pilot:
+291 registered camera frames, GNSS-seeded poses, 100,000 sparse seed points,
+6 ready XY tiles, and 6 browser `.splat` files.
+
+Open the hosted Dynamic Map Viewer pilot:
+
+```text
+https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Fistanbul-bag6-pilot-tile-catalog.json&tilePreload=metadata&robotRoute=%2Frobot-routes%2Fistanbul-bag6-pilot-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
+```
+
+| Result | Value |
+| --- | --- |
+| Tile catalog | [`istanbul-bag6-pilot-tile-catalog.json`](apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json) |
+| Route playback | [`istanbul-bag6-pilot-route.json`](apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json) |
+| Source capture | Istanbul rosbag2, 20.2 s, 3 camera topics, LiDAR, GNSS, TF, IMU |
+| Ready tiles | 6 / 6 ready tiles, 0 missing |
+| Tile bytes | 12.5 MB total across 6 browser tile `.splat` files |
+| Pipeline | `preprocess --method mcd` -> GNSS-seeded COLMAP sparse -> `large-scale-3dgs-run` -> Dynamic Map Viewer promotion |
+
 Run it locally:
 
 ```bash

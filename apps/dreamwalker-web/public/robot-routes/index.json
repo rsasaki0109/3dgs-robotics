@@ -20,6 +20,14 @@
       "accent": "#f4ca72"
     },
     {
+      "id": "istanbul-bag6-pilot-route",
+      "label": "Istanbul Bag6 3DGS Pilot Route",
+      "url": "/robot-routes/istanbul-bag6-pilot-route.json",
+      "description": "six-tile real rosbag2 3DGS pilot with GNSS-seeded dynamic map playback",
+      "fragmentId": "residency",
+      "accent": "#85e3e1"
+    },
+    {
       "id": "outdoor-demo-dust3r-tile-loop",
       "label": "Outdoor Demo DUSt3R Tile Loop",
       "url": "/robot-routes/outdoor-demo-dust3r-tile-loop.json",
