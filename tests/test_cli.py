@@ -84,6 +84,56 @@ class TestCLIHelp:
         assert args.include_chunk_models is True
         assert args.format == "json"
 
+    def test_cli_large_scale_3dgs_bootstrap_help(self) -> None:
+        """Running large-scale-3dgs-bootstrap --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-bootstrap", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_bootstrap_args(self) -> None:
+        """large-scale-3dgs-bootstrap accepts scan and pilot generation args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-bootstrap",
+                "--root",
+                "data",
+                "--output",
+                "outputs/autoware_large",
+                "--report",
+                "outputs/bootstrap.json",
+                "--axes",
+                "xz",
+                "--tile-sizes",
+                "8,12",
+                "--overlap",
+                "1.5",
+                "--min-images",
+                "2",
+                "--pilot-chunks",
+                "3",
+                "--route-start-image",
+                "4",
+                "--write-plan",
+                "--link-mode",
+                "copy",
+                "--format",
+                "json",
+            ]
+        )
+
+        assert args.root == "data"
+        assert args.output == "outputs/autoware_large"
+        assert args.report == "outputs/bootstrap.json"
+        assert args.axes == "xz"
+        assert args.tile_sizes == "8,12"
+        assert args.overlap == 1.5
+        assert args.min_images == 2
+        assert args.pilot_chunks == 3
+        assert args.route_start_image == 4
+        assert args.write_plan is True
+        assert args.link_mode == "copy"
+        assert args.format == "json"
+
     def test_cli_large_scale_3dgs_smoke_data_help(self) -> None:
         """Running large-scale-3dgs-smoke-data --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
