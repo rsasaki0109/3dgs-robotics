@@ -7,24 +7,6 @@
       "label": "Outdoor GS Demo",
       "manifest": "assets/outdoor-demo/scene.json",
       "description": "Outdoor 3DGS smoke reconstruction from the public Autoware Leo Drive ISUZU bag (GNSS-seeded COLMAP + gsplat)."
-    },
-    {
-      "id": "street-gallery",
-      "label": "Street Gallery",
-      "manifest": "assets/street-gallery/scene.json",
-      "description": "Photo-derived point scene built from the street sample gallery image."
-    },
-    {
-      "id": "campus-gallery",
-      "label": "Campus Gallery",
-      "manifest": "assets/campus-gallery/scene.json",
-      "description": "Photo-derived point scene built from the campus sample gallery image."
-    },
-    {
-      "id": "indoor-gallery",
-      "label": "Indoor Gallery",
-      "manifest": "assets/indoor-gallery/scene.json",
-      "description": "Photo-derived point scene built from the indoor sample gallery image."
     }
   ]
 }

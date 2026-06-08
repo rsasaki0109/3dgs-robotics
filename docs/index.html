@@ -930,6 +930,67 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
 /* 3D Viewer */
 #viewer-section { max-width: 1400px; }
 
+.viewer-brief {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.3fr) repeat(3, minmax(160px, 0.7fr));
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.viewer-brief-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #111821;
+  padding: 14px 15px;
+}
+
+.viewer-brief-card.primary {
+  border-color: rgba(63,185,80,0.42);
+  background: linear-gradient(135deg, rgba(63,185,80,0.15), rgba(17,24,33,0.98));
+}
+
+.viewer-brief-card span {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+}
+
+.viewer-brief-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.35;
+  margin-bottom: 0.45rem;
+}
+
+.viewer-brief-card p {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.viewer-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0.85rem;
+}
+
+.viewer-brief-actions a {
+  border: 1px solid rgba(63,185,80,0.42);
+  border-radius: 6px;
+  color: var(--accent-green);
+  padding: 5px 10px;
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+
+.viewer-brief-actions a:hover {
+  background: rgba(63,185,80,0.1);
+}
+
 .viewer-container {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1251,6 +1312,7 @@ footer a:hover { text-decoration: underline; }
   .proof-media img { height: auto; }
   .pipeline-flow { flex-direction: column; }
   .pipeline-arrow { transform: rotate(90deg); }
+  .viewer-brief { grid-template-columns: 1fr; }
   #viewer-canvas { height: 400px; }
   .viewer-toolbar { gap: 8px; }
   .footer-links { gap: 0.9rem 1.2rem; }
@@ -1276,9 +1338,9 @@ footer a:hover { text-decoration: underline; }
     </a>
     <nav>
       <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker</a>
-      <a href="splat.html">Live Demo</a>
-      <a href="#scene-showcase-section">Scenes</a>
-      <a href="#mission-control-section">Mission</a>
+      <a href="splat.html">Splat Set</a>
+      <a href="#scene-showcase-section">Source Splats</a>
+      <a href="#mission-control-section">Mission Review</a>
       <a href="reviews/">Reviews</a>
       <a href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI</a>
       <a href="#pipeline-section">Pipeline</a>
@@ -1299,9 +1361,8 @@ footer a:hover { text-decoration: underline; }
     <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted DreamWalker route demo and watch the resident tile window move through a 34-tile production grid.</p>
     <div class="hero-actions">
       <a class="hero-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Launch DreamWalker map &rarr;</a>
-      <a class="hero-action" href="#scene-showcase-section">Compare all scenes &rarr;</a>
-      <a class="hero-action" href="#mission-control-section">Open mission proof &rarr;</a>
-      <a class="hero-action" href="reviews/">Scenario CI reviews &rarr;</a>
+      <a class="hero-action" href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json">Open tile catalog &rarr;</a>
+      <a class="hero-action" href="#viewer-section">Inspect splat source &rarr;</a>
     </div>
     <div class="hero-proof">
       <span>34 ready map tiles</span>
@@ -1349,11 +1410,11 @@ footer a:hover { text-decoration: underline; }
   <div class="showcase-inner">
     <div class="showcase-heading">
       <div>
-        <div class="showcase-eyebrow">Production outdoor GS set</div>
-        <h2>Outdoor GS works here: supervised, pose-free, and external-SLAM splats in one picker.</h2>
-        <p>These are shipped <code>.splat</code> assets, not mock screenshots. The picker is backed by <code>docs/scenes-list.json</code>, so the README table, preview capture scripts, hero GIF, and viewer entry points stay aligned.</p>
+        <div class="showcase-eyebrow">Dynamic-map source splats</div>
+        <h2>Production outdoor splats feed the dynamic-map catalog.</h2>
+        <p>These shipped <code>.splat</code> assets are the source set behind the large-map proof, README previews, result GIF, and viewer entry points. Supervised, pose-free, and external-SLAM variants stay inspectable without pulling the focus away from DreamWalker.</p>
       </div>
-      <a class="showcase-link" href="splat.html">Open scene picker &rarr;</a>
+      <a class="showcase-link" href="splat.html">Inspect splat set &rarr;</a>
     </div>
     <div class="scene-showcase-grid">
       <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/outdoor-demo.splat">
@@ -1598,14 +1659,38 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Section 1: 3D Viewer -->
 <section id="viewer-section">
-  <h2 class="section-title">Outdoor Scene Inspector</h2>
-  <p class="section-sub">The production splat viewers are <a href="splat.html" style="color:var(--accent-green);text-decoration:none;font-weight:500;">antimatter15/splat (WebGL)</a> · <a href="splat_spark.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">Spark (WebGL / ESM)</a> · <a href="splat_webgpu.html" style="color:#f59e0b;text-decoration:none;font-weight:500;">shrekshao (WebGPU, compute-sort)</a>. This embedded inspector loads the lightweight point bundle for quick bounds and scene-contract checks.</p>
+  <h2 class="section-title">Dynamic Map Splat Inspector</h2>
+  <p class="section-sub">Use this embedded point-bundle viewer for quick bounds checks. The full DreamWalker route demo loads the 34-tile <a href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json" style="color:var(--accent-green);text-decoration:none;font-weight:500;">tile catalog</a>, while the production splat viewers remain available through <a href="splat.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">the source splat set</a>.</p>
+  <div class="viewer-brief">
+    <div class="viewer-brief-card primary">
+      <span>DreamWalker route</span>
+      <strong>34 ready tiles, 6 resident slots</strong>
+      <p>Route playback drives tile residency from a static GitHub Pages catalog.</p>
+      <div class="viewer-brief-actions">
+        <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open map</a>
+        <a href="dreamwalker/robot-routes/outdoor-production-grid-large-route.json">Route JSON</a>
+      </div>
+    </div>
+    <div class="viewer-brief-card">
+      <span>Tile payload</span>
+      <strong>78.2 MB</strong>
+      <p>Browser-ready splat tiles served directly from Pages.</p>
+    </div>
+    <div class="viewer-brief-card">
+      <span>Source splats</span>
+      <strong>9 scenes</strong>
+      <p>Supervised, pose-free, and external-SLAM outdoor assets.</p>
+    </div>
+    <div class="viewer-brief-card">
+      <span>Inspector bundle</span>
+      <strong>Outdoor GS Demo</strong>
+      <p>Lightweight point scene for embedded contract checks.</p>
+    </div>
+  </div>
   <div class="viewer-container">
     <div class="viewer-toolbar">
       <div class="scene-tabs">
-        <button class="scene-tab active" data-scene="street">Street</button>
-        <button class="scene-tab" data-scene="campus">Campus</button>
-        <button class="scene-tab" data-scene="indoor">Prototype</button>
+        <button class="scene-tab active" data-scene="outdoor-demo">Outdoor GS Demo</button>
       </div>
       <span class="toolbar-label viewer-status" id="viewer-status">Checking published scenes…</span>
       <label class="toolbar-btn toolbar-file">
@@ -1683,8 +1768,8 @@ footer a:hover { text-decoration: underline; }
 <!-- Section 3: Metrics -->
 <section id="metrics-section">
   <h2 class="section-title">Outdoor Build Signals</h2>
-  <p class="section-sub">The production proof is the shipped outdoor `.splat` set above. These charts keep the lighter prototype training path visible for debugging and documentation.</p>
-  <div class="metrics-badge" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:20px;padding:4px 16px;font-size:0.8rem;color:var(--accent-blue);font-family:var(--font-mono);margin-bottom:1.5rem;">Prototype training traces | Production outdoor demos are the bundled .splat assets</div>
+  <p class="section-sub">The production proof is the shipped outdoor `.splat` set and DreamWalker tile catalog above. These charts keep the lighter debug training path visible for build diagnostics.</p>
+  <div class="metrics-badge" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:20px;padding:4px 16px;font-size:0.8rem;color:var(--accent-blue);font-family:var(--font-mono);margin-bottom:1.5rem;">Debug training traces | Production dynamic-map proof is the tiled .splat catalog</div>
   <!-- Summary Stats -->
   <div class="stats-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:2rem;">
     <div class="chart-card" id="stats-street">
@@ -1706,7 +1791,7 @@ footer a:hover { text-decoration: underline; }
       </div>
     </div>
     <div class="chart-card" id="stats-indoor">
-      <h3 style="color:var(--accent-orange);">Prototype Scene</h3>
+      <h3 style="color:var(--accent-orange);">Debug Training Scene</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0.75rem;">
         <div class="stat"><div class="label">Final PSNR</div><div class="value" style="color:var(--accent-green);">30.47 dB</div></div>
         <div class="stat"><div class="label">Final SSIM</div><div class="value">0.8959</div></div>
@@ -1737,8 +1822,8 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Section 4: Datasets -->
 <section id="datasets-section">
-  <h2 class="section-title">Outdoor Data Sources</h2>
-  <p class="section-sub">The public demo centers on robotics logs and external SLAM artifacts that can plausibly feed outdoor Physical AI evaluation.</p>
+  <h2 class="section-title">Dynamic Map Inputs</h2>
+  <p class="section-sub">The public Pages story now centers on the robotics logs and imported geometry that feed large-scale splat tiles, route playback, and Physical AI evaluation.</p>
   <div class="dataset-grid">
     <div class="dataset-card">
       <span class="tag" style="background:rgba(88,166,255,0.15);color:var(--accent-blue);">Street / Driving</span>
@@ -1785,7 +1870,7 @@ footer a:hover { text-decoration: underline; }
     <a href="https://github.com/rsasaki0109/gs-mapper">GitHub</a>
     <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker Map</a>
     <a href="reviews/">Reviews</a>
-    <a href="splat.html">Live Demo</a>
+    <a href="splat.html">Splat Viewer</a>
     <a href="launch-kit.html">Launch Kit</a>
     <a href="https://repo-rasterizer.github.io/3d-gaussian-splatting/">3DGS Paper</a>
     <a href="#viewer-section">Back to Top</a>
@@ -1863,7 +1948,7 @@ footer a:hover { text-decoration: underline; }
   let sceneEntries = [
     { id: 'street', label: 'Street', source: 'procedural' },
     { id: 'campus', label: 'Campus', source: 'procedural' },
-    { id: 'indoor', label: 'Prototype', source: 'procedural' }
+    { id: 'indoor', label: 'Debug Fallback', source: 'procedural' }
   ];
   const publishedSceneRegistry = new Map();
   const sceneTabsEl = document.querySelector('.scene-tabs');
@@ -2144,7 +2229,7 @@ footer a:hover { text-decoration: underline; }
       setSceneEntries([
         { id: 'street', label: 'Street', source: 'procedural' },
         { id: 'campus', label: 'Campus', source: 'procedural' },
-        { id: 'indoor', label: 'Prototype', source: 'procedural' },
+        { id: 'indoor', label: 'Debug Fallback', source: 'procedural' },
       ]);
       activeSceneId = 'street';
       setViewerStatus('Using built-in demo scenes', 'ready');
@@ -2507,7 +2592,7 @@ footer a:hover { text-decoration: underline; }
     }
     if (name === 'street') sceneData[name] = buildScenePayload(generateStreetScene(50000), { label: 'Street', source: 'procedural' });
     else if (name === 'campus') sceneData[name] = buildScenePayload(generateCampusScene(50000), { label: 'Campus', source: 'procedural' });
-    else if (name === 'indoor') sceneData[name] = buildScenePayload(generateIndoorScene(30000), { label: 'Prototype', source: 'procedural' });
+    else if (name === 'indoor') sceneData[name] = buildScenePayload(generateIndoorScene(30000), { label: 'Debug Fallback', source: 'procedural' });
     else throw new Error(`unknown scene: ${name}`);
     return sceneData[name];
   }
@@ -2638,7 +2723,7 @@ footer a:hover { text-decoration: underline; }
       setSceneEntries([
         { id: 'street', label: 'Street', source: 'procedural' },
         { id: 'campus', label: 'Campus', source: 'procedural' },
-        { id: 'indoor', label: 'Prototype', source: 'procedural' },
+        { id: 'indoor', label: 'Debug Fallback', source: 'procedural' },
       ]);
       setViewerStatus(`Published scene load failed: ${error.message || error}`, 'error');
       return loadScene('street');
@@ -2757,7 +2842,7 @@ footer a:hover { text-decoration: underline; }
     campus: '#3fb950',
     indoor: '#d29922'
   };
-  const sceneNames = { street: 'Street', campus: 'Campus', indoor: 'Prototype' };
+  const sceneNames = { street: 'Street', campus: 'Campus', indoor: 'Debug' };
 
   // Loss chart - per scene
   const lossTraces = Object.keys(metrics).map(scene => ({

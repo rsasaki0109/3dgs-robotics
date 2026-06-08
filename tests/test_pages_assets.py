@@ -501,20 +501,27 @@ def test_index_surfaces_interactive_mission_control_proof() -> None:
 
 
 def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
-    """The Pages landing page should read as an outdoor-GS demo, not a generic prototype."""
+    """The Pages landing page should read as a dynamic-map demo, not an old generic demo."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
-    assert "Outdoor GS works here" in html
+    scene_index = json.loads((REPO_ROOT / "docs" / "assets" / "scenes.json").read_text(encoding="utf-8"))
+    assert "Production outdoor splats feed the dynamic-map catalog." in html
     assert "Robot logs in. Outdoor Gaussian splats out." in html
     assert "Autoware rosbags" in html
     assert "MCD ATV / handheld sessions" in html
     assert "GNSS + LiDAR splats" in html
     assert "images/demo-sweep/compare_bag6_15k.png" in html
     assert "images/demo-sweep/mobile_iphone14_webgpu.png" in html
-    assert "Outdoor Data Sources" in html
-    assert "Outdoor Scene Inspector" in html
+    assert "Dynamic Map Inputs" in html
+    assert "Dynamic Map Splat Inspector" in html
+    assert "34 ready tiles, 6 resident slots" in html
+    assert "Open tile catalog" in html
+    assert [scene["id"] for scene in scene_index["scenes"]] == ["outdoor-demo"]
     assert "Input Gallery" not in html
     assert 'id="gallery-section"' not in html
     assert "gallery-tab" not in html
+    assert "Street Gallery" not in html
+    assert "Campus Gallery" not in html
+    assert "Indoor Gallery" not in html
     assert "gallery/street/" not in html
     assert "gallery/campus/" not in html
     assert "gallery/indoor/" not in html

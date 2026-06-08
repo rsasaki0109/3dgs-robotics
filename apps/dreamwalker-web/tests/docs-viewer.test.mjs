@@ -41,7 +41,7 @@ async function waitForServer(url, child, timeoutMs = 10000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-test('docs viewer loads published photo-derived scene bundles', async () => {
+test('docs viewer loads the published outdoor scene bundle', async () => {
   const docsPort = await reservePort();
   const docsUrl = `http://127.0.0.1:${docsPort}/`;
   const server = spawn('python3', ['-m', 'http.server', String(docsPort), '-d', 'docs'], {
@@ -71,12 +71,7 @@ test('docs viewer loads published photo-derived scene bundles', async () => {
 
     assert.equal(snapshot.status, 'Showing Outdoor GS Demo from published');
     assert.ok(/\d[\d,]* points/.test(snapshot.pointCount));
-    assert.deepEqual(snapshot.tabs, [
-      'Outdoor GS Demo',
-      'Street Gallery',
-      'Campus Gallery',
-      'Indoor Gallery',
-    ]);
+    assert.deepEqual(snapshot.tabs, ['Outdoor GS Demo']);
   } finally {
     if (browser) {
       await browser.close();
