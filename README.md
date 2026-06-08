@@ -268,13 +268,16 @@ gs-mapper large-scale-3dgs-run --plan outputs/autoware_large/large_scale_3dgs_pi
 ```
 
 When the pilot splats look stable, run the full preflight-generated plan and
-publish a tile catalog:
+promote the trained tiles into Dynamic Map Viewer public assets:
 
 ```bash
 gs-mapper large-scale-3dgs-run --plan outputs/autoware_large/large_scale_3dgs_plan.json
-gs-mapper large-scale-3dgs-catalog \
+gs-mapper large-scale-3dgs-promote \
   --plan outputs/autoware_large/large_scale_3dgs_plan.json \
-  --run-report outputs/autoware_large/large_scale_3dgs_run_report.json
+  --run-report outputs/autoware_large/large_scale_3dgs_run_report.json \
+  --public-root apps/dreamwalker-web/public \
+  --scene-id autoware-large-route \
+  --label "Autoware Large Route"
 ```
 
 For the bundled large fixture, compose the 9 production splats into a 5x5

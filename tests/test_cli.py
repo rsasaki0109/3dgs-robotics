@@ -223,6 +223,52 @@ class TestCLIHelp:
             main(["large-scale-3dgs-route", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_promote_help(self) -> None:
+        """Running large-scale-3dgs-promote --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-promote", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_promote_args(self) -> None:
+        """large-scale-3dgs-promote accepts public asset promotion args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-promote",
+                "--bootstrap",
+                "outputs/autoware_large/large_scale_3dgs_bootstrap.json",
+                "--run-report",
+                "outputs/autoware_large/large_scale_3dgs_run_report.json",
+                "--public-root",
+                "apps/dreamwalker-web/public",
+                "--scene-id",
+                "autoware-route",
+                "--label",
+                "Autoware Route",
+                "--link-mode",
+                "copy",
+                "--full-plan",
+                "--route-order",
+                "snake",
+                "--route-playback-ms",
+                "900",
+                "--no-route-playback-loop",
+                "--format",
+                "json",
+            ]
+        )
+
+        assert args.bootstrap == "outputs/autoware_large/large_scale_3dgs_bootstrap.json"
+        assert args.run_report == "outputs/autoware_large/large_scale_3dgs_run_report.json"
+        assert args.public_root == "apps/dreamwalker-web/public"
+        assert args.scene_id == "autoware-route"
+        assert args.label == "Autoware Route"
+        assert args.link_mode == "copy"
+        assert args.full_plan is True
+        assert args.route_order == "snake"
+        assert args.route_playback_ms == 900
+        assert args.no_route_playback_loop is True
+        assert args.format == "json"
+
     def test_cli_splat_tile_catalog_help(self) -> None:
         """Running splat-tile-catalog --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:

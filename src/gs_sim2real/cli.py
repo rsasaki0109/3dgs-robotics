@@ -816,6 +816,101 @@ def build_parser() -> argparse.ArgumentParser:
         help="Stdout format after writing the robot route",
     )
 
+    lsgpr = subparsers.add_parser(
+        "large-scale-3dgs-promote",
+        help="Promote large-scale 3DGS run outputs into Dynamic Map Viewer public assets",
+    )
+    lsgpr.add_argument("--bootstrap", default=None, help="Optional large_scale_3dgs_bootstrap.json")
+    lsgpr.add_argument("--plan", default=None, help="Optional large_scale_3dgs_plan.json or pilot plan JSON")
+    lsgpr.add_argument("--run-report", default=None, help="Optional large_scale_3dgs_run_report.json")
+    lsgpr.add_argument("--report", default=None, help="Optional promotion report JSON path")
+    lsgpr.add_argument(
+        "--public-root",
+        default="apps/dreamwalker-web/public",
+        help="Dynamic Map Viewer public root where catalog, route, and splats are staged",
+    )
+    lsgpr.add_argument("--catalog", default=None, help="Optional tile catalog output path")
+    lsgpr.add_argument("--route", default=None, help="Optional robot route output path")
+    lsgpr.add_argument("--scene-id", default="large-scale-3dgs", help="Scene id used in catalog and route filenames")
+    lsgpr.add_argument("--label", default="Large-scale 3DGS", help="Human-readable catalog label")
+    lsgpr.add_argument(
+        "--public-url-prefix",
+        default="/splats",
+        help="URL prefix corresponding to staged splat files under --public-root",
+    )
+    lsgpr.add_argument(
+        "--link-mode",
+        choices=["copy", "symlink", "none"],
+        default="copy",
+        help="How existing splats are staged below --public-root",
+    )
+    lsgpr.add_argument(
+        "--allow-missing-splats",
+        action="store_true",
+        help="Include tiles without generated .splat files in the catalog",
+    )
+    lsgpr.add_argument("--full-plan", action="store_true", help="When --bootstrap is used, prefer the full plan")
+    lsgpr.add_argument("--no-route", action="store_true", help="Only write the tile catalog")
+    lsgpr.add_argument(
+        "--web-app-dir",
+        default="apps/dreamwalker-web",
+        help="Dynamic Map Viewer web app directory used in validation commands",
+    )
+    lsgpr.add_argument(
+        "--site-url",
+        default="http://localhost:5173/",
+        help="Dynamic Map Viewer site URL used in the generated launch URL",
+    )
+    lsgpr.add_argument(
+        "--tile-preload",
+        choices=["off", "metadata", "cache"],
+        default="metadata",
+        help="Dynamic map tile preload mode used in the generated launch URL",
+    )
+    lsgpr.add_argument("--no-route-playback", action="store_true", help="Do not enable route playback in launch URLs")
+    lsgpr.add_argument(
+        "--route-playback-ms",
+        type=int,
+        default=1200,
+        help="Robot route playback interval in milliseconds",
+    )
+    lsgpr.add_argument(
+        "--no-route-playback-loop",
+        action="store_true",
+        help="Do not loop route playback in launch URLs",
+    )
+    lsgpr.add_argument("--route-label", default=None, help="Optional robot route label")
+    lsgpr.add_argument("--route-description", default=None, help="Optional robot route description")
+    lsgpr.add_argument("--fragment-id", default="residency", help="Dynamic Map Viewer fragment id for the route")
+    lsgpr.add_argument("--fragment-label", default="Residency", help="Dynamic Map Viewer fragment label")
+    lsgpr.add_argument("--frame-id", default="dreamwalker_map", help="Route coordinate frame id")
+    lsgpr.add_argument("--asset-label", default=None, help="Optional world asset label stored in the route")
+    lsgpr.add_argument(
+        "--zone-map-url",
+        default="/manifests/robotics-residency.zones.json",
+        help="Semantic zone map URL stored in the route world context",
+    )
+    lsgpr.add_argument("--world-splat-url", default="", help="Optional world splat URL stored in the route")
+    lsgpr.add_argument("--collider-mesh-url", default="", help="Optional collider mesh URL stored in the route")
+    lsgpr.add_argument("--default-y", type=float, default=0.0, help="Y coordinate when catalog axes do not include y")
+    lsgpr.add_argument(
+        "--route-order",
+        choices=["spiral", "snake", "row-major"],
+        default="spiral",
+        help="Tile traversal order for the generated route",
+    )
+    lsgpr.add_argument(
+        "--include-missing-splats-in-route",
+        action="store_true",
+        help="Allow generated routes to traverse catalog tiles without .splat files",
+    )
+    lsgpr.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the promotion report",
+    )
+
     # view
     vw = subparsers.add_parser("view", help="Launch the web viewer")
     vw.add_argument("--model", required=True, help="Path to the .ply file or COLMAP sparse dir")
@@ -3077,6 +3172,58 @@ def cmd_large_scale_3dgs_route(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_route_text(route, route_path))
 
 
+def cmd_large_scale_3dgs_promote(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-promote subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSPromoteOptions,
+        build_large_scale_3dgs_promotion,
+        format_large_scale_3dgs_promotion_text,
+        write_large_scale_3dgs_promotion,
+    )
+
+    options = LargeScale3DGSPromoteOptions(
+        bootstrap_path=Path(args.bootstrap) if args.bootstrap else None,
+        plan_path=Path(args.plan) if args.plan else None,
+        run_report_path=Path(args.run_report) if args.run_report else None,
+        report_path=Path(args.report) if args.report else None,
+        public_root=Path(args.public_root),
+        catalog_path=Path(args.catalog) if args.catalog else None,
+        route_path=Path(args.route) if args.route else None,
+        scene_id=args.scene_id,
+        label=args.label,
+        public_url_prefix=args.public_url_prefix,
+        link_mode=args.link_mode,
+        require_splats=not args.allow_missing_splats,
+        use_full_plan=args.full_plan,
+        write_route=not args.no_route,
+        web_app_dir=Path(args.web_app_dir) if args.web_app_dir else None,
+        site_url=args.site_url,
+        tile_preload=args.tile_preload,
+        route_playback=not args.no_route_playback,
+        route_playback_ms=args.route_playback_ms,
+        route_playback_loop=not args.no_route_playback_loop,
+        route_label=args.route_label,
+        route_description=args.route_description,
+        fragment_id=args.fragment_id,
+        fragment_label=args.fragment_label,
+        frame_id=args.frame_id,
+        asset_label=args.asset_label,
+        zone_map_url=args.zone_map_url,
+        world_splat_url=args.world_splat_url,
+        collider_mesh_url=args.collider_mesh_url,
+        default_y=args.default_y,
+        route_order=args.route_order,
+        include_missing_splats_in_route=args.include_missing_splats_in_route,
+    )
+    report = build_large_scale_3dgs_promotion(options)
+    report_path = write_large_scale_3dgs_promotion(report, options.report_path)
+
+    if args.format == "json":
+        print(json.dumps({**report, "reportPath": str(report_path)}, indent=2))
+    else:
+        print(format_large_scale_3dgs_promotion_text(report, report_path))
+
+
 def cmd_view(args: argparse.Namespace) -> None:
     """Handle the view subcommand."""
     from gs_sim2real.viewer.web_viewer import GaussianViewer
@@ -3999,6 +4146,7 @@ def main(argv: list[str] | None = None) -> None:
         "large-scale-3dgs-run": cmd_large_scale_3dgs_run,
         "large-scale-3dgs-catalog": cmd_large_scale_3dgs_catalog,
         "large-scale-3dgs-route": cmd_large_scale_3dgs_route,
+        "large-scale-3dgs-promote": cmd_large_scale_3dgs_promote,
         "view": cmd_view,
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,

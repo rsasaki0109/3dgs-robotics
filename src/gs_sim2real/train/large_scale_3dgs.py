@@ -182,6 +182,42 @@ class LargeScale3DGSRouteOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSPromoteOptions:
+    bootstrap_path: Path | None = None
+    plan_path: Path | None = None
+    run_report_path: Path | None = None
+    report_path: Path | None = None
+    public_root: Path = Path("apps/dreamwalker-web/public")
+    catalog_path: Path | None = None
+    route_path: Path | None = None
+    scene_id: str = "large-scale-3dgs"
+    label: str = "Large-scale 3DGS"
+    public_url_prefix: str = "/splats"
+    link_mode: str = "copy"
+    require_splats: bool = True
+    use_full_plan: bool = False
+    write_route: bool = True
+    web_app_dir: Path | None = Path("apps/dreamwalker-web")
+    site_url: str = "http://localhost:5173/"
+    tile_preload: str = "metadata"
+    route_playback: bool = True
+    route_playback_ms: int | None = 1200
+    route_playback_loop: bool = True
+    route_label: str | None = None
+    route_description: str | None = None
+    fragment_id: str = "residency"
+    fragment_label: str = "Residency"
+    frame_id: str = "dreamwalker_map"
+    asset_label: str | None = None
+    zone_map_url: str = "/manifests/robotics-residency.zones.json"
+    world_splat_url: str = ""
+    collider_mesh_url: str = ""
+    default_y: float = 0.0
+    route_order: str = "spiral"
+    include_missing_splats_in_route: bool = False
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSSmokeDataOptions:
     output_dir: Path
     axes: str = "xz"
@@ -2627,5 +2663,202 @@ def format_large_scale_3dgs_catalog_text(
             lines.append(f"  launch: {runbook['launchUrl']}")
         else:
             lines.append("  launch: unavailable until --output is inside --public-root")
+
+    return "\n".join(lines)
+
+
+def _resolve_existing_json_path(path_value: str | Path, *, base_path: Path | None = None) -> Path:
+    path = Path(path_value)
+    if path.is_absolute() or path.exists() or base_path is None:
+        return path
+
+    candidate = base_path.parent / path
+    return candidate if candidate.exists() else path
+
+
+def _load_promotion_bootstrap(options: LargeScale3DGSPromoteOptions) -> tuple[dict[str, Any] | None, Path | None]:
+    if options.bootstrap_path is None:
+        return None, None
+
+    bootstrap_path = Path(options.bootstrap_path)
+    return json.loads(bootstrap_path.read_text(encoding="utf-8")), bootstrap_path
+
+
+def _resolve_promotion_plan_path(
+    options: LargeScale3DGSPromoteOptions,
+    bootstrap: dict[str, Any] | None,
+    bootstrap_path: Path | None,
+) -> Path:
+    if options.plan_path is not None:
+        return Path(options.plan_path)
+
+    if bootstrap is None:
+        raise ValueError("--plan or --bootstrap is required")
+
+    next_block = bootstrap.get("next") if isinstance(bootstrap.get("next"), dict) else {}
+    preferred_keys = ("fullPlanPath", "pilotPlanPath") if options.use_full_plan else ("pilotPlanPath", "fullPlanPath")
+    for key in preferred_keys:
+        value = next_block.get(key)
+        if value:
+            return _resolve_existing_json_path(str(value), base_path=bootstrap_path)
+
+    raise ValueError("bootstrap report does not contain a pilotPlanPath or fullPlanPath")
+
+
+def _default_promotion_run_report_path(plan: dict[str, Any]) -> Path | None:
+    output_dir = Path(str(plan.get("outputDir") or ""))
+    if not str(output_dir):
+        return None
+
+    candidate = output_dir / "large_scale_3dgs_run_report.json"
+    return candidate if candidate.exists() else None
+
+
+def _default_promotion_catalog_path(options: LargeScale3DGSPromoteOptions) -> Path:
+    scene_id = _slugify(options.scene_id, "large-scale-3dgs")
+    return Path(options.public_root) / "manifests" / f"{scene_id}-tile-catalog.json"
+
+
+def _default_promotion_route_path(options: LargeScale3DGSPromoteOptions) -> Path:
+    scene_id = _slugify(options.scene_id, "large-scale-3dgs")
+    return Path(options.public_root) / "robot-routes" / f"{scene_id}-route.json"
+
+
+def _default_promotion_report_path(plan: dict[str, Any], catalog_path: Path) -> Path:
+    output_dir = Path(str(plan.get("outputDir") or ""))
+    if str(output_dir):
+        return output_dir / "large_scale_3dgs_promotion.json"
+    return catalog_path.with_name("large_scale_3dgs_promotion.json")
+
+
+def build_large_scale_3dgs_promotion(options: LargeScale3DGSPromoteOptions) -> dict[str, Any]:
+    """Promote trained large-scale 3DGS chunks into Dynamic Map Viewer public assets."""
+    bootstrap, bootstrap_path = _load_promotion_bootstrap(options)
+    plan_path = _resolve_promotion_plan_path(options, bootstrap, bootstrap_path)
+    plan = load_large_scale_3dgs_plan(plan_path)
+    run_report_path = (
+        Path(options.run_report_path) if options.run_report_path else _default_promotion_run_report_path(plan)
+    )
+    catalog_path = (
+        Path(options.catalog_path) if options.catalog_path is not None else _default_promotion_catalog_path(options)
+    )
+    route_path = Path(options.route_path) if options.route_path is not None else _default_promotion_route_path(options)
+
+    catalog_options = LargeScale3DGSCatalogOptions(
+        plan_path=plan_path,
+        output_path=catalog_path,
+        run_report_path=run_report_path,
+        scene_id=options.scene_id,
+        label=options.label,
+        public_root=options.public_root,
+        public_url_prefix=options.public_url_prefix,
+        link_mode=options.link_mode,
+        require_splats=options.require_splats,
+        web_app_dir=options.web_app_dir,
+        site_url=options.site_url,
+        tile_preload=options.tile_preload,
+        route_path=route_path if options.write_route else None,
+        route_playback=options.route_playback,
+        route_playback_ms=options.route_playback_ms,
+        route_playback_loop=options.route_playback_loop,
+    )
+    catalog = build_large_scale_3dgs_catalog(catalog_options)
+    written_catalog_path = write_large_scale_3dgs_catalog(catalog, catalog_options)
+
+    route: dict[str, Any] | None = None
+    written_route_path: Path | None = None
+    if options.write_route:
+        route_options = LargeScale3DGSRouteOptions(
+            catalog_path=written_catalog_path,
+            output_path=route_path,
+            label=options.route_label,
+            description=options.route_description,
+            fragment_id=options.fragment_id,
+            fragment_label=options.fragment_label,
+            frame_id=options.frame_id,
+            asset_label=options.asset_label,
+            zone_map_url=options.zone_map_url,
+            world_splat_url=options.world_splat_url,
+            collider_mesh_url=options.collider_mesh_url,
+            default_y=options.default_y,
+            order=options.route_order,
+            include_missing_splats=options.include_missing_splats_in_route,
+        )
+        route = build_large_scale_3dgs_route(route_options)
+        written_route_path = write_large_scale_3dgs_route(route, route_options)
+
+    runbook = build_large_scale_3dgs_web_runbook(written_catalog_path, catalog_options)
+    summary = catalog["summary"]
+    status = "viewer-ready" if options.write_route and written_route_path is not None else "catalog-ready"
+
+    return {
+        "version": 1,
+        "type": "large-scale-3dgs-promotion",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        "source": {
+            "bootstrapPath": str(bootstrap_path) if bootstrap_path is not None else "",
+            "planPath": str(plan_path),
+            "runReportPath": str(run_report_path) if run_report_path is not None else "",
+            "usedFullPlan": bool(options.use_full_plan),
+        },
+        "publicRoot": str(options.public_root),
+        "catalog": catalog,
+        "catalogPath": str(written_catalog_path),
+        "route": route if route is not None else {},
+        "routePath": str(written_route_path) if written_route_path is not None else "",
+        "webRunbook": runbook,
+        "summary": {
+            "tileCount": summary["tileCount"],
+            "readyTileCount": summary["readyTileCount"],
+            "missingSplatTileCount": summary["missingSplatTileCount"],
+            "routePointCount": len(route.get("route", [])) if route is not None else 0,
+            "publicSplatCount": sum(1 for tile in catalog["tiles"] if tile.get("publicPath")),
+        },
+        "next": {
+            "catalogPath": str(written_catalog_path),
+            "routePath": str(written_route_path) if written_route_path is not None else "",
+            "validateCommand": runbook["validateCommand"],
+            "launchUrl": runbook["launchUrl"],
+        },
+    }
+
+
+def write_large_scale_3dgs_promotion(
+    report: dict[str, Any],
+    output_path: Path | None = None,
+) -> Path:
+    if output_path is not None:
+        report_path = Path(output_path)
+    else:
+        plan = load_large_scale_3dgs_plan(Path(report["source"]["planPath"]))
+        report_path = _default_promotion_report_path(plan, Path(report["catalogPath"]))
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
+def format_large_scale_3dgs_promotion_text(report: dict[str, Any], report_path: Path | None = None) -> str:
+    summary = report["summary"]
+    lines = [
+        "Large-scale 3DGS Dynamic Map promotion",
+        f"  status: {report['status']}",
+        f"  catalog: {report['catalogPath']}",
+        f"  tiles: {summary['readyTileCount']} ready / {summary['tileCount']} total",
+    ]
+    if report.get("routePath"):
+        lines.append(f"  route: {report['routePath']}")
+        lines.append(f"  route points: {summary['routePointCount']}")
+    if report_path is not None:
+        lines.append(f"  report: {report_path}")
+
+    next_block = report.get("next") if isinstance(report.get("next"), dict) else {}
+    if next_block.get("validateCommand"):
+        lines.append(f"  validate: {next_block['validateCommand']}")
+    if next_block.get("launchUrl"):
+        lines.append(f"  launch: {next_block['launchUrl']}")
+    else:
+        lines.append("  launch: unavailable until the catalog is inside --public-root")
 
     return "\n".join(lines)
