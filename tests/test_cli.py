@@ -43,6 +43,47 @@ class TestCLIHelp:
             main(["large-scale-3dgs-plan", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_large_scale_3dgs_discover_help(self) -> None:
+        """Running large-scale-3dgs-discover --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["large-scale-3dgs-discover", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_large_scale_3dgs_discover_args(self) -> None:
+        """large-scale-3dgs-discover accepts scan and generated-command args."""
+        args = build_parser().parse_args(
+            [
+                "large-scale-3dgs-discover",
+                "--root",
+                "data",
+                "--output",
+                "outputs/discovery.json",
+                "--axes",
+                "xz",
+                "--tile-sizes",
+                "8,12",
+                "--pilot-chunks",
+                "3",
+                "--route-start-image",
+                "4",
+                "--max-depth",
+                "5",
+                "--include-chunk-models",
+                "--format",
+                "json",
+            ]
+        )
+
+        assert args.root == "data"
+        assert args.output == "outputs/discovery.json"
+        assert args.axes == "xz"
+        assert args.tile_sizes == "8,12"
+        assert args.pilot_chunks == 3
+        assert args.route_start_image == 4
+        assert args.max_depth == 5
+        assert args.include_chunk_models is True
+        assert args.format == "json"
+
     def test_cli_large_scale_3dgs_smoke_data_help(self) -> None:
         """Running large-scale-3dgs-smoke-data --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
