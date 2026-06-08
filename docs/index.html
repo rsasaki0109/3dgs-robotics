@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GS Mapper - Outdoor Gaussian splats from robot logs</title>
-<meta name="description" content="GS Mapper turns real outdoor robot logs and external SLAM outputs into browser-viewable Gaussian splats, scene contracts, policy benchmarks, and CI review bundles.">
+<title>GS Mapper - Large-scale 3DGS dynamic maps from robot logs</title>
+<meta name="description" content="GS Mapper turns real outdoor robot logs into browser-ready large-scale 3DGS dynamic maps, route-driven tile loading demos, scene contracts, and CI review bundles.">
 <link rel="canonical" href="https://rsasaki0109.github.io/gs-mapper/">
-<meta property="og:title" content="GS Mapper - Outdoor robot logs to Gaussian splats">
-<meta property="og:description" content="Open nine bundled outdoor Gaussian-splat demos built from robotics logs, GNSS/LiDAR supervision, DUSt3R, MASt3R, VGGT-SLAM, MASt3R-SLAM, and Pi3X outputs.">
+<meta property="og:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
+<meta property="og:description" content="Open the hosted DreamWalker demo with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="GS Mapper - Outdoor robot logs to Gaussian splats">
-<meta name="twitter:description" content="Open nine bundled outdoor Gaussian-splat demos built from robotics logs, GNSS/LiDAR supervision, DUSt3R, MASt3R, VGGT-SLAM, MASt3R-SLAM, and Pi3X outputs.">
+<meta name="twitter:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
+<meta name="twitter:description" content="Open the hosted DreamWalker demo with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
 <meta name="twitter:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -116,11 +116,11 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 /* Hero */
 .hero {
   position: relative;
-  min-height: min(560px, calc(100vh - 80px));
+  min-height: min(680px, calc(100vh - 56px));
   display: flex;
   align-items: center;
   overflow: hidden;
-  padding: 5rem 2rem 4rem;
+  padding: 5.5rem 2rem 4rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -133,31 +133,23 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   opacity: 0.56;
 }
 
-.hero-bg-splat {
-  border: 0;
-  left: 30%;
-  width: 70%;
-  opacity: 0.38;
-  filter: saturate(1.12) brightness(1.05);
-  pointer-events: none;
-  background: #05070c;
-  z-index: 1;
-}
-
-.hero-bg-fallback {
+.hero-bg-map {
   z-index: 0;
+  opacity: 0.7;
+  filter: saturate(1.08) contrast(1.02) brightness(0.82);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-bg-splat { display: none; }
-  .hero-bg-fallback { opacity: 0.42; }
+  .hero-bg-map { content: url("images/demo-sweep/dynamic-map-material.png"); }
 }
 
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(13,17,23,0.98) 0%, rgba(13,17,23,0.88) 56%, rgba(13,17,23,0.2) 100%);
+  background:
+    linear-gradient(90deg, rgba(7,12,11,0.96) 0%, rgba(7,12,11,0.84) 48%, rgba(7,12,11,0.28) 100%),
+    linear-gradient(0deg, rgba(7,12,11,0.78) 0%, rgba(7,12,11,0) 34%);
   z-index: 2;
   pointer-events: none;
 }
@@ -165,7 +157,7 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hero-inner {
   position: relative;
   z-index: 3;
-  width: min(920px, 100%);
+  width: min(980px, 100%);
   margin: 0 auto;
 }
 
@@ -180,7 +172,7 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hero p {
   font-size: 1.15rem;
   color: rgba(230,237,243,0.88);
-  max-width: 620px;
+  max-width: 680px;
 }
 
 .hero-kicker {
@@ -233,6 +225,134 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hero-proof span {
   border-left: 2px solid var(--accent-blue);
   padding-left: 10px;
+}
+
+/* Dynamic Map Result */
+.dynamic-map-band {
+  max-width: none;
+  padding: 3rem 2rem 3.5rem;
+  background: #f4f7ef;
+  color: #162016;
+  border-bottom: 1px solid #d6dfcf;
+}
+
+.dynamic-map-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.dynamic-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.68fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.dynamic-map-media {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #c9d5c1;
+  border-radius: 8px;
+  background: #101711;
+  box-shadow: 0 18px 45px rgba(22, 32, 22, 0.14);
+}
+
+.dynamic-map-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.dynamic-map-caption {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid rgba(244,247,239,0.22);
+  border-radius: 6px;
+  background: rgba(8,13,10,0.76);
+  color: #edf5ea;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+.dynamic-map-copy .hero-kicker {
+  color: #2f6840;
+}
+
+.dynamic-map-copy h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  margin-bottom: 0.85rem;
+}
+
+.dynamic-map-copy p {
+  color: #4c594d;
+  max-width: 660px;
+}
+
+.dynamic-map-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 1.4rem;
+}
+
+.dynamic-map-stat {
+  padding: 12px 13px;
+  border: 1px solid #d6dfcf;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.dynamic-map-stat span {
+  display: block;
+  color: #627066;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+
+.dynamic-map-stat strong {
+  display: block;
+  color: #172018;
+  font-size: 1.16rem;
+}
+
+.dynamic-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1.4rem;
+}
+
+.dynamic-map-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid #98aa91;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172018;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.dynamic-map-action.primary {
+  border-color: #2f6840;
+  background: #2f6840;
+  color: #ffffff;
 }
 
 /* Scene Showcase */
@@ -1168,17 +1288,27 @@ footer a:hover { text-decoration: underline; }
   margin-bottom: 1rem;
 }
 
+@media (max-width: 880px) {
+  nav { display: none; }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   nav { display: none; }
   .hero { min-height: auto; padding: 2.5rem 1.2rem 1.8rem; }
-  .hero-bg-splat { left: 0; width: 100%; opacity: 0.3; }
-  .hero::after { background: rgba(13,17,23,0.68); }
+  .hero-bg-map { opacity: 0.42; }
+  .hero::after { background: rgba(7,12,11,0.74); }
   .hero h1 { font-size: 2.7rem; }
   .hero p { font-size: 1rem; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .hero-action { justify-content: center; min-height: 36px; padding: 7px 12px; }
   .hero-proof { margin-top: 1rem; font-size: 0.78rem; }
+  .dynamic-map-band { padding: 2rem 1rem 2.5rem; }
+  .dynamic-map-layout { grid-template-columns: 1fr; gap: 1.4rem; }
+  .dynamic-map-caption { position: static; border-radius: 0; border-width: 1px 0 0; }
+  .dynamic-map-copy h2 { font-size: 1.8rem; }
+  .dynamic-map-stats { grid-template-columns: 1fr 1fr; }
+  .dynamic-map-action { flex: 1 1 180px; }
   .showcase-band { padding: 2rem 1rem 2.5rem; }
   .showcase-heading { grid-template-columns: 1fr; gap: 1rem; }
   .showcase-heading h2 { font-size: 1.45rem; }
@@ -1226,6 +1356,7 @@ footer a:hover { text-decoration: underline; }
       <span>GS Mapper</span>
     </a>
     <nav>
+      <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker</a>
       <a href="splat.html">Live Demo</a>
       <a href="#scene-showcase-section">Scenes</a>
       <a href="#mission-control-section">Mission</a>
@@ -1242,27 +1373,57 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Hero -->
 <div class="hero">
-  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat&amp;embed=1" title="Live Gaussian splat of the bag6 MASt3R outdoor reconstruction, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
-  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/04_bag6-mast3r.png" alt="bag6 MASt3R outdoor Gaussian splat preview">
+  <img class="hero-bg hero-bg-map" src="images/demo-sweep/map-quality.gif" alt="Large-scale 3DGS dynamic map loading over the outdoor production grid">
   <div class="hero-inner">
-    <div class="hero-kicker">Outdoor GS from real robot logs</div>
+    <div class="hero-kicker">Large-scale 3DGS dynamic map loading</div>
     <h1>GS Mapper</h1>
-    <p>Outdoor 3D Gaussian Splatting is the core demo: supervised GNSS/LiDAR splats, pose-free DUSt3R / MASt3R reconstructions, and external-SLAM comparisons all open directly in the browser.</p>
+    <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted DreamWalker route demo and watch the resident tile window move through a 34-tile production grid.</p>
     <div class="hero-actions">
-      <a class="hero-action primary" href="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat">Open large outdoor demo &rarr;</a>
+      <a class="hero-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Launch DreamWalker map &rarr;</a>
       <a class="hero-action" href="#scene-showcase-section">Compare all scenes &rarr;</a>
       <a class="hero-action" href="#mission-control-section">Open mission proof &rarr;</a>
       <a class="hero-action" href="reviews/">Scenario CI reviews &rarr;</a>
-      <a class="hero-action" href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI docs &rarr;</a>
     </div>
     <div class="hero-proof">
-      <span>9 production splats</span>
-      <span>Autoware + MCD outdoor logs</span>
-      <span>DUSt3R / MASt3R / VGGT-SLAM / Pi3X</span>
-      <span>reviewable scenario CI artifacts</span>
+      <span>34 ready map tiles</span>
+      <span>2.44M tiled splats</span>
+      <span>route-driven residency</span>
+      <span>static GitHub Pages delivery</span>
     </div>
   </div>
 </div>
+
+<!-- Dynamic Map Result -->
+<section id="dynamic-map-section" class="dynamic-map-band">
+  <div class="dynamic-map-inner">
+    <div class="dynamic-map-layout">
+      <div class="dynamic-map-media">
+        <img src="images/demo-sweep/dynamic-map-material.png" alt="Rendered large-scale dynamic map material with resident and preload tile coverage">
+        <div class="dynamic-map-caption">
+          <span>white: splat footprint</span>
+          <span>green: resident</span>
+          <span>amber: preload</span>
+        </div>
+      </div>
+      <div class="dynamic-map-copy">
+        <div class="hero-kicker">Hosted result</div>
+        <h2>Large-scale 3DGS, served as a live dynamic map.</h2>
+        <p>The Pages demo now ships the DreamWalker app plus its public assets under <code>/dreamwalker/</code>. The route playback loads the catalog, resolves tile URLs, checks splat metadata, and swaps active/preload tiles from static GitHub Pages files.</p>
+        <div class="dynamic-map-stats">
+          <div class="dynamic-map-stat"><span>Ready tiles</span><strong>34 / 34</strong></div>
+          <div class="dynamic-map-stat"><span>Composite input</span><strong>1.52M splats</strong></div>
+          <div class="dynamic-map-stat"><span>Tiled output</span><strong>2.44M splats</strong></div>
+          <div class="dynamic-map-stat"><span>Tile payload</span><strong>78.2 MB</strong></div>
+        </div>
+        <div class="dynamic-map-actions">
+          <a class="dynamic-map-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open hosted map &rarr;</a>
+          <a class="dynamic-map-action" href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json">View tile catalog &rarr;</a>
+          <a class="dynamic-map-action" href="images/demo-sweep/map-quality.gif">Open result GIF &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- Scene Showcase -->
 <section id="scene-showcase-section" class="showcase-band">
@@ -1732,6 +1893,7 @@ footer a:hover { text-decoration: underline; }
 <footer>
   <div class="footer-links">
     <a href="https://github.com/rsasaki0109/gs-mapper">GitHub</a>
+    <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker Map</a>
     <a href="reviews/">Reviews</a>
     <a href="splat.html">Live Demo</a>
     <a href="launch-kit.html">Launch Kit</a>
