@@ -55,5 +55,20 @@
       0.0,
       7.75
     ]
-  ]
+  ],
+  "tileSequence": [
+    "tile_x000_z000",
+    "tile_x000_z001",
+    "tile_x001_z001",
+    "tile_x002_z001",
+    "tile_x002_z000",
+    "tile_x001_z000"
+  ],
+  "sourceCatalog": {
+    "path": "apps/dreamwalker-web/public/manifests/smoke-gsplat-grid6-catalog.json",
+    "sceneId": "smoke-gsplat-grid6",
+    "label": "Smoke gsplat Grid 6",
+    "axes": "xz",
+    "order": "spiral"
+  }
 }
