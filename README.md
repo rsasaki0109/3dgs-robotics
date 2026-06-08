@@ -245,6 +245,19 @@ gs-mapper large-scale-3dgs-bootstrap \
   --pilot-chunks 6
 ```
 
+For production logs, first gate the staged input root so smoke/demo fixtures do
+not get promoted by accident:
+
+```bash
+python3 scripts/check_large_scale_3dgs_inputs.py \
+  data/large-scale-3dgs-real \
+  --output outputs/autoware_large \
+  --scene-id autoware-large
+```
+
+See [`docs/large-scale-3dgs-real-run.md`](docs/large-scale-3dgs-real-run.md) for
+the real-input staging and Dynamic Map Viewer promotion runbook.
+
 For manual control, preflight the COLMAP sparse model before launching many
 tile jobs:
 
@@ -276,7 +289,7 @@ gs-mapper large-scale-3dgs-promote \
   --plan outputs/autoware_large/large_scale_3dgs_plan.json \
   --run-report outputs/autoware_large/large_scale_3dgs_run_report.json \
   --public-root apps/dreamwalker-web/public \
-  --scene-id autoware-large-route \
+  --scene-id autoware-large \
   --label "Autoware Large Route"
 ```
 
