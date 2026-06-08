@@ -89,6 +89,20 @@ class LargeScale3DGSPreflightOptions:
 
 
 @dataclass(frozen=True)
+class LargeScale3DGSDiscoveryOptions:
+    root_dir: Path
+    output_path: Path | None = None
+    axes: str = "xy"
+    tile_sizes: tuple[float, ...] = (20.0, 30.0, 50.0)
+    target_images_per_chunk: int = 48
+    pilot_chunks: int = 6
+    route_start_image: int = 0
+    max_depth: int = 8
+    max_results: int = 20
+    include_chunk_models: bool = False
+
+
+@dataclass(frozen=True)
 class LargeScale3DGSPilotOptions:
     data_dir: Path
     output_dir: Path
@@ -615,6 +629,354 @@ def _slugify(value: str, fallback: str) -> str:
 def _join_public_url(*parts: str) -> str:
     cleaned = [part.strip("/") for part in parts if str(part).strip("/")]
     return "/" + "/".join(cleaned)
+
+
+_DISCOVERY_SKIP_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+}
+
+
+def _within_discovery_depth(path: Path, root_dir: Path, max_depth: int) -> bool:
+    try:
+        depth = len(path.relative_to(root_dir).parts)
+    except ValueError:
+        return False
+    return depth <= max_depth
+
+
+def _should_skip_discovery_path(path: Path, *, include_chunk_models: bool) -> bool:
+    parts = set(path.parts)
+    if parts & _DISCOVERY_SKIP_DIRS:
+        return True
+    return not include_chunk_models and "chunks" in parts
+
+
+def _discovery_output_dir_for(data_dir: Path) -> Path:
+    slug = _slugify(data_dir.name or "discovered", "discovered")
+    return Path("outputs") / f"{slug}_large"
+
+
+def _build_discovery_preflight_command(options: LargeScale3DGSDiscoveryOptions, data_dir: Path) -> str:
+    tile_sizes = ",".join(f"{tile_size:g}" for tile_size in options.tile_sizes)
+    return _format_command(
+        [
+            "gs-mapper",
+            "large-scale-3dgs-preflight",
+            "--data",
+            data_dir,
+            "--output",
+            _discovery_output_dir_for(data_dir),
+            "--axes",
+            options.axes,
+            "--tile-sizes",
+            tile_sizes,
+            "--target-images-per-chunk",
+            options.target_images_per_chunk,
+            "--write-pilot",
+            "--pilot-chunks",
+            options.pilot_chunks,
+            "--route-start-image",
+            options.route_start_image,
+        ]
+    )
+
+
+def _build_discovery_preprocess_command(source_path: Path) -> str:
+    slug = _slugify(source_path.stem if source_path.is_file() else source_path.name, "robot-log")
+    return _format_command(
+        [
+            "gs-mapper",
+            "preprocess",
+            "--method",
+            "colmap",
+            "--data",
+            source_path,
+            "--output",
+            Path("outputs") / f"{slug}_sparse",
+        ]
+    )
+
+
+def _colmap_data_dir_from_sparse_dir(sparse_dir: Path) -> Path:
+    if sparse_dir.name == "0" and sparse_dir.parent.name == "sparse":
+        return sparse_dir.parent.parent
+    if sparse_dir.name == "sparse":
+        return sparse_dir.parent
+    return sparse_dir.parent
+
+
+def _discover_colmap_scenes(options: LargeScale3DGSDiscoveryOptions, root_dir: Path) -> list[dict[str, Any]]:
+    axes = _validate_axes(options.axes)
+    scenes: list[dict[str, Any]] = []
+    seen_data_dirs: set[Path] = set()
+
+    for images_txt in root_dir.rglob("images.txt"):
+        if not _within_discovery_depth(images_txt, root_dir, options.max_depth):
+            continue
+        if _should_skip_discovery_path(images_txt, include_chunk_models=options.include_chunk_models):
+            continue
+
+        sparse_dir = images_txt.parent
+        if not (sparse_dir / "cameras.txt").exists():
+            continue
+
+        data_dir = _colmap_data_dir_from_sparse_dir(sparse_dir)
+        resolved_data_dir = data_dir.resolve()
+        if resolved_data_dir in seen_data_dirs:
+            continue
+        seen_data_dirs.add(resolved_data_dir)
+
+        try:
+            image_records = load_colmap_images_text(images_txt)
+            point_records = load_colmap_points_text(sparse_dir / "points3D.txt")
+            world_bounds = _bounds_for_records(image_records, axes) if image_records else {}
+            world_span = (
+                {
+                    axes[0]: round(world_bounds[f"max{axes[0].upper()}"] - world_bounds[f"min{axes[0].upper()}"], 3),
+                    axes[1]: round(world_bounds[f"max{axes[1].upper()}"] - world_bounds[f"min{axes[1].upper()}"], 3),
+                }
+                if world_bounds
+                else {}
+            )
+            image_root, image_sizes = _image_size_index(data_dir, (record.name for record in image_records))
+            status = "ready" if image_records else "no-registered-images"
+            error = ""
+        except Exception as exc:  # pragma: no cover - exercised through malformed user data.
+            image_records = []
+            point_records = []
+            world_bounds = {}
+            world_span = {}
+            image_root = ""
+            image_sizes = {}
+            status = "error"
+            error = str(exc)
+
+        scene = {
+            "dataDir": str(data_dir),
+            "sparseDir": str(sparse_dir),
+            "imageRoot": image_root,
+            "status": status,
+            "registeredImageCount": len(image_records),
+            "points3DCount": len(point_records),
+            "sourceImageBytes": int(sum(image_sizes.values())),
+            "worldBounds": world_bounds,
+            "worldSpan": world_span,
+            "preflightCommand": _build_discovery_preflight_command(options, data_dir),
+        }
+        if error:
+            scene["error"] = error
+        scenes.append(scene)
+
+    scenes.sort(key=lambda scene: (scene["status"] != "ready", -int(scene["registeredImageCount"]), scene["dataDir"]))
+    return scenes[: options.max_results]
+
+
+def _discover_bag_inputs(options: LargeScale3DGSDiscoveryOptions, root_dir: Path) -> list[dict[str, Any]]:
+    bag_suffixes = {".bag", ".db3", ".mcap"}
+    inputs: list[dict[str, Any]] = []
+    seen_sources: set[Path] = set()
+
+    for path in root_dir.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in bag_suffixes:
+            continue
+        if not _within_discovery_depth(path, root_dir, options.max_depth):
+            continue
+        if _should_skip_discovery_path(path, include_chunk_models=True):
+            continue
+        source_path = path.parent if path.suffix.lower() == ".db3" else path
+        resolved_source = source_path.resolve()
+        if resolved_source in seen_sources:
+            continue
+        seen_sources.add(resolved_source)
+        inputs.append(
+            {
+                "path": str(path),
+                "source": str(source_path),
+                "kind": path.suffix.lower().lstrip("."),
+                "bytes": int(path.stat().st_size),
+                "preprocessCommand": _build_discovery_preprocess_command(source_path),
+            }
+        )
+
+    inputs.sort(key=lambda item: (-int(item["bytes"]), item["source"]))
+    return inputs
+
+
+def _discover_splat_groups(options: LargeScale3DGSDiscoveryOptions, root_dir: Path) -> list[dict[str, Any]]:
+    groups: dict[Path, list[Path]] = {}
+    for path in root_dir.rglob("*.splat"):
+        if (
+            path.is_file()
+            and _within_discovery_depth(path, root_dir, options.max_depth)
+            and not _should_skip_discovery_path(path, include_chunk_models=True)
+        ):
+            groups.setdefault(path.parent, []).append(path)
+
+    discovered: list[dict[str, Any]] = []
+    for group_dir, splat_paths in groups.items():
+        splat_paths = sorted(splat_paths)
+        total_bytes = sum(path.stat().st_size for path in splat_paths)
+        slug = _slugify(group_dir.name, "splat-scene")
+        catalog_command = ""
+        if len(splat_paths) == 1:
+            catalog_command = _format_command(
+                [
+                    "gs-mapper",
+                    "splat-tile-catalog",
+                    "--input",
+                    splat_paths[0],
+                    "--output",
+                    Path("outputs") / f"{slug}_tile_catalog.json",
+                    "--scene-id",
+                    slug,
+                    "--label",
+                    slug,
+                    "--tile-size",
+                    8,
+                    "--min-splats",
+                    200,
+                ]
+            )
+        discovered.append(
+            {
+                "dir": str(group_dir),
+                "splatCount": len(splat_paths),
+                "bytes": int(total_bytes),
+                "samples": [str(path) for path in splat_paths[:5]],
+                "catalogCommand": catalog_command,
+            }
+        )
+
+    discovered.sort(key=lambda group: (-int(group["splatCount"]), -int(group["bytes"]), group["dir"]))
+    return discovered[: options.max_results]
+
+
+def build_large_scale_3dgs_discovery(options: LargeScale3DGSDiscoveryOptions) -> dict[str, Any]:
+    """Discover real-map inputs and print the next large-scale 3DGS commands."""
+    if options.max_depth < 1:
+        raise ValueError("--max-depth must be >= 1")
+    if options.max_results < 1:
+        raise ValueError("--max-results must be >= 1")
+    if options.target_images_per_chunk < 1:
+        raise ValueError("--target-images-per-chunk must be >= 1")
+    if options.pilot_chunks < 1:
+        raise ValueError("--pilot-chunks must be >= 1")
+    if options.route_start_image < 0:
+        raise ValueError("--route-start-image must be >= 0")
+
+    _validate_axes(options.axes)
+    parse_large_scale_3dgs_tile_sizes(options.tile_sizes)
+    root_dir = Path(options.root_dir)
+    if not root_dir.exists():
+        raise ValueError(f"Discovery root does not exist: {root_dir}")
+
+    root_dir = root_dir.resolve()
+    colmap_scenes = _discover_colmap_scenes(options, root_dir)
+    bag_inputs = _discover_bag_inputs(options, root_dir)[: options.max_results]
+    splat_groups = _discover_splat_groups(options, root_dir)
+    ready_scenes = [scene for scene in colmap_scenes if scene.get("status") == "ready"]
+    recommendation: dict[str, Any]
+    if ready_scenes:
+        scene = ready_scenes[0]
+        recommendation = {
+            "kind": "colmap-scene",
+            "dataDir": scene["dataDir"],
+            "preflightCommand": scene["preflightCommand"],
+        }
+    elif bag_inputs:
+        bag_input = bag_inputs[0]
+        recommendation = {
+            "kind": "bag-input",
+            "source": bag_input["source"],
+            "preprocessCommand": bag_input["preprocessCommand"],
+        }
+    else:
+        recommendation = {
+            "kind": "none",
+            "message": "No COLMAP sparse model or rosbag input was found under the discovery root.",
+        }
+
+    return {
+        "version": 1,
+        "type": "large-scale-3dgs-discovery",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "rootDir": str(root_dir),
+        "options": {
+            "axes": options.axes,
+            "tileSizes": list(options.tile_sizes),
+            "targetImagesPerChunk": int(options.target_images_per_chunk),
+            "pilotChunks": int(options.pilot_chunks),
+            "routeStartImage": int(options.route_start_image),
+            "maxDepth": int(options.max_depth),
+            "maxResults": int(options.max_results),
+            "includeChunkModels": bool(options.include_chunk_models),
+        },
+        "summary": {
+            "colmapSceneCount": len(colmap_scenes),
+            "readyColmapSceneCount": len(ready_scenes),
+            "bagInputCount": len(bag_inputs),
+            "splatGroupCount": len(splat_groups),
+        },
+        "recommendation": recommendation,
+        "colmapScenes": colmap_scenes,
+        "bagInputs": bag_inputs,
+        "splatGroups": splat_groups,
+    }
+
+
+def write_large_scale_3dgs_discovery(report: dict[str, Any], output_path: Path | None = None) -> Path:
+    path = Path(output_path) if output_path is not None else Path("outputs/large_scale_3dgs_discovery.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def format_large_scale_3dgs_discovery_text(report: dict[str, Any], report_path: Path | None = None) -> str:
+    summary = report["summary"]
+    lines = [
+        "Large-scale 3DGS input discovery",
+        f"  root: {report['rootDir']}",
+        f"  COLMAP scenes: {summary['readyColmapSceneCount']} ready / {summary['colmapSceneCount']} found",
+        f"  bag inputs: {summary['bagInputCount']}",
+        f"  splat groups: {summary['splatGroupCount']}",
+    ]
+    if report_path is not None:
+        lines.append(f"  report: {report_path}")
+
+    recommendation = report["recommendation"]
+    if recommendation["kind"] == "colmap-scene":
+        lines.extend(
+            [
+                f"  recommended data: {recommendation['dataDir']}",
+                f"  next preflight: {recommendation['preflightCommand']}",
+            ]
+        )
+    elif recommendation["kind"] == "bag-input":
+        lines.extend(
+            [
+                f"  recommended bag: {recommendation['source']}",
+                f"  next preprocess: {recommendation['preprocessCommand']}",
+            ]
+        )
+    else:
+        lines.append(f"  recommendation: {recommendation['message']}")
+
+    if report["colmapScenes"]:
+        lines.append("  top COLMAP scenes:")
+        for scene in report["colmapScenes"][:5]:
+            span = scene.get("worldSpan") or {}
+            span_text = f" span={span}" if span else ""
+            lines.append(
+                f"    - {scene['dataDir']} images={scene['registeredImageCount']} "
+                f"points={scene['points3DCount']}{span_text}"
+            )
+    return "\n".join(lines)
 
 
 def _write_chunk_sparse(

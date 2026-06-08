@@ -234,8 +234,16 @@ gs-mapper train --data outputs/autoware_sparse --method gsplat --iterations 3000
 gs-mapper export --model outputs/train/point_cloud.ply --format splat --output outputs/autoware.splat
 ```
 
-For larger routes, preflight the COLMAP sparse model before launching many
-tile jobs:
+For larger routes, first discover usable COLMAP sparse outputs, unprocessed
+rosbags, and existing splat sets under the workspace:
+
+```bash
+gs-mapper large-scale-3dgs-discover \
+  --root . \
+  --output outputs/large_scale_3dgs_discovery.json
+```
+
+Then preflight the COLMAP sparse model before launching many tile jobs:
 
 ```bash
 gs-mapper large-scale-3dgs-preflight \

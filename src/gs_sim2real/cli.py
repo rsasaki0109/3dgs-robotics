@@ -365,6 +365,54 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip COLMAP sparse preflight before gsplat training (not recommended)",
     )
 
+    lsgd = subparsers.add_parser(
+        "large-scale-3dgs-discover",
+        help="Discover COLMAP, rosbag, and splat inputs before large-scale 3DGS map runs",
+    )
+    lsgd.add_argument("--root", default=".", help="Root directory to scan for map inputs")
+    lsgd.add_argument(
+        "--output",
+        default=None,
+        help="Optional discovery report JSON path",
+    )
+    lsgd.add_argument(
+        "--axes",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="Axes used in generated preflight commands",
+    )
+    lsgd.add_argument(
+        "--tile-sizes",
+        default="20,30,50",
+        help="Comma-separated candidate tile sizes used in generated preflight commands",
+    )
+    lsgd.add_argument(
+        "--target-images-per-chunk",
+        type=int,
+        default=48,
+        help="Target images per chunk used in generated preflight commands",
+    )
+    lsgd.add_argument("--pilot-chunks", type=int, default=6, help="Pilot chunk count used in generated commands")
+    lsgd.add_argument(
+        "--route-start-image",
+        type=int,
+        default=0,
+        help="Zero-based COLMAP image index used in generated pilot commands",
+    )
+    lsgd.add_argument("--max-depth", type=int, default=8, help="Maximum relative directory depth to scan")
+    lsgd.add_argument("--max-results", type=int, default=20, help="Maximum results per discovered input kind")
+    lsgd.add_argument(
+        "--include-chunk-models",
+        action="store_true",
+        help="Include already materialized chunk sparse models in COLMAP discovery",
+    )
+    lsgd.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Stdout format after writing the discovery report",
+    )
+
     lsgs = subparsers.add_parser(
         "large-scale-3dgs-smoke-data",
         help="Generate a deterministic multi-tile COLMAP fixture for large-scale gsplat smoke runs",
@@ -2679,6 +2727,37 @@ def cmd_large_scale_3dgs_smoke_data(args: argparse.Namespace) -> None:
         print(format_large_scale_3dgs_smoke_data_text(manifest))
 
 
+def cmd_large_scale_3dgs_discover(args: argparse.Namespace) -> None:
+    """Handle the large-scale-3dgs-discover subcommand."""
+    from gs_sim2real.train.large_scale_3dgs import (
+        LargeScale3DGSDiscoveryOptions,
+        build_large_scale_3dgs_discovery,
+        format_large_scale_3dgs_discovery_text,
+        parse_large_scale_3dgs_tile_sizes,
+        write_large_scale_3dgs_discovery,
+    )
+
+    options = LargeScale3DGSDiscoveryOptions(
+        root_dir=Path(args.root),
+        output_path=Path(args.output) if args.output else None,
+        axes=args.axes,
+        tile_sizes=parse_large_scale_3dgs_tile_sizes(args.tile_sizes),
+        target_images_per_chunk=args.target_images_per_chunk,
+        pilot_chunks=args.pilot_chunks,
+        route_start_image=args.route_start_image,
+        max_depth=args.max_depth,
+        max_results=args.max_results,
+        include_chunk_models=args.include_chunk_models,
+    )
+    report = build_large_scale_3dgs_discovery(options)
+    report_path = write_large_scale_3dgs_discovery(report, options.output_path)
+
+    if args.format == "json":
+        print(json.dumps({**report, "reportPath": str(report_path)}, indent=2))
+    else:
+        print(format_large_scale_3dgs_discovery_text(report, report_path))
+
+
 def cmd_large_scale_3dgs_preflight(args: argparse.Namespace) -> None:
     """Handle the large-scale-3dgs-preflight subcommand."""
     from gs_sim2real.train.large_scale_3dgs import (
@@ -3809,6 +3888,7 @@ def main(argv: list[str] | None = None) -> None:
         "download": cmd_download,
         "preprocess": cmd_preprocess,
         "train": cmd_train,
+        "large-scale-3dgs-discover": cmd_large_scale_3dgs_discover,
         "large-scale-3dgs-smoke-data": cmd_large_scale_3dgs_smoke_data,
         "large-scale-3dgs-preflight": cmd_large_scale_3dgs_preflight,
         "large-scale-3dgs-pilot": cmd_large_scale_3dgs_pilot,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSCatalogOptions,
+    LargeScale3DGSDiscoveryOptions,
     LargeScale3DGSOptions,
     LargeScale3DGSPilotOptions,
     LargeScale3DGSPreflightOptions,
@@ -14,12 +15,14 @@ from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSSmokeDataOptions,
     _default_command_runner,
     build_large_scale_3dgs_catalog,
+    build_large_scale_3dgs_discovery,
     build_large_scale_3dgs_plan,
     build_large_scale_3dgs_pilot,
     build_large_scale_3dgs_preflight,
     build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
     format_large_scale_3dgs_catalog_text,
+    format_large_scale_3dgs_discovery_text,
     format_large_scale_3dgs_pilot_text,
     format_large_scale_3dgs_preflight_text,
     format_large_scale_3dgs_route_text,
@@ -28,6 +31,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     load_colmap_images_text,
     run_large_scale_3dgs_plan,
     write_large_scale_3dgs_catalog,
+    write_large_scale_3dgs_discovery,
     write_large_scale_3dgs_plan,
     write_large_scale_3dgs_pilot,
     write_large_scale_3dgs_preflight,
@@ -174,6 +178,51 @@ def test_write_large_scale_3dgs_smoke_data_feeds_multi_tile_planner(tmp_path: Pa
     assert (Path(plan["chunks"][0]["dataDir"]) / "images").exists()
     assert "next plan: gs-mapper large-scale-3dgs-plan" in text
     assert "--axes xz" in text
+
+
+def test_build_large_scale_3dgs_discovery_recommends_preflight_for_colmap_scene(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    data_dir = _write_route_sparse_fixture(root / "autoware_sparse", image_count=5)
+    log_dir = root / "rosbags"
+    splat_dir = root / "splats"
+    log_dir.mkdir()
+    splat_dir.mkdir()
+    (log_dir / "route_001.db3").write_bytes(b"sqlite")
+    (splat_dir / "route_seed.splat").write_bytes(b"splat")
+
+    report = build_large_scale_3dgs_discovery(
+        LargeScale3DGSDiscoveryOptions(
+            root_dir=root,
+            axes="xy",
+            tile_sizes=(10.0, 20.0),
+            target_images_per_chunk=3,
+            pilot_chunks=2,
+            route_start_image=1,
+            max_depth=5,
+            max_results=10,
+        )
+    )
+    report_path = write_large_scale_3dgs_discovery(report, root / "discovery.json")
+    text = format_large_scale_3dgs_discovery_text(report, report_path)
+
+    assert report["type"] == "large-scale-3dgs-discovery"
+    assert report["summary"]["readyColmapSceneCount"] == 1
+    assert report["summary"]["bagInputCount"] == 1
+    assert report["summary"]["splatGroupCount"] == 1
+    assert report["recommendation"]["kind"] == "colmap-scene"
+    assert report["recommendation"]["dataDir"] == str(data_dir)
+    assert "--tile-sizes 10,20" in report["recommendation"]["preflightCommand"]
+    assert "--write-pilot" in report["recommendation"]["preflightCommand"]
+    assert "--route-start-image 1" in report["recommendation"]["preflightCommand"]
+    assert report["colmapScenes"][0]["registeredImageCount"] == 5
+    assert report["colmapScenes"][0]["points3DCount"] == 5
+    assert report["bagInputs"][0]["source"] == str(log_dir)
+    assert "gs-mapper preprocess --method colmap" in report["bagInputs"][0]["preprocessCommand"]
+    assert report["splatGroups"][0]["splatCount"] == 1
+    assert "gs-mapper splat-tile-catalog" in report["splatGroups"][0]["catalogCommand"]
+    assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["kind"] == "colmap-scene"
+    assert "Large-scale 3DGS input discovery" in text
+    assert "next preflight: gs-mapper large-scale-3dgs-preflight" in text
 
 
 def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands(tmp_path: Path) -> None:
