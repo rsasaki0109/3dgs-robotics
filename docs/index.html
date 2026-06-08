@@ -327,6 +327,46 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   font-size: 1.16rem;
 }
 
+.dynamic-map-pilot {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(260px, 1fr);
+  gap: 14px;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding: 14px 0;
+  border-top: 1px solid #d6dfcf;
+  border-bottom: 1px solid #d6dfcf;
+}
+
+.dynamic-map-pilot h3 {
+  margin: 0.22rem 0 0;
+  color: #172018;
+  font-size: 1.02rem;
+  line-height: 1.28;
+}
+
+.dynamic-map-pilot span {
+  color: #2f6840;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.dynamic-map-pilot code {
+  display: block;
+  min-width: 0;
+  padding: 11px 12px;
+  overflow-x: auto;
+  border: 1px solid #cbd7c5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172018;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .dynamic-map-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1290,6 +1330,7 @@ footer a:hover { text-decoration: underline; }
   .dynamic-map-caption { position: static; border-radius: 0; border-width: 1px 0 0; }
   .dynamic-map-copy h2 { font-size: 1.8rem; }
   .dynamic-map-stats { grid-template-columns: 1fr 1fr; }
+  .dynamic-map-pilot { grid-template-columns: 1fr; }
   .dynamic-map-action { flex: 1 1 180px; }
   .showcase-band { padding: 2rem 1rem 2.5rem; }
   .showcase-heading { grid-template-columns: 1fr; gap: 1rem; }
@@ -1394,6 +1435,13 @@ footer a:hover { text-decoration: underline; }
           <div class="dynamic-map-stat"><span>Composite input</span><strong>1.75M splats</strong></div>
           <div class="dynamic-map-stat"><span>Tiled output</span><strong>2.70M splats</strong></div>
           <div class="dynamic-map-stat"><span>Tile payload</span><strong>86.3 MB</strong></div>
+        </div>
+        <div class="dynamic-map-pilot">
+          <div>
+            <span>Real log pilot</span>
+            <h3>Train route-contiguous chunks before launching the full regional 3DGS run.</h3>
+          </div>
+          <code>gs-mapper large-scale-3dgs-pilot --data outputs/autoware_sparse --output outputs/autoware_real_pilot --pilot-chunks 6</code>
         </div>
         <div class="dynamic-map-actions">
           <a class="dynamic-map-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open hosted map &rarr;</a>
