@@ -378,9 +378,9 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Dynamic map loading material rendered from the outdoor production grid" in readme
-    assert "Lead GIF: dynamic map loading over the 34-tile outdoor production grid" in readme
-    assert "white is the PCD-like `.splat` footprint" in readme
+    assert "Dynamic map loading material rendered from the outdoor production regional mosaic" in readme
+    assert "Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic" in readme
+    assert "white is the `.splat` footprint" in readme
     assert "route overlay tracks the loading window" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
@@ -459,8 +459,8 @@ def test_index_hero_promotes_hosted_dynamic_map() -> None:
     assert "Launch DreamWalker map" not in html
     assert "DreamWalker" not in html
     assert "dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json" in html
-    assert "34 ready map tiles" in html
-    assert "2.44M tiled splats" in html
+    assert "87 ready map tiles" in html
+    assert "2.70M tiled splats" in html
     assert 'id="dynamic-map-section"' in html
     assert "View tile catalog" in html
     assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"
@@ -515,7 +515,7 @@ def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
     assert "images/demo-sweep/mobile_iphone14_webgpu.png" in html
     assert "Dynamic Map Inputs" in html
     assert "Dynamic Map Splat Inspector" in html
-    assert "34 ready tiles, 6 resident slots" in html
+    assert "87 ready tiles, 6 resident slots" in html
     assert "Open tile catalog" in html
     assert [scene["id"] for scene in scene_index["scenes"]] == ["outdoor-demo"]
     assert "Input Gallery" not in html

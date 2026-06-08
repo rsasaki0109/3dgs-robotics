@@ -74,11 +74,11 @@ test('large-scale demo button launches the bundled outdoor tile catalog', async 
     new RegExp(`tileCatalog=.*${encodeURIComponent(outdoorDemoCatalogUrl)}`)
   );
   await expect(page).toHaveURL(new RegExp(`robotRoute=.*${encodeURIComponent(outdoorDemoRouteUrl)}`));
-  await expect(page.getByText('Outdoor Production Grid Large').first()).toBeVisible();
+  await expect(page.getByText('Outdoor Production Regional Mosaic').first()).toBeVisible();
   await expect(page.getByText('Route Loaded', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Robot route playback: 1200 ms / loop').first()).toBeVisible();
   await expect(page.locator('.dreamwalker-shell')).toHaveClass(/mode-robot/);
-  await expect(page.getByText('34 ready / 34 tiles').first()).toBeVisible();
+  await expect(page.getByText('87 ready / 87 tiles').first()).toBeVisible();
   await expect(page.getByText('Preload limit: 4').first()).toBeVisible();
   await expect(page.getByText('Resident limit: 6').first()).toBeVisible();
   await expect(page.locator('.dynamic-map-tile-overlay')).toBeVisible();
