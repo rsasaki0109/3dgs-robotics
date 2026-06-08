@@ -26,8 +26,8 @@ FRAME_DURATION_MS = 260
 MAX_POINTS_PER_SCENE = 170_000
 FOV_DEGREES = 64.0
 MAP_PANEL_SIZE = (424, 468)
-MAP_TILE_COLUMNS = 8
-MAP_TILE_ROWS = 4
+MAP_TILE_COLUMNS = 12
+MAP_TILE_ROWS = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +63,7 @@ class RouteMapProjection:
 MAP_PROOF_SCENES = (
     MapProofScene(
         asset="outdoor-production-grid-large-tile-catalog.json",
-        label="34-tile outdoor production grid",
+        label="87-tile outdoor production regional mosaic",
         axes=(0, 2),
         catalog="apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json",
     ),
@@ -684,10 +684,10 @@ def _render_dynamic_map_material(
         subtitle_font = _load_font(15 if width < 1100 else 17)
         source_name = source_asset or "actual shipped .splat"
         gaussian_text = f" / {gaussian_count // 1000}k gaussians" if gaussian_count is not None else ""
-        draw.text((48, 32), "Dynamic map loading", font=title_font, fill=(245, 250, 255, 255))
+        draw.text((48, 32), "Regional 3DGS dynamic map", font=title_font, fill=(245, 250, 255, 255))
         draw.text(
             (52, 82),
-            f"PCD cells + route overlay over {source_name} footprint{gaussian_text}",
+            f"87 streamed 3DGS tiles + route overlay over {source_name} footprint{gaussian_text}",
             font=subtitle_font,
             fill=(176, 197, 214, 235),
         )
@@ -750,7 +750,6 @@ def _draw_dynamic_tile_layer(
     labels: bool,
 ) -> None:
     loaded_tiles, preload_tiles, active_tile = _tile_residency_sets(camera, projection=projection)
-    tile_font = _load_font(13 if full_material else 9)
     for column in range(MAP_TILE_COLUMNS):
         for row in range(MAP_TILE_ROWS):
             rect = _tile_rect(column, row, box=box)
@@ -767,27 +766,13 @@ def _draw_dynamic_tile_layer(
                 outline = (181, 255, 192, 210)
             draw.rectangle(rect, fill=fill, outline=outline, width=2 if (column, row) == active_tile else 1)
 
-            if labels and (full_material or (row in (0, MAP_TILE_ROWS - 1) and column % 2 == 0)):
-                label = f"PCD {column + 1}{row + 1}" if full_material else f"P{column + 1}{row + 1}"
-                draw.text((rect[0] + 7, rect[1] + 7), label, font=tile_font, fill=(157, 190, 210, 150))
-
     loaded_bounds = _tile_group_bounds(loaded_tiles, box=box)
     if loaded_bounds is not None:
         draw.rounded_rectangle(loaded_bounds, radius=8, outline=(91, 232, 120, 230), width=3 if full_material else 2)
-        if full_material and labels:
-            draw.text(
-                (loaded_bounds[0] + 12, loaded_bounds[1] + 10),
-                "RESIDENT TILE WINDOW",
-                font=_load_font(16),
-                fill=(194, 255, 206, 245),
-            )
 
     preload_bounds = _tile_group_bounds(preload_tiles, box=box)
     if full_material and labels and preload_bounds is not None:
         draw.rounded_rectangle(preload_bounds, radius=8, outline=(242, 190, 82, 210), width=2)
-        draw.text(
-            (preload_bounds[0] + 12, preload_bounds[1] + 10), "PRELOAD", font=_load_font(15), fill=(255, 221, 139, 240)
-        )
 
 
 def _draw_route_overlay_layer(
@@ -818,10 +803,6 @@ def _draw_route_overlay_layer(
     stop_index = min(len(route_xy) - 2, max(1, int(len(route_xy) * 0.72)))
     stop_start, stop_end = _perpendicular_segment(route_xy, stop_index, lane_width * 1.25)
     draw.line((*stop_start, *stop_end), fill=(255, 82, 82, 230), width=4 if full_material else 2)
-    if full_material and labels:
-        label_x = int((stop_start[0] + stop_end[0]) / 2) + 8
-        label_y = int((stop_start[1] + stop_end[1]) / 2) - 24
-        draw.text((label_x, label_y), "route / stop marker", font=_load_font(14), fill=(230, 244, 236, 220))
 
 
 def _draw_load_radius(
@@ -846,8 +827,6 @@ def _draw_load_radius(
         outline=(96, 178, 255, 80),
         width=2 if full_material else 1,
     )
-    if full_material and labels:
-        draw.text((eye_x + radius + 8, eye_y - 10), "load radius", font=_load_font(14), fill=(190, 240, 204, 220))
 
 
 def _draw_density_material(
@@ -1065,8 +1044,6 @@ def _draw_ego_vehicle_marker(
         fill=(88, 178, 255, 235),
         width=3 if full_material else 2,
     )
-    if full_material and labels:
-        draw.text((eye[0] + 24, eye[1] - 12), "base_link", font=_load_font(15), fill=(196, 255, 206, 245))
 
 
 def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int, int]) -> None:
@@ -1074,7 +1051,7 @@ def _draw_material_legend(draw: ImageDraw.ImageDraw, *, box: tuple[int, int, int
     x = box[2] - 358
     y = box[1] + 18
     items = (
-        ((91, 232, 120, 150), "resident PCD cells"),
+        ((91, 232, 120, 150), "resident 3DGS tiles"),
         ((242, 190, 82, 150), "preload request"),
         ((230, 244, 236, 190), "route overlay"),
         ((232, 246, 238, 165), ".splat footprint density"),
@@ -1106,10 +1083,10 @@ def _draw_map_loading_status_hud(
     text_font = _load_font(13)
     total = f"{gaussian_count // 1000}k" if gaussian_count is not None else "n/a"
     lines = (
-        "/map/pointcloud_map  GetPartialPointCloudMap",
-        "/route_overlay       debug marker layer",
-        f"loaded {len(loaded_tiles):02d} PCD cells / preload {len(preload_tiles):02d} / src {total}",
-        f"active cell pcd_{active_tile[0] + 1:02d}_{active_tile[1] + 1:02d}  frame_id=map -> base_link",
+        "partial pointcloud map",
+        "route-coupled tile window",
+        f"resident {len(loaded_tiles):02d} / preload {len(preload_tiles):02d} / source {total}",
+        f"active tile {active_tile[0] + 1:02d}-{active_tile[1] + 1:02d}",
     )
     draw.text((x0 + 14, y0 + 12), "map_loader debug view", font=title_font, fill=(196, 225, 243, 245))
     for index, line in enumerate(lines):
@@ -1142,7 +1119,7 @@ def _draw_material_footer(
         )
     draw.text(
         (box[0], height - 68),
-        f"PCD footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
+        f"Regional 3DGS footprint {right - left:.1f} x {top - bottom:.1f} m / route span {_route_span_meters(projection):.1f} m",
         font=footer_font,
         fill=(225, 238, 247, 240),
     )

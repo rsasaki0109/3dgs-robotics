@@ -1354,19 +1354,19 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Hero -->
 <div class="hero">
-  <img class="hero-bg hero-bg-map" src="images/demo-sweep/map-quality.gif" alt="Large-scale 3DGS dynamic map loading over the outdoor production grid">
+  <img class="hero-bg hero-bg-map" src="images/demo-sweep/map-quality.gif" alt="Large-scale 3DGS dynamic map loading over the outdoor production regional mosaic">
   <div class="hero-inner">
     <div class="hero-kicker">Large-scale 3DGS dynamic map loading</div>
     <h1>GS Mapper</h1>
-    <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted Dynamic Map Viewer route demo and watch the resident tile window move through a 34-tile production grid.</p>
+    <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted Dynamic Map Viewer route demo and watch the resident tile window move through an 87-tile regional mosaic.</p>
     <div class="hero-actions">
       <a class="hero-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Launch Dynamic Map Viewer &rarr;</a>
       <a class="hero-action" href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json">Open tile catalog &rarr;</a>
       <a class="hero-action" href="#viewer-section">Inspect splat source &rarr;</a>
     </div>
     <div class="hero-proof">
-      <span>34 ready map tiles</span>
-      <span>2.44M tiled splats</span>
+      <span>87 ready map tiles</span>
+      <span>2.70M tiled splats</span>
       <span>route-driven residency</span>
       <span>static GitHub Pages delivery</span>
     </div>
@@ -1390,10 +1390,10 @@ footer a:hover { text-decoration: underline; }
         <h2>Large-scale 3DGS, served as a live dynamic map.</h2>
         <p>The Pages demo now ships the Dynamic Map Viewer app plus its public assets through the static GitHub Pages build. The route playback loads the catalog, resolves tile URLs, checks splat metadata, and swaps active/preload tiles from static GitHub Pages files.</p>
         <div class="dynamic-map-stats">
-          <div class="dynamic-map-stat"><span>Ready tiles</span><strong>34 / 34</strong></div>
-          <div class="dynamic-map-stat"><span>Composite input</span><strong>1.52M splats</strong></div>
-          <div class="dynamic-map-stat"><span>Tiled output</span><strong>2.44M splats</strong></div>
-          <div class="dynamic-map-stat"><span>Tile payload</span><strong>78.2 MB</strong></div>
+          <div class="dynamic-map-stat"><span>Ready tiles</span><strong>87 / 87</strong></div>
+          <div class="dynamic-map-stat"><span>Composite input</span><strong>1.75M splats</strong></div>
+          <div class="dynamic-map-stat"><span>Tiled output</span><strong>2.70M splats</strong></div>
+          <div class="dynamic-map-stat"><span>Tile payload</span><strong>86.3 MB</strong></div>
         </div>
         <div class="dynamic-map-actions">
           <a class="dynamic-map-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open hosted map &rarr;</a>
@@ -1660,11 +1660,11 @@ footer a:hover { text-decoration: underline; }
 <!-- Section 1: 3D Viewer -->
 <section id="viewer-section">
   <h2 class="section-title">Dynamic Map Splat Inspector</h2>
-  <p class="section-sub">Use this embedded point-bundle viewer for quick bounds checks. The full Dynamic Map Viewer route demo loads the 34-tile <a href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json" style="color:var(--accent-green);text-decoration:none;font-weight:500;">tile catalog</a>, while the production splat viewers remain available through <a href="splat.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">the source splat set</a>.</p>
+  <p class="section-sub">Use this embedded point-bundle viewer for quick bounds checks. The full Dynamic Map Viewer route demo loads the 87-tile <a href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json" style="color:var(--accent-green);text-decoration:none;font-weight:500;">tile catalog</a>, while the production splat viewers remain available through <a href="splat.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">the source splat set</a>.</p>
   <div class="viewer-brief">
     <div class="viewer-brief-card primary">
       <span>Dynamic Map route</span>
-      <strong>34 ready tiles, 6 resident slots</strong>
+      <strong>87 ready tiles, 6 resident slots</strong>
       <p>Route playback drives tile residency from a static GitHub Pages catalog.</p>
       <div class="viewer-brief-actions">
         <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open map</a>
@@ -1673,7 +1673,7 @@ footer a:hover { text-decoration: underline; }
     </div>
     <div class="viewer-brief-card">
       <span>Tile payload</span>
-      <strong>78.2 MB</strong>
+      <strong>86.3 MB</strong>
       <p>Browser-ready splat tiles served directly from Pages.</p>
     </div>
     <div class="viewer-brief-card">

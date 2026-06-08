@@ -13,9 +13,9 @@
     },
     {
       "id": "outdoor-production-grid-large-route",
-      "label": "Outdoor Production Grid Large Route",
+      "label": "Outdoor Production Regional Route",
       "url": "/robot-routes/outdoor-production-grid-large-route.json",
-      "description": "34-tile route across a 3x3 production outdoor 3DGS grid",
+      "description": "87-tile route across a 5x5 production outdoor 3DGS regional mosaic",
       "fragmentId": "residency",
       "accent": "#f4ca72"
     },

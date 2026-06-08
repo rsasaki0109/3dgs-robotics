@@ -429,7 +429,7 @@ export const dreamwalkerConfig = {
     residentLimitQueryParam: 'tileResidentLimit'
   },
   largeScaleDemo: {
-    label: 'Outdoor Production Grid Large',
+    label: 'Outdoor Production Regional Mosaic',
     tileCatalogUrl: '/manifests/outdoor-production-grid-large-tile-catalog.json',
     preloadMode: 'metadata',
     tilePreloadLimit: 4,
