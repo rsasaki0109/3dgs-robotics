@@ -360,7 +360,7 @@ function buildAssetManifestTemplate() {
 
   return {
     version: 1,
-    label: 'Local DreamWalker Asset Manifest',
+    label: 'Local Dynamic Map Asset Manifest',
     note:
       'splatUrl と colliderMeshUrl に実ファイルを入れると、fragment ごとに Marble world を差し替えられる。',
     fragments
@@ -400,7 +400,7 @@ function buildSceneWorkspaceTemplate() {
 
   return {
     version: 1,
-    label: 'Local DreamWalker Scene Workspace',
+    label: 'Local Dynamic Map Scene Workspace',
     note:
       'stream scene の title / topic / memo / branding override を localStorage で持つ workspace。',
     fragments
@@ -584,7 +584,7 @@ function normalizeStudioBundle(bundleLike) {
     version: 1,
     label: typeof bundle.label === 'string' && bundle.label.trim()
       ? bundle.label
-      : 'Local DreamWalker Studio Bundle',
+      : 'Local Dynamic Map Studio Bundle',
     note:
       typeof bundle.note === 'string' && bundle.note.trim()
         ? bundle.note
@@ -732,7 +732,7 @@ function normalizeRobotRouteCatalog(catalogLike) {
     label:
       typeof catalog.label === 'string' && catalog.label.trim()
         ? catalog.label
-        : 'DreamWalker Robot Route Catalog',
+        : 'Dynamic Map Viewer Robot Route Catalog',
     note:
       typeof catalog.note === 'string' && catalog.note.trim()
         ? catalog.note
@@ -770,7 +770,7 @@ function normalizeRobotMissionCatalog(catalogLike) {
     label:
       typeof catalog.label === 'string' && catalog.label.trim()
         ? catalog.label
-        : 'DreamWalker Robot Mission Catalog',
+        : 'Dynamic Map Viewer Robot Mission Catalog',
     note:
       typeof catalog.note === 'string' && catalog.note.trim()
         ? catalog.note
@@ -808,7 +808,7 @@ function normalizeStudioBundleCatalog(catalogLike) {
     label:
       typeof catalog.label === 'string' && catalog.label.trim()
         ? catalog.label
-        : 'DreamWalker Studio Bundle Catalog',
+        : 'Dynamic Map Viewer Studio Bundle Catalog',
     note:
       typeof catalog.note === 'string' && catalog.note.trim()
         ? catalog.note
@@ -3376,7 +3376,7 @@ export default function App() {
   );
   const [showGuides, setShowGuides] = useState(true);
   const [statusMessage, setStatusMessage] = useState(
-    'DreamWalker Live shell ready'
+    'Dynamic Map Viewer shell ready'
   );
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [collectedShardIds, setCollectedShardIds] = useState(() =>
@@ -4230,7 +4230,7 @@ export default function App() {
     () =>
       JSON.stringify(
         normalizeStudioBundle({
-          label: 'Current DreamWalker Studio Bundle',
+          label: 'Current Dynamic Map Studio Bundle',
           assetWorkspace: assetWorkspaceDraft,
           sceneWorkspace: sceneWorkspaceDraft,
           semanticZoneWorkspace: semanticZoneWorkspaceDrafts,
@@ -9876,7 +9876,7 @@ export default function App() {
     setCollectedShardIds([]);
     setActiveModalItem(null);
     setSelectedHotspotId(null);
-    setStatusMessage('DreamWalker state をリセットしました');
+    setStatusMessage('Dynamic Map Viewer state をリセットしました');
   }
 
   if (isOverlayMode) {
@@ -9890,7 +9890,7 @@ export default function App() {
           fallback={
             <div className="empty-world-banner">
               <span className="empty-world-badge">Loading Scene</span>
-              <p>DreamWalker stage を起動しています。</p>
+              <p>Dynamic Map Viewer stage を起動しています。</p>
             </div>
           }>
           <DreamwalkerScene
@@ -9930,7 +9930,7 @@ export default function App() {
             <span className="empty-world-badge">No Splat Configured</span>
             <p>
               `public/manifests/dreamwalker-live.assets.json` の `splatUrl` を埋めるか、
-              `?assetManifest=` で別 manifest を渡すと DreamWalker world が表示されます。
+              `?assetManifest=` で別 manifest を渡すと Dynamic Map Viewer world が表示されます。
             </p>
           </div>
         ) : null}
@@ -10310,7 +10310,7 @@ export default function App() {
               <div key={entry.id} className="state-card">
                 <span className="state-label">{entry.label}</span>
                 <div className="status-row">
-                  <strong>{entry.fragmentId || 'DreamWalker Live'}</strong>
+                  <strong>{entry.fragmentId || 'Dynamic Map Viewer'}</strong>
                   <HealthBadge health={publicStudioBundleHealthMap[entry.id]} />
                 </div>
                 {entry.description ? (

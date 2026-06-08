@@ -38,7 +38,7 @@
 ### 3.1 基盤 (リネーム前から存在)
 
 - **3DGS パイプライン**: COLMAP / pose-free (DUSt3R) / gsplat / nerfstudio → PLY 出力
-- **DreamWalker web app**: Photo / Live / Walk / Robot モード
+- **Dynamic Map Viewer web app**: Photo / Live / Walk / Robot モード
   - robot teleop (keyboard WASD / gamepad)
   - front / chase / top カメラ切替
   - waypoint / route / semantic zone / nav overlay
@@ -56,8 +56,8 @@
 - `pip install --user --break-system-packages -e .` で再インストール済み
 
 #### end-to-end demo コマンド
-- `gs-sim2real demo --images <dir>` → COLMAP → 学習 → DreamWalker staging → Vite 起動
-- `gs-sim2real demo --ply <file>` → 既存 PLY を直接 DreamWalker に staging
+- `gs-sim2real demo --images <dir>` → COLMAP → 学習 → Dynamic Map Viewer staging → Vite 起動
+- `gs-sim2real demo --ply <file>` → 既存 PLY を直接 Dynamic Map Viewer に staging
 - staging モジュール: `src/gs_sim2real/demo/stage_for_dreamwalker.py`
   - PLY を `apps/dreamwalker-web/public/splats/<fragment>-main.ply` にコピー
   - `apps/dreamwalker-web/public/manifests/dreamwalker-live.assets.json` の `splatUrl` を更新
@@ -205,7 +205,7 @@
 P0 のコードは全て実装済みだが、実際に ROS2 で動く確認がまだ。以下を実行して動作確認:
 
 ```bash
-# Terminal 1: DreamWalker dev server
+# Terminal 1: Dynamic Map Viewer dev server
 cd /media/sasaki/aiueo/ai_coding_ws/nerf-gs-playground/apps/dreamwalker-web
 npm run dev
 
@@ -312,7 +312,7 @@ sim2real の機能を README に追加。star を狙うなら以下を入れる:
 |---------|------|------|
 | `src/gs_sim2real/cli.py` | CLI エントリポイント | demo / train / preprocess / robotics-node 等 |
 | `src/gs_sim2real/demo/__init__.py` | demo パッケージ | 空 |
-| `src/gs_sim2real/demo/stage_for_dreamwalker.py` | PLY → DreamWalker staging | PLY コピー + manifest JSON 更新 |
+| `src/gs_sim2real/demo/stage_for_dreamwalker.py` | PLY → Dynamic Map Viewer staging | PLY コピー + manifest JSON 更新 |
 | `src/gs_sim2real/robotics/ros2_bridge_node.py` | ROS2 scaffold node | --enable-image-relay で画像 topic subscribe |
 | `src/gs_sim2real/robotics/topic_map.py` | ROS2 topic 定義 | camera_compressed, camera_info 含む |
 | `src/gs_sim2real/train/gsplat_trainer.py` | gsplat 学習 | → PLY 出力 |
@@ -322,7 +322,7 @@ sim2real の機能を README に追加。star を狙うなら以下を入れる:
 | `app.py` | Streamlit UI | 6タブ: Input/Preprocess/Training/Viewer/Export/Teleop |
 | `pyproject.toml` | パッケージ定義 | name=gs-sim2real, scripts: gs-sim2real, gs-sim2real-robotics-node |
 
-### 6.2 JavaScript (DreamWalker browser app)
+### 6.2 JavaScript (Dynamic Map Viewer browser app)
 
 | ファイル | 役割 | 備考 |
 |---------|------|------|
@@ -399,7 +399,7 @@ cd /media/sasaki/aiueo/ai_coding_ws/nerf-gs-playground/apps/dreamwalker-web && n
 gs-sim2real --help
 gs-sim2real demo --help
 
-# DreamWalker 開発
+# Dynamic Map Viewer 開発
 cd apps/dreamwalker-web
 npm run dev                          # Vite dev server (port 5173)
 npm run build                        # production build

@@ -1,4 +1,4 @@
-"""Tests for DreamWalker robotics topic helpers."""
+"""Tests for Dynamic Map Viewer robotics topic helpers."""
 
 from __future__ import annotations
 

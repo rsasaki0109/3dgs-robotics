@@ -8,7 +8,7 @@ import {
 import { buildSemanticZoneMap, serializeSemanticZoneMap } from '../src/semantic-zones.js';
 
 function printUsage() {
-  console.log(`DreamWalker robot zone suggestion
+  console.log(`Dynamic Map Viewer robot zone suggestion
 
 Usage:
   node ./tools/suggest-robot-zones.mjs --route ./public/robot-routes/residency-window-loop.json --zones ./public/manifests/robotics-residency.zones.json
@@ -355,7 +355,7 @@ async function main() {
     return;
   }
 
-  console.log('DreamWalker Robot Zone Suggestion');
+  console.log('Dynamic Map Viewer Robot Zone Suggestion');
   console.log(`- route: ${route.label}`);
   console.log(`- frame: route=${route.frameId} / zone=${zoneMap.frameId}`);
   console.log(`- generated corridors: ${corridorZones.length}`);

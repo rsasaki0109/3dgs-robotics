@@ -1,8 +1,8 @@
-# DreamWalker Robotics
+# Dynamic Map Viewer Robotics
 
 ## ねらい
 
-DreamWalker の Gaussian Splat world を、
+Dynamic Map Viewer の Gaussian Splat world を、
 配信・写真・探索だけでなく
 `robotics simulation / teleoperation / perception sandbox`
 としても使えるようにする。
@@ -19,7 +19,7 @@ DreamWalker の Gaussian Splat world を、
 
 - Marble 由来の実世界っぽい scene をすぐ browser で使える
 - RGB ベースの perception / teleop / UI 実験と相性が良い
-- DreamWalker Live の `fragment / bundle / asset staging` をそのまま使い回せる
+- Dynamic Map Viewer の `fragment / bundle / asset staging` をそのまま使い回せる
 - 同じ world を
   - `Live / Photo / Explore`
   - `Robot Sandbox / Teleop / Eval`
@@ -60,7 +60,7 @@ apps/dreamwalker-robotics-web/   # 将来
 ```
 
 最初は別 app を増やさず、
-`DreamWalker Live` に `robotics mode` を足すだけでもよい。
+`Dynamic Map Viewer` に `robotics mode` を足すだけでもよい。
 現時点ではこの最小モードを先に入れていて、
 `robot base teleop / waypoint / route polyline / front-chase-top camera panel`
 までは `apps/dreamwalker-web` 側で動かす。
@@ -115,7 +115,7 @@ apps/dreamwalker-robotics-web/   # 将来
 6. `traversability overlay`
 7. 必要なら `URDF` / `ROS2`
 
-上の 1〜4 は、いまの `DreamWalker Live` に最小実装済み。
+上の 1〜4 は、いまの `Dynamic Map Viewer` に最小実装済み。
 5 の websocket bridge も最小版を入れていて、browser から `robot-state` を publish し、
 外部 client から `set-pose / teleop / set-waypoint` などを送れる。
 いまは `dreamwalker-robotics/v1` を正規 protocol として固定し、CLI client からも叩ける。
@@ -158,14 +158,14 @@ python scripts/robotics_smoke.py \
     --out artifacts/robotics-smoke
 ```
 
-出力: `rgb.png` + `depth.npy` + `payload.json` (DreamWalker render-query v1
+出力: `rgb.png` + `depth.npy` + `payload.json` (Dynamic Map Viewer render-query v1
 payload と `/dreamwalker/...` relay topic 名がまとめて入る)。
 このスクリプトの regression は `tests/test_robotics_smoke_script.py` で
 CI に乗っている。
 
 ## 重要な設計原則
 
-- DreamWalker Live の価値を壊さない
+- Dynamic Map Viewer の価値を壊さない
 - robotics 機能は `別モード` として積む
 - splat を physics source of truth にしない
 - perception realism と interaction realism を分ける

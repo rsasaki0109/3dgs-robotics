@@ -1,4 +1,4 @@
-# DreamWalker プロトタイプメモ
+# Dynamic Map Viewer プロトタイプメモ
 
 ## コンセプト
 
@@ -8,13 +8,13 @@
 ## 現在の方向性
 
 - Unity 版は高機能プロトタイプの土台として維持する
-- 初期の公開体験はブラウザ版 `DreamWalker Live` を優先する
+- 初期の公開体験はブラウザ版 `Dynamic Map Viewer` を優先する
 - 写真モードと VTuber 配信空間としての利用を最初から織り込む
 - 詳細は `docs/prototypes/dreamwalker-live.md` を参照
 
 ## 最初のプレイアブル目標
 
-以下がつながれば、DreamWalker の最初の縦切りとして十分です。
+以下がつながれば、Dynamic Map Viewer の最初の縦切りとして十分です。
 
 1. Marble 由来の 1 シーンを正常表示できる
 2. プレイヤーが歩く、走る、跳ぶ、低重力で漂う
@@ -45,7 +45,7 @@
 - `DreamGate` の解放条件
 - シーン遷移または同シーン内ワープ
 
-### Milestone 4: DreamWalker らしさ
+### Milestone 4: Dynamic Map Viewer らしさ
 
 - 視界歪みポストプロセス
 - 環境音の位置トリガー
@@ -67,7 +67,7 @@
 - `IInteractable`
 - `DistortionShard`
 - `DreamGate`
-- `DreamWalkerHUD`
+- `DynamicMapViewerHUD`
 - `DreamScreenFader`
 - `DreamEchoNote`
 - `DreamStateManager`

@@ -65,7 +65,7 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(`DreamWalker dynamic map catalog validation
+  console.log(`Dynamic Map Viewer dynamic map catalog validation
 
 Usage:
   node ./tools/validate-dynamic-map-catalog.mjs public/manifests/scene.json
@@ -75,7 +75,7 @@ Options:
   --catalog <file|url>       large-scale 3DGS tile catalog JSON. Positional input is also accepted.
   --route <file|url>         optional robot route JSON to validate against ready tiles.
   --public-root <dir>        local public root for checking /splats/... files.
-  --site-url <url>           DreamWalker site URL for the printed launch URL.
+  --site-url <url>           Dynamic Map Viewer site URL for the printed launch URL.
   --preload-mode <mode>      tile preload mode for the printed launch URL: metadata, cache, or off.
   --tile-id <id>             optional tile override for the printed launch URL.
   --route-playback <0|1>     include robotRoutePlayback=1 in the printed launch URL.

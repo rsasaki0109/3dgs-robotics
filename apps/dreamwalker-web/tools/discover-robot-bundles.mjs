@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const appRoot = path.resolve(__dirname, '..');
 
 function printUsage() {
-  console.log(`DreamWalker robot bundle discovery
+  console.log(`Dynamic Map Viewer robot bundle discovery
 
 Usage:
   node ./tools/discover-robot-bundles.mjs

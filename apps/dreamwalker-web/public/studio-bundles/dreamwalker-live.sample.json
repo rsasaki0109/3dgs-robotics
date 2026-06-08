@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "label": "DreamWalker Live Sample Studio Bundle",
+  "label": "Dynamic Map Viewer Sample Studio Bundle",
   "note": "URL query から直接読み込める sample studio bundle。asset / scene / semantic zone / robot route の session draft をまとめて適用する。",
   "assetWorkspace": {
     "version": 1,

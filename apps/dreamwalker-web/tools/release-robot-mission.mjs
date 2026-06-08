@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function printUsage() {
-  console.log(`DreamWalker robot mission release
+  console.log(`Dynamic Map Viewer robot mission release
 
 Usage:
   node ./tools/release-robot-mission.mjs --bundle ./downloads/dreamwalker-live-residency.artifact-pack.json --force --validate

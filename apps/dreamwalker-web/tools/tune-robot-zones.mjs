@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function printUsage() {
-  console.log(`DreamWalker robot zone autotune
+  console.log(`Dynamic Map Viewer robot zone autotune
 
 Usage:
   node ./tools/tune-robot-zones.mjs --route ./public/robot-routes/residency-window-loop.json --zones ./public/manifests/robotics-residency.zones.json --fragment residency --force

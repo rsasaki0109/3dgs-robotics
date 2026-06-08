@@ -1,4 +1,4 @@
-"""Topic map and payload helpers for DreamWalker robotics integration."""
+"""Topic map and payload helpers for Dynamic Map Viewer robotics integration."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def normalize_namespace(namespace: str) -> str:
 
 @dataclass(frozen=True)
 class DreamwalkerRosTopicMap:
-    """Fixed ROS topic map for DreamWalker relay and ROS2 nodes."""
+    """Fixed ROS topic map for Dynamic Map Viewer relay and ROS2 nodes."""
 
     namespace: str
     camera_compressed: str

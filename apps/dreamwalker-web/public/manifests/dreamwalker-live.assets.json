@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "label": "Local DreamWalker Asset Manifest",
+  "label": "Local Dynamic Map Asset Manifest",
   "note": "splatUrl と colliderMeshUrl に実ファイルを入れると、fragment ごとに Marble world を差し替えられる。",
   "fragments": {
     "residency": {

@@ -1498,7 +1498,7 @@ def _yaw_degrees_from_segment(
 
 
 def build_large_scale_3dgs_route(options: LargeScale3DGSRouteOptions) -> dict[str, Any]:
-    """Build a DreamWalker robot route through ready tiles in a large-scale 3DGS catalog."""
+    """Build a Dynamic Map Viewer robot route through ready tiles in a large-scale 3DGS catalog."""
     catalog_path = Path(options.catalog_path)
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     axes = _catalog_route_axes(catalog)
@@ -1657,7 +1657,7 @@ def build_large_scale_3dgs_web_runbook(
     catalog_path: Path,
     options: LargeScale3DGSCatalogOptions,
 ) -> dict[str, str]:
-    """Build follow-up commands for validating and loading a tile catalog in DreamWalker."""
+    """Build follow-up commands for validating and loading a tile catalog in Dynamic Map Viewer."""
     preload_mode = options.tile_preload if options.tile_preload in {"off", "metadata", "cache"} else "metadata"
     public_root = Path(options.public_root) if options.public_root is not None else None
     catalog_url = _path_to_public_url(Path(catalog_path), public_root)

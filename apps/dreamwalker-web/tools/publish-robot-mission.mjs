@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const robotMissionArtifactPackProtocolId = 'dreamwalker-robot-mission-artifact-pack/v1';
 
 function printUsage() {
-  console.log(`DreamWalker robot mission publish
+  console.log(`Dynamic Map Viewer robot mission publish
 
 Usage:
   node ./tools/publish-robot-mission.mjs --route ./public/robot-routes/residency-window-loop.json --fragment residency --route-id residency-patrol --force
@@ -869,7 +869,7 @@ async function main() {
         await readFile(missionCatalogPath, 'utf8').catch(() =>
           JSON.stringify({
             version: 1,
-            label: 'DreamWalker Public Robot Mission Catalog',
+            label: 'Dynamic Map Viewer Public Robot Mission Catalog',
             note: 'publish-robot-mission.mjs により生成される public robot mission catalog。',
             missions: []
           })
@@ -883,7 +883,7 @@ async function main() {
         fragmentId: resolvedFragmentId,
         accent: resolvedMissionAccent
       }, {
-        label: 'DreamWalker Public Robot Mission Catalog',
+        label: 'Dynamic Map Viewer Public Robot Mission Catalog',
         note: 'publish-robot-mission.mjs により生成される public robot mission catalog。'
       });
 

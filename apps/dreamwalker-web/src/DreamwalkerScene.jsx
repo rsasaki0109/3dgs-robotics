@@ -628,7 +628,7 @@ function FrameStreamBridge({
       .then((results) => {
         for (const result of results) {
           if (result.status === 'rejected') {
-            console.error('DreamWalker sensor capture failed', result.reason);
+            console.error('Dynamic Map Viewer sensor capture failed', result.reason);
           }
         }
       })

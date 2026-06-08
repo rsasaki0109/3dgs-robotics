@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "label": "DreamWalker Public Robot Route Catalog",
+  "label": "Dynamic Map Viewer Public Robot Route Catalog",
   "note": "repo 同梱の robot route preset 一覧。robot sandbox の導線や demo route をここへ足す。",
   "routes": [
     {

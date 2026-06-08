@@ -106,7 +106,7 @@ function OverlaySceneCard({ overlayState, overlayPreset, overlayBranding, previe
         data-overlay-branding={resolvedBranding?.id ?? 'default-branding'}
         data-overlay-preset={resolvedPreset.id}
         style={cardStyle}>
-        <p className="obs-overlay-kicker">DreamWalker Live</p>
+        <p className="obs-overlay-kicker">Dynamic Map Viewer</p>
         <h1>No Live Scene Published</h1>
         <p className="obs-overlay-topic">
           通常画面で Live Mode を開くと、scene 情報がここへ同期されます。
@@ -124,12 +124,12 @@ function OverlaySceneCard({ overlayState, overlayPreset, overlayBranding, previe
       <div className="obs-overlay-accent-line" />
       <div className="obs-overlay-live-row">
         <span className="obs-live-pill">{resolvedBranding?.badge ?? 'LIVE'}</span>
-        <span className="obs-overlay-fragment">{activeState.fragmentLabel ?? 'DreamWalker Live'}</span>
+        <span className="obs-overlay-fragment">{activeState.fragmentLabel ?? 'Dynamic Map Viewer'}</span>
         <span className="obs-overlay-scene-chip">
           {activeState.streamSceneLabel ?? resolvedPreset.label}
         </span>
       </div>
-      <p className="obs-overlay-kicker">{activeState.fragmentLabel ?? 'DreamWalker Live'}</p>
+      <p className="obs-overlay-kicker">{activeState.fragmentLabel ?? 'Dynamic Map Viewer'}</p>
       <h1>{activeState.streamSceneTitle ?? activeState.appTitle ?? 'Live Scene'}</h1>
       <p className="obs-overlay-topic">
         {activeState.streamSceneTopic ?? '配信用 scene 情報がここに表示されます。'}

@@ -136,7 +136,7 @@ async function main() {
 }
 
 function printHelp() {
-  console.log(`DreamWalker Robotics CLI
+  console.log(`Dynamic Map Viewer Robotics CLI
 
 Protocol: ${robotBridgeProtocolId}
 Default URL: ${robotBridgeDefaultUrl}
