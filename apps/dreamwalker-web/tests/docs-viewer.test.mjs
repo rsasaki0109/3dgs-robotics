@@ -58,7 +58,7 @@ test('docs viewer loads published photo-derived scene bundles', async () => {
     await page.waitForFunction(() => {
       const pointCount = document.getElementById('point-count')?.textContent || '';
       const status = document.getElementById('viewer-status')?.textContent || '';
-      return /points/.test(pointCount) && pointCount !== '0 points' && /Showing Street Gallery/.test(status);
+      return /points/.test(pointCount) && pointCount !== '0 points' && /Showing Outdoor GS Demo/.test(status);
     });
 
     const snapshot = await page.evaluate(() => ({
@@ -69,9 +69,14 @@ test('docs viewer loads published photo-derived scene bundles', async () => {
       ),
     }));
 
-    assert.equal(snapshot.status, 'Showing Street Gallery from published');
+    assert.equal(snapshot.status, 'Showing Outdoor GS Demo from published');
     assert.ok(/\d[\d,]* points/.test(snapshot.pointCount));
-    assert.deepEqual(snapshot.tabs, ['Street Gallery', 'Campus Gallery', 'Indoor Gallery']);
+    assert.deepEqual(snapshot.tabs, [
+      'Outdoor GS Demo',
+      'Street Gallery',
+      'Campus Gallery',
+      'Indoor Gallery',
+    ]);
   } finally {
     if (browser) {
       await browser.close();

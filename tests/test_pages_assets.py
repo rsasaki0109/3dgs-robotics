@@ -449,16 +449,18 @@ def test_readme_quickstart_split_lists_three_entry_points() -> None:
     assert "## CLI reference" in readme
 
 
-def test_index_hero_embeds_live_outdoor_splat() -> None:
-    """docs/index.html hero must show the live WebGL splat viewer with a strong fallback."""
+def test_index_hero_promotes_hosted_dynamic_map() -> None:
+    """docs/index.html hero must send visitors to the hosted dynamic-map demo."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
-    assert "hero-bg-splat" in html, "hero iframe needs the hero-bg-splat class"
-    assert "hero-bg-fallback" in html, "hero must retain a reduced-motion / fallback image layer"
-    assert "splat.html?url=" in html, "hero iframe must point at splat.html with a ?url= scene"
-    assert "embed=1" in html, "hero iframe must request embed mode"
-    assert "bag6-mast3r.splat" in html, "hero should default to a visually large outdoor production splat"
-    assert "images/demo-sweep/04_bag6-mast3r.png" in html, "hero fallback should use the same strong outdoor scene"
-    assert "pointer-events: none" in html, "hero iframe must not capture clicks from the hero buttons"
+    assert "hero-bg-map" in html, "hero should use the dynamic-map result media layer"
+    assert "images/demo-sweep/map-quality.gif" in html, "hero should foreground the dynamic-map loading GIF"
+    assert "images/demo-sweep/dynamic-map-material.png" in html, "hero should keep a reduced-motion still"
+    assert "Launch DreamWalker map" in html
+    assert "dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json" in html
+    assert "34 ready map tiles" in html
+    assert "2.44M tiled splats" in html
+    assert 'id="dynamic-map-section"' in html
+    assert "View tile catalog" in html
     assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"
 
 
@@ -518,8 +520,9 @@ def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
 def test_index_outdoor_hero_visuals_are_not_muted_or_mobile_overflow_prone() -> None:
     """The Pages hero should visibly foreground outdoor GS and avoid narrow-screen overflow traps."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
-    assert "opacity: 0.38" in html
-    assert "filter: saturate(1.12) brightness(1.05)" in html
+    assert "opacity: 0.7" in html
+    assert "filter: saturate(1.08) contrast(1.02) brightness(0.82)" in html
+    assert "@media (max-width: 880px)" in html
     assert ".scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }" in html
     assert "flex-wrap: wrap;" in html
     assert ".gallery-tabs { flex-wrap: wrap; }" in html
