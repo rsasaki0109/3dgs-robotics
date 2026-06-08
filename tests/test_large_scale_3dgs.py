@@ -11,6 +11,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     LargeScale3DGSOptions,
     LargeScale3DGSPilotOptions,
     LargeScale3DGSPreflightOptions,
+    LargeScale3DGSPromoteOptions,
     LargeScale3DGSRouteOptions,
     LargeScale3DGSRunOptions,
     LargeScale3DGSSmokeDataOptions,
@@ -21,6 +22,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     build_large_scale_3dgs_plan,
     build_large_scale_3dgs_pilot,
     build_large_scale_3dgs_preflight,
+    build_large_scale_3dgs_promotion,
     build_large_scale_3dgs_route,
     build_large_scale_3dgs_web_runbook,
     format_large_scale_3dgs_bootstrap_text,
@@ -28,6 +30,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     format_large_scale_3dgs_discovery_text,
     format_large_scale_3dgs_pilot_text,
     format_large_scale_3dgs_preflight_text,
+    format_large_scale_3dgs_promotion_text,
     format_large_scale_3dgs_route_text,
     format_large_scale_3dgs_shell,
     format_large_scale_3dgs_smoke_data_text,
@@ -39,6 +42,7 @@ from gs_sim2real.train.large_scale_3dgs import (
     write_large_scale_3dgs_plan,
     write_large_scale_3dgs_pilot,
     write_large_scale_3dgs_preflight,
+    write_large_scale_3dgs_promotion,
     write_large_scale_3dgs_route,
     write_large_scale_3dgs_smoke_data,
 )
@@ -694,6 +698,84 @@ def test_build_large_scale_3dgs_catalog_can_require_existing_splats(tmp_path: Pa
 
     assert catalog["summary"]["tileCount"] == 1
     assert [tile["id"] for tile in catalog["tiles"]] == ["tile_x000_y000"]
+
+
+def test_build_large_scale_3dgs_promotion_writes_dynamic_map_assets_from_bootstrap(tmp_path: Path) -> None:
+    data_dir = _write_sparse_fixture(tmp_path / "data")
+    output_dir = tmp_path / "large"
+    plan = build_large_scale_3dgs_plan(
+        LargeScale3DGSOptions(
+            data_dir=data_dir,
+            output_dir=output_dir,
+            tile_size=20,
+            overlap=0,
+            axes="xy",
+            min_images=1,
+        )
+    )
+    for chunk in plan["chunks"]:
+        if chunk["status"] != "ready":
+            continue
+        splat_path = Path(chunk["splatOutput"])
+        splat_path.parent.mkdir(parents=True, exist_ok=True)
+        splat_path.write_bytes(f"splat:{chunk['id']}".encode("utf-8"))
+
+    plan_path = write_large_scale_3dgs_plan(plan, output_dir)
+    run_report_path = output_dir / "large_scale_3dgs_run_report.json"
+    run_report_path.write_text(
+        json.dumps(
+            {
+                "type": "large-scale-3dgs-run-report",
+                "chunks": [{"id": chunk["id"], "status": "done"} for chunk in plan["chunks"]],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bootstrap_path = output_dir / "large_scale_3dgs_bootstrap.json"
+    bootstrap_path.write_text(
+        json.dumps({"type": "large-scale-3dgs-bootstrap", "next": {"pilotPlanPath": str(plan_path)}}) + "\n",
+        encoding="utf-8",
+    )
+
+    public_root = tmp_path / "apps" / "dreamwalker-web" / "public"
+    report = build_large_scale_3dgs_promotion(
+        LargeScale3DGSPromoteOptions(
+            bootstrap_path=bootstrap_path,
+            run_report_path=run_report_path,
+            public_root=public_root,
+            scene_id="Demo Large",
+            label="Demo Large",
+            link_mode="copy",
+            site_url="/dreamwalker/",
+            route_order="row-major",
+        )
+    )
+    report_path = write_large_scale_3dgs_promotion(report)
+    text = format_large_scale_3dgs_promotion_text(report, report_path)
+    catalog_path = public_root / "manifests" / "demo-large-tile-catalog.json"
+    route_path = public_root / "robot-routes" / "demo-large-route.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+
+    assert report["type"] == "large-scale-3dgs-promotion"
+    assert report["status"] == "viewer-ready"
+    assert report_path == output_dir / "large_scale_3dgs_promotion.json"
+    assert report["source"]["planPath"] == str(plan_path)
+    assert report["summary"]["readyTileCount"] == 2
+    assert report["summary"]["publicSplatCount"] == 2
+    assert catalog["sceneId"] == "demo-large"
+    assert catalog["summary"]["missingSplatTileCount"] == 0
+    assert catalog["tiles"][0]["runStatus"] == "done"
+    assert Path(catalog["tiles"][0]["publicPath"]).read_bytes().startswith(b"splat:")
+    assert route["sourceCatalog"]["sceneId"] == "demo-large"
+    assert route["sourceCatalog"]["order"] == "row-major"
+    assert len(route["route"]) == 2
+    assert "tileCatalog=%2Fmanifests%2Fdemo-large-tile-catalog.json" in report["next"]["launchUrl"]
+    assert "robotRoute=%2Frobot-routes%2Fdemo-large-route.json" in report["next"]["launchUrl"]
+    assert "robotRoutePlayback=1" in report["next"]["launchUrl"]
+    assert "Large-scale 3DGS Dynamic Map promotion" in text
+    assert "status: viewer-ready" in text
 
 
 def _write_grid_catalog_fixture(catalog_path: Path) -> None:
