@@ -1,8 +1,8 @@
-# DreamWalker Live
+# Dynamic Map Viewer
 
 ## コンセプト
 
-DreamWalker Live は、Gaussian Splat の夢景色を
+Dynamic Map Viewer は、Gaussian Splat の夢景色を
 「探索ゲーム」ではなく「住める配信空間」として扱うブラウザ版プロトタイプ。
 
 目標は次の 3 つを 1 つの体験としてつなぐことです。
@@ -17,7 +17,7 @@ DreamWalker Live は、Gaussian Splat の夢景色を
 - PlayCanvas / SuperSplat 系はブラウザ配信と相性がよい
 - Aras の UnityGaussianSplatting は D3D12 / Metal / Vulkan 前提で、
   Web を主戦場にするには向かない
-- DreamWalker は重い物理より、空気感・見栄え・回遊性の方が価値が高い
+- Dynamic Map Viewer は重い物理より、空気感・見栄え・回遊性の方が価値が高い
 
 ## 体験の柱
 
@@ -33,7 +33,7 @@ DreamWalker Live は、Gaussian Splat の夢景色を
 - HUD を隠す
 - 構図ガイドを表示する
 - `1:1` / `4:5` / `9:16` の撮影比率を切り替える
-- DreamWalker らしい色味フィルタを選ぶ
+- Dynamic Map Viewer らしい色味フィルタを選ぶ
 - PNG を保存する
 
 ### 3. Live Mode

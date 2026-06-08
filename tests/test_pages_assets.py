@@ -455,7 +455,9 @@ def test_index_hero_promotes_hosted_dynamic_map() -> None:
     assert "hero-bg-map" in html, "hero should use the dynamic-map result media layer"
     assert "images/demo-sweep/map-quality.gif" in html, "hero should foreground the dynamic-map loading GIF"
     assert "images/demo-sweep/dynamic-map-material.png" in html, "hero should keep a reduced-motion still"
-    assert "Launch DreamWalker map" in html
+    assert "Launch Dynamic Map Viewer" in html
+    assert "Launch DreamWalker map" not in html
+    assert "DreamWalker" not in html
     assert "dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json" in html
     assert "34 ready map tiles" in html
     assert "2.44M tiled splats" in html

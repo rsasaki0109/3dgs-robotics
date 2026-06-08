@@ -96,7 +96,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`DreamWalker ROSBridge Relay
+  console.log(`Dynamic Map Viewer ROSBridge Relay
 
 Protocol: ${robotBridgeProtocolId}
 
@@ -105,7 +105,7 @@ Usage:
 
 Publishes to rosbridge:
   ${topicMap.robotStateJson}   std_msgs/String
-  ${topicMap.robotPose2d}      geometry_msgs/Pose2D (DreamWalker native plane)
+  ${topicMap.robotPose2d}      geometry_msgs/Pose2D (Dynamic Map Viewer native plane)
   ${topicMap.robotPoseStamped} geometry_msgs/PoseStamped (ROS map frame)
   ${topicMap.robotWaypoint}    geometry_msgs/Point
   ${topicMap.robotWaypointJson} std_msgs/String

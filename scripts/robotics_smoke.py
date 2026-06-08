@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end smoke for the DreamWalker robotics render-server.
+"""End-to-end smoke for the Dynamic Map Viewer robotics render-server.
 
 Wires together the three pieces that exist in ``src/gs_sim2real/robotics/`` —
 ``HeadlessSplatRenderer``, the render query payload schema used by
 ``render_query_client``, and the bridge-side topic map from ``topic_map.py`` —
 so that a caller can verify the full "pose query → RGB + depth frame →
-DreamWalker-topic payload" path without needing a live ROS2 stack.
+Dynamic Map Viewer topic payload" path without needing a live ROS2 stack.
 
 Usage::
 

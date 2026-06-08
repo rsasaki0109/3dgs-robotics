@@ -13,14 +13,14 @@ const defaultManifestPath = path.join(defaultPublicRoot, 'manifests', 'dreamwalk
 const defaultCatalogPath = path.join(defaultPublicRoot, 'studio-bundles', 'index.json');
 
 function printUsage() {
-  console.log(`DreamWalker Marble fragment staging
+  console.log(`Dynamic Map Viewer Marble fragment staging
 
 Usage:
   node ./tools/stage-marble-fragment.mjs --fragment residency --source-dir /path/to/export
   node ./tools/stage-marble-fragment.mjs --fragment residency --splat https://.../main.sog --collider https://.../collider.glb
 
 Options:
-  --fragment <id>          DreamWalker fragment id. required.
+  --fragment <id>          Dynamic Map Viewer fragment id. required.
   --source-dir <dir>       source directory that contains splat and collider files.
   --splat <file|url>       source splat file or http(s) url. if omitted, auto-detect from --source-dir.
   --collider <file|url>    source collider file or http(s) url. if omitted, auto-detect from --source-dir.
@@ -328,7 +328,7 @@ function upsertCatalogEntry(catalog, nextEntry) {
   return {
     ...catalog,
     version: catalog.version ?? 1,
-    label: catalog.label ?? 'DreamWalker Public Bundle Catalog',
+    label: catalog.label ?? 'Dynamic Map Viewer Public Bundle Catalog',
     note: catalog.note ?? 'repo 同梱の studio bundle 一覧。',
     bundles: nextBundles
   };
@@ -444,7 +444,7 @@ async function main() {
 
     const manifest = await readJsonOrFallback(manifestPath, {
       version: 1,
-      label: 'Local DreamWalker Asset Manifest',
+      label: 'Local Dynamic Map Asset Manifest',
       note: 'stage-marble-fragment.mjs により生成される asset manifest。',
       fragments: {}
     });
@@ -493,7 +493,7 @@ async function main() {
 
     const catalog = await readJsonOrFallback(catalogPath, {
       version: 1,
-      label: 'DreamWalker Public Bundle Catalog',
+      label: 'Dynamic Map Viewer Public Bundle Catalog',
       note: 'stage-marble-fragment.mjs により生成される public studio bundle catalog。',
       bundles: []
     });

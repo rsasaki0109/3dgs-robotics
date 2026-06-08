@@ -12,7 +12,7 @@ const appRoot = path.resolve(__dirname, '..');
 const defaultPublicRoot = path.join(appRoot, 'public');
 
 function printUsage() {
-  console.log(`DreamWalker robot zone staging
+  console.log(`Dynamic Map Viewer robot zone staging
 
 Usage:
   node ./tools/stage-robot-zones.mjs --source ./public/manifests/robotics-residency.zones.json

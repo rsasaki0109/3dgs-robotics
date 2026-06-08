@@ -1,4 +1,4 @@
-"""Robotics helpers for DreamWalker and Gaussian Splat environments."""
+"""Robotics helpers for Dynamic Map Viewer and Gaussian Splat environments."""
 
 from .rosbag_correlation import (
     CORRELATION_EVENT_WINDOWS_VERSION,

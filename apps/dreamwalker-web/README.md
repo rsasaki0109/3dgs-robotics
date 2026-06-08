@@ -1,8 +1,8 @@
-# DreamWalker Web
+# Dynamic Map Viewer Web
 
-DreamWalker の browser-first 実験アプリです。
+Dynamic Map Viewer の browser-first 実験アプリです。
 
-現在は `DreamWalker Live` の最小土台として、
+現在は `Dynamic Map Viewer` の最小土台として、
 PlayCanvas React 上で splat 表示、写真モード UI、配信用 UI、
 そして `Echo Note hotspot` の枠組みを用意しています。
 
@@ -333,7 +333,7 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 
 ## Real Asset Staging
 
-- `npm run stage:fragment -- --fragment residency --source-dir /path/to/export --force` で実 asset を DreamWalker 用の public 配置へ流し込めます
+- `npm run stage:fragment -- --fragment residency --source-dir /path/to/export --force` で実 asset を Dynamic Map Viewer 用の public 配置へ流し込めます
 - `--splat https://... --collider https://...` を使うと、ローカル source が無くても remote export URL から直接 staging できます
 - fragment ごとに `expectedSplatUrl / expectedColliderMeshUrl` をベースに staging するので、Residency と Echo Chamber の導線を揃えやすいです
 - `--bundle-id` と `--bundle-label` を付けると、そのまま `Public Studio Bundles` から launch できる catalog entry が作られます

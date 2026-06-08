@@ -1,7 +1,7 @@
-"""Stage a trained PLY into DreamWalker's public directory.
+"""Stage a trained PLY into the Dynamic Map Viewer public directory.
 
-Copies the PLY file and updates the asset manifest so DreamWalker loads it
-as the splat source for the target fragment.
+Copies the PLY file and updates the asset manifest so the Dynamic Map Viewer
+loads it as the splat source for the target fragment.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ def stage_ply(
     fragment: str = "residency",
     dreamwalker_root: str | Path | None = None,
 ) -> dict[str, str]:
-    """Copy *ply_path* into DreamWalker public/splats/ and update the manifest.
+    """Copy *ply_path* into Dynamic Map Viewer public/splats/ and update the manifest.
 
     Returns a dict with ``splat_dest``, ``manifest``, and ``launch_url``.
     """
@@ -40,7 +40,7 @@ def stage_ply(
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text())
     else:
-        manifest = {"version": 1, "label": "Local DreamWalker Asset Manifest", "fragments": {}}
+        manifest = {"version": 1, "label": "Local Dynamic Map Asset Manifest", "fragments": {}}
 
     if fragment not in manifest.get("fragments", {}):
         manifest.setdefault("fragments", {})[fragment] = {

@@ -13,7 +13,7 @@ GS Mapper turns photos, rosbags, and external SLAM outputs into browser-viewable
 reviewable scenario CI artifacts.
 
 **Try it first:** [Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
-[Large-scale DreamWalker map](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1) |
+[Large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1) |
 [Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section) |
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
 [Physical AI docs](docs/physical-ai-sim.md)
@@ -76,7 +76,7 @@ Pages hosts multiple viewers over the same production scene list:
 The repo also ships a browser-ready large-scale dynamic-map fixture in
 `apps/dreamwalker-web/public/`: 9 production outdoor `.splat` results are
 sampled into a 3x3 X/Z grid, tiled into 34 ready browser splats, and played
-back through the DreamWalker robot route UI.
+back through the Dynamic Map Viewer route UI.
 
 [![Large-scale 3DGS dynamic map loading result](docs/images/demo-sweep/map-quality.gif)](docs/images/demo-sweep/map-quality.gif)
 
@@ -86,7 +86,7 @@ loading GIF, [`dynamic-map-material.png`](docs/images/demo-sweep/dynamic-map-mat
 is the standalone still, and [`hero.gif`](docs/images/demo-sweep/hero.gif) is
 the older scene-sweep hero.
 
-Open the hosted DreamWalker result:
+Open the hosted Dynamic Map Viewer result:
 
 ```text
 https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1

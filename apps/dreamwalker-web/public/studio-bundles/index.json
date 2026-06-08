@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "label": "DreamWalker Public Bundle Catalog",
+  "label": "Dynamic Map Viewer Public Bundle Catalog",
   "note": "repo 同梱の studio bundle 一覧。実運用では配信回ごとの bundle file をここへ足す。",
   "bundles": [
     {

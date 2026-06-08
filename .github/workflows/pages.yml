@@ -29,10 +29,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/dreamwalker-web/package-lock.json
-      - name: Install DreamWalker web dependencies
+      - name: Install Dynamic Map Viewer dependencies
         run: npm ci
         working-directory: apps/dreamwalker-web
-      - name: Build DreamWalker web demo
+      - name: Build Dynamic Map Viewer demo
         run: npm run build
         working-directory: apps/dreamwalker-web
         env:

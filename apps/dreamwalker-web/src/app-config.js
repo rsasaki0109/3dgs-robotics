@@ -140,7 +140,7 @@ const residencyFragment = {
       title: 'Distortion Shard 01',
       position: [-1.75, 1.1, 4.4],
       accentColor: '#9deaf4',
-      body: 'DreamWalker Live の最初の欠片。導入トークや最初の感想を置く場所。'
+      body: 'Dynamic Map Viewer の最初の欠片。導入トークや最初の感想を置く場所。'
     },
     {
       id: 'shard-02',
@@ -170,7 +170,7 @@ const residencyFragment = {
       position: [0, 1.75, 2.6],
       accentColor: '#f4ca72',
       body:
-        'DreamWalker Live では、この世界は「訪れる場所」ではなく、' +
+        'Dynamic Map Viewer では、この世界は「訪れる場所」ではなく、' +
         '配信者が帰ってくる生活圏として扱う。\n\n' +
         '毎回の導入、待機、雑談、告知、深夜の散歩まで同じ空間の延長で語れるようにする。'
     },
@@ -211,7 +211,7 @@ const residencyFragment = {
     openTitle: 'Dream Gate: Echo Chamber へ接続',
     lockedBody:
       '歪みの欠片を集めると gate が目を覚ます。\n\n' +
-      'DreamWalker Live では、この gate は次の fragment を切り替える browser portal として扱う。',
+      'Dynamic Map Viewer では、この gate は次の fragment を切り替える browser portal として扱う。',
     openBody:
       'DreamGate は Echo Chamber に接続された。\n\n' +
       'ここから別の fragment へ遷移して、配信の章立てを切り替えられる。'
@@ -414,8 +414,8 @@ const echoChamberFragment = {
 };
 
 export const dreamwalkerConfig = {
-  appTitle: 'DreamWalker Live',
-  subtitle: 'Browser-first Gaussian Splat residency for photo mode and streaming',
+  appTitle: 'Dynamic Map Viewer',
+  subtitle: 'Browser-first 3DGS dynamic-map loading and route playback',
   defaultFragmentId: 'residency',
   assetManifest: {
     defaultUrl: '/manifests/dreamwalker-live.assets.json',

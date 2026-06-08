@@ -1,4 +1,4 @@
-"""Semantic zone parsing and costmap rasterization for DreamWalker robotics."""
+"""Semantic zone parsing and costmap rasterization for Dynamic Map Viewer robotics."""
 
 from __future__ import annotations
 

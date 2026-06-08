@@ -20,7 +20,7 @@ const defaultCatalogPath = path.join(defaultPublicRoot, 'robot-routes', 'index.j
 const routeProtocolId = 'dreamwalker-robot-route/v1';
 
 function printUsage() {
-  console.log(`DreamWalker robot route staging
+  console.log(`Dynamic Map Viewer robot route staging
 
 Usage:
   node ./tools/stage-robot-route.mjs --source ./public/robot-routes/residency-window-loop.json
@@ -296,7 +296,7 @@ function upsertRouteCatalogEntry(catalog, nextEntry) {
   return {
     ...catalog,
     version: catalog.version ?? 1,
-    label: catalog.label ?? 'DreamWalker Public Robot Route Catalog',
+    label: catalog.label ?? 'Dynamic Map Viewer Public Robot Route Catalog',
     note: catalog.note ?? 'repo 同梱の robot route preset 一覧。robot sandbox の導線や demo route をここへ足す。',
     routes: nextRoutes
   };
@@ -354,7 +354,7 @@ async function main() {
     const catalogPath = toAbsolutePath(args['catalog-path'] ?? defaultCatalogPath);
     const assetManifest = await readJsonOrFallback(assetManifestPath, {
       version: 1,
-      label: 'Local DreamWalker Asset Manifest',
+      label: 'Local Dynamic Map Asset Manifest',
       fragments: {}
     });
     const assetBundle = resolveWorldAssetBundle(activeConfig, assetManifest);
@@ -444,7 +444,7 @@ async function main() {
 
     const catalog = await readJsonOrFallback(catalogPath, {
       version: 1,
-      label: 'DreamWalker Public Robot Route Catalog',
+      label: 'Dynamic Map Viewer Public Robot Route Catalog',
       note: 'stage-robot-route.mjs により生成される public robot route catalog。',
       routes: []
     });

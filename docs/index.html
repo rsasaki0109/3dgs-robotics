@@ -7,13 +7,13 @@
 <meta name="description" content="GS Mapper turns real outdoor robot logs into browser-ready large-scale 3DGS dynamic maps, route-driven tile loading demos, scene contracts, and CI review bundles.">
 <link rel="canonical" href="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
-<meta property="og:description" content="Open the hosted DreamWalker demo with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
+<meta property="og:description" content="Open the hosted Dynamic Map Viewer with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
-<meta name="twitter:description" content="Open the hosted DreamWalker demo with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
+<meta name="twitter:description" content="Open the hosted Dynamic Map Viewer with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
 <meta name="twitter:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1337,7 +1337,7 @@ footer a:hover { text-decoration: underline; }
       <span>GS Mapper</span>
     </a>
     <nav>
-      <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker</a>
+      <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Dynamic Map Viewer</a>
       <a href="splat.html">Splat Set</a>
       <a href="#scene-showcase-section">Source Splats</a>
       <a href="#mission-control-section">Mission Review</a>
@@ -1358,9 +1358,9 @@ footer a:hover { text-decoration: underline; }
   <div class="hero-inner">
     <div class="hero-kicker">Large-scale 3DGS dynamic map loading</div>
     <h1>GS Mapper</h1>
-    <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted DreamWalker route demo and watch the resident tile window move through a 34-tile production grid.</p>
+    <p>Outdoor robot logs become browser-ready Gaussian-splat map tiles. Open the hosted Dynamic Map Viewer route demo and watch the resident tile window move through a 34-tile production grid.</p>
     <div class="hero-actions">
-      <a class="hero-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Launch DreamWalker map &rarr;</a>
+      <a class="hero-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Launch Dynamic Map Viewer &rarr;</a>
       <a class="hero-action" href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json">Open tile catalog &rarr;</a>
       <a class="hero-action" href="#viewer-section">Inspect splat source &rarr;</a>
     </div>
@@ -1388,7 +1388,7 @@ footer a:hover { text-decoration: underline; }
       <div class="dynamic-map-copy">
         <div class="hero-kicker">Hosted result</div>
         <h2>Large-scale 3DGS, served as a live dynamic map.</h2>
-        <p>The Pages demo now ships the DreamWalker app plus its public assets under <code>/dreamwalker/</code>. The route playback loads the catalog, resolves tile URLs, checks splat metadata, and swaps active/preload tiles from static GitHub Pages files.</p>
+        <p>The Pages demo now ships the Dynamic Map Viewer app plus its public assets through the static GitHub Pages build. The route playback loads the catalog, resolves tile URLs, checks splat metadata, and swaps active/preload tiles from static GitHub Pages files.</p>
         <div class="dynamic-map-stats">
           <div class="dynamic-map-stat"><span>Ready tiles</span><strong>34 / 34</strong></div>
           <div class="dynamic-map-stat"><span>Composite input</span><strong>1.52M splats</strong></div>
@@ -1412,7 +1412,7 @@ footer a:hover { text-decoration: underline; }
       <div>
         <div class="showcase-eyebrow">Dynamic-map source splats</div>
         <h2>Production outdoor splats feed the dynamic-map catalog.</h2>
-        <p>These shipped <code>.splat</code> assets are the source set behind the large-map proof, README previews, result GIF, and viewer entry points. Supervised, pose-free, and external-SLAM variants stay inspectable without pulling the focus away from DreamWalker.</p>
+        <p>These shipped <code>.splat</code> assets are the source set behind the large-map proof, README previews, result GIF, and viewer entry points. Supervised, pose-free, and external-SLAM variants stay inspectable without pulling the focus away from the Dynamic Map Viewer.</p>
       </div>
       <a class="showcase-link" href="splat.html">Inspect splat set &rarr;</a>
     </div>
@@ -1660,10 +1660,10 @@ footer a:hover { text-decoration: underline; }
 <!-- Section 1: 3D Viewer -->
 <section id="viewer-section">
   <h2 class="section-title">Dynamic Map Splat Inspector</h2>
-  <p class="section-sub">Use this embedded point-bundle viewer for quick bounds checks. The full DreamWalker route demo loads the 34-tile <a href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json" style="color:var(--accent-green);text-decoration:none;font-weight:500;">tile catalog</a>, while the production splat viewers remain available through <a href="splat.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">the source splat set</a>.</p>
+  <p class="section-sub">Use this embedded point-bundle viewer for quick bounds checks. The full Dynamic Map Viewer route demo loads the 34-tile <a href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json" style="color:var(--accent-green);text-decoration:none;font-weight:500;">tile catalog</a>, while the production splat viewers remain available through <a href="splat.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">the source splat set</a>.</p>
   <div class="viewer-brief">
     <div class="viewer-brief-card primary">
-      <span>DreamWalker route</span>
+      <span>Dynamic Map route</span>
       <strong>34 ready tiles, 6 resident slots</strong>
       <p>Route playback drives tile residency from a static GitHub Pages catalog.</p>
       <div class="viewer-brief-actions">
@@ -1768,7 +1768,7 @@ footer a:hover { text-decoration: underline; }
 <!-- Section 3: Metrics -->
 <section id="metrics-section">
   <h2 class="section-title">Outdoor Build Signals</h2>
-  <p class="section-sub">The production proof is the shipped outdoor `.splat` set and DreamWalker tile catalog above. These charts keep the lighter debug training path visible for build diagnostics.</p>
+  <p class="section-sub">The production proof is the shipped outdoor `.splat` set and Dynamic Map Viewer tile catalog above. These charts keep the lighter debug training path visible for build diagnostics.</p>
   <div class="metrics-badge" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:20px;padding:4px 16px;font-size:0.8rem;color:var(--accent-blue);font-family:var(--font-mono);margin-bottom:1.5rem;">Debug training traces | Production dynamic-map proof is the tiled .splat catalog</div>
   <!-- Summary Stats -->
   <div class="stats-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:2rem;">
@@ -1868,7 +1868,7 @@ footer a:hover { text-decoration: underline; }
 <footer>
   <div class="footer-links">
     <a href="https://github.com/rsasaki0109/gs-mapper">GitHub</a>
-    <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">DreamWalker Map</a>
+    <a href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Dynamic Map Viewer</a>
     <a href="reviews/">Reviews</a>
     <a href="splat.html">Splat Viewer</a>
     <a href="launch-kit.html">Launch Kit</a>

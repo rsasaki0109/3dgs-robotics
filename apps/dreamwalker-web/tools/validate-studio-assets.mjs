@@ -72,7 +72,7 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(`DreamWalker studio validation
+  console.log(`Dynamic Map Viewer studio validation
 
 Usage:
   node ./tools/validate-studio-assets.mjs

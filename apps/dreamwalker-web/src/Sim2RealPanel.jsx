@@ -279,7 +279,7 @@ function markdownEscapeCell(value) {
 
 function buildLocalizationRunCompareMarkdown(comparison, { fragmentId, fragmentLabel, createdAt } = {}) {
   const titleLabel =
-    readNonEmptyString(fragmentLabel) || readNonEmptyString(fragmentId) || 'DreamWalker'
+    readNonEmptyString(fragmentLabel) || readNonEmptyString(fragmentId) || 'Dynamic Map Viewer'
   const lines = [
     `# Localization Run Compare`,
     '',

@@ -1,7 +1,7 @@
 """Smoke test for scripts/robotics_smoke.py.
 
 Runs the fixture path (no trained PLY required) end to end through
-``HeadlessSplatRenderer`` and the DreamWalker topic map, verifying that the
+``HeadlessSplatRenderer`` and the Dynamic Map Viewer topic map, verifying that the
 written artifacts look like a real rendered frame + a well-shaped query
 payload.
 """
@@ -58,7 +58,7 @@ def test_robotics_smoke_fixture_end_to_end(tmp_path: Path) -> None:
     bundle = json.loads(payload_path.read_text(encoding="utf-8"))
     assert bundle["payload"]["type"] == "dreamwalker-render-query/v1"
     assert bundle["payload"]["resolution"] == {"width": 160, "height": 120}
-    # Topic map should expose the DreamWalker relay topics the bridge subscribes to.
+    # Topic map should expose the Dynamic Map Viewer relay topics the bridge subscribes to.
     tm = bundle["topic_map"]
     assert tm["namespace"] == "/dreamwalker"
     assert tm["camera_compressed"].startswith("/dreamwalker/")

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "label": "DreamWalker Public Robot Mission Catalog",
+  "label": "Dynamic Map Viewer Public Robot Mission Catalog",
   "note": "route + zone + launch URL を束ねた robotics mission manifest 一覧。実運用では配信回や patrol ごとの mission file をここへ足す。",
   "missions": [
     {

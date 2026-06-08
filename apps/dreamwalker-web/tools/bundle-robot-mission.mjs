@@ -11,7 +11,7 @@ const robotMissionArtifactPackProtocolId = 'dreamwalker-robot-mission-artifact-p
 const robotMissionPublishReportProtocolId = 'dreamwalker-robot-mission-publish-report/v1';
 
 function printUsage() {
-  console.log(`DreamWalker robot mission bundle
+  console.log(`Dynamic Map Viewer robot mission bundle
 
 Usage:
   node ./tools/bundle-robot-mission.mjs --mission ./public/robot-missions/residency-window-loop.mission.json

@@ -475,7 +475,7 @@ gs-sim2real view --model outputs/train/point_cloud.ply
 
 # ---- Tab 6: Robot Teleop ----
 with tab_teleop:
-    st.header("Robot Teleop in DreamWalker")
+    st.header("Robot Teleop in Dynamic Map Viewer")
 
     ply_path_str = st.session_state.get("ply_path")
     has_ply = ply_path_str and Path(ply_path_str).exists()
@@ -484,7 +484,7 @@ with tab_teleop:
         st.success(f"Trained model ready: `{ply_path_str}`")
         fragment = st.text_input("Fragment name", value="residency")
 
-        if st.button("Stage for DreamWalker", type="primary"):
+        if st.button("Stage for Dynamic Map Viewer", type="primary"):
             try:
                 from gs_sim2real.demo.stage_for_dreamwalker import stage_ply
 

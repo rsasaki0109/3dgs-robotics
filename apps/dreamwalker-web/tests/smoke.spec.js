@@ -510,7 +510,7 @@ async function stopChildProcess(child) {
   });
 }
 
-test('DreamWalker Live smoke flow', async ({ page, browser, baseURL }) => {
+test('Dynamic Map Viewer smoke flow', async ({ page, browser, baseURL }) => {
   await page.goto('/?relay=1');
   await page.evaluate(({ storageKeyPrefixValue, assetWorkspaceStorageKeyValue }) => {
     const keysToRemove = [];
@@ -533,10 +533,10 @@ test('DreamWalker Live smoke flow', async ({ page, browser, baseURL }) => {
   const leftPanel = page.locator('.left-panel');
   const rightPanel = page.locator('.right-panel');
 
-  await expect(page.getByRole('heading', { name: 'DreamWalker Live' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dynamic Map Viewer' })).toBeVisible();
   await expect(page.locator('.dreamwalker-stage canvas')).toBeVisible();
   await expect(page.getByText('No Splat Configured')).toHaveCount(0);
-  await expect(leftPanel.getByText('Local DreamWalker Asset Manifest', { exact: true })).toBeVisible();
+  await expect(leftPanel.getByText('Local Dynamic Map Asset Manifest', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('Residency', { exact: true }).first()).toBeVisible();
   await expect(leftPanel.getByText('Proxy Floor', { exact: true }).first()).toBeVisible();
   await expect(leftPanel.getByText('Demo Fallback', { exact: true }).first()).toBeVisible();
@@ -750,7 +750,7 @@ test('Studio bundle url loads startup stage set', async ({ page }) => {
   const currentZoneCard = rightPanel.locator('.state-grid .state-card').nth(6);
   const poseCard = rightPanel.locator('.state-grid .state-card').first();
   const routeCard = rightPanel.locator('.state-grid .state-card').nth(2);
-  await expect(leftPanel.getByText('DreamWalker Live Sample Studio Bundle', { exact: true })).toBeVisible();
+  await expect(leftPanel.getByText('Dynamic Map Viewer Sample Studio Bundle', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('/studio-bundles/dreamwalker-live.sample.json', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('Sample Residency Bundle', { exact: true }).first()).toBeVisible();
 
@@ -790,7 +790,7 @@ test('Public studio bundle catalog applies sample bundle', async ({ page }) => {
   const poseCard = rightPanel.locator('.state-grid .state-card').first();
   const routeCard = rightPanel.locator('.state-grid .state-card').nth(2);
 
-  await expect(leftPanel.getByText('DreamWalker Public Bundle Catalog', { exact: true })).toBeVisible();
+  await expect(leftPanel.getByText('Dynamic Map Viewer Public Bundle Catalog', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('Sample Residency Bundle', { exact: true })).toBeVisible();
   await expect(
     leftPanel
@@ -1142,7 +1142,7 @@ test('Public robot route catalog applies sample route', async ({ page }) => {
   const poseCard = rightPanel.locator('.state-grid .state-card').first();
   const routeCard = rightPanel.locator('.state-grid .state-card').nth(2);
 
-  await expect(leftPanel.getByText('DreamWalker Public Robot Route Catalog', { exact: true })).toBeVisible();
+  await expect(leftPanel.getByText('Dynamic Map Viewer Public Robot Route Catalog', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('Residency Window Loop', { exact: true })).toBeVisible();
   await expect(publicRouteCard).toContainText('World Match');
 
@@ -1622,7 +1622,7 @@ test('Public robot mission catalog applies sample mission', async ({ page }) => 
   const poseCard = rightPanel.locator('.state-grid .state-card').first();
   const routeCard = rightPanel.locator('.state-grid .state-card').nth(2);
 
-  await expect(leftPanel.getByText('DreamWalker Public Robot Mission Catalog', { exact: true })).toBeVisible();
+  await expect(leftPanel.getByText('Dynamic Map Viewer Public Robot Mission Catalog', { exact: true })).toBeVisible();
   await expect(leftPanel.getByText('Residency Window Loop Mission', { exact: true })).toBeVisible();
   await expect(publicMissionCard).toContainText('Mission Ready');
 
@@ -4000,7 +4000,7 @@ test('Robot frame streaming from browser reaches ROS image topics through relay'
     const rightPanel = page.locator('.right-panel');
     const bridgeCard = rightPanel.locator('.state-grid .state-card').nth(3);
 
-    await expect(page.getByRole('heading', { name: 'DreamWalker Live' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dynamic Map Viewer' })).toBeVisible();
     await expect(page.locator('.dreamwalker-stage canvas')).toBeVisible({ timeout: 20_000 });
     await topbar.getByRole('button', { name: 'Robot', exact: true }).click();
     await expect(bridgeCard).toContainText('Connected');
@@ -4094,7 +4094,7 @@ test('Robot depth streaming from browser reaches ROS depth topics through relay'
     const rightPanel = page.locator('.right-panel');
     const bridgeCard = rightPanel.locator('.state-grid .state-card').nth(3);
 
-    await expect(page.getByRole('heading', { name: 'DreamWalker Live' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dynamic Map Viewer' })).toBeVisible();
     await expect(page.locator('.dreamwalker-stage canvas')).toBeVisible({ timeout: 20_000 });
     await topbar.getByRole('button', { name: 'Robot', exact: true }).click();
     await expect(bridgeCard).toContainText('Connected');

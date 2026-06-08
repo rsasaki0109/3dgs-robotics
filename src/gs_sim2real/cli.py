@@ -553,12 +553,12 @@ def build_parser() -> argparse.ArgumentParser:
     lsgc.add_argument(
         "--web-app-dir",
         default="apps/dreamwalker-web",
-        help="DreamWalker web app directory used in the printed validation command",
+        help="Dynamic Map Viewer web app directory used in the printed validation command",
     )
     lsgc.add_argument(
         "--site-url",
         default="http://localhost:5173/",
-        help="DreamWalker site URL used in the printed launch URL",
+        help="Dynamic Map Viewer site URL used in the printed launch URL",
     )
     lsgc.add_argument(
         "--tile-preload",
@@ -596,14 +596,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     lsgrt = subparsers.add_parser(
         "large-scale-3dgs-route",
-        help="Build a DreamWalker robot route from a large-scale 3DGS tile catalog",
+        help="Build a Dynamic Map Viewer robot route from a large-scale 3DGS tile catalog",
     )
     lsgrt.add_argument("--catalog", required=True, help="Path to a large-scale 3DGS tile catalog JSON")
     lsgrt.add_argument("--output", default=None, help="Optional robot route JSON output path")
     lsgrt.add_argument("--label", default=None, help="Optional robot route label")
     lsgrt.add_argument("--description", default=None, help="Optional robot route description")
-    lsgrt.add_argument("--fragment-id", default="residency", help="DreamWalker fragment id for the route")
-    lsgrt.add_argument("--fragment-label", default="Residency", help="DreamWalker fragment label for the route")
+    lsgrt.add_argument("--fragment-id", default="residency", help="Dynamic Map Viewer fragment id for the route")
+    lsgrt.add_argument("--fragment-label", default="Residency", help="Dynamic Map Viewer fragment label for the route")
     lsgrt.add_argument("--frame-id", default="dreamwalker_map", help="Route coordinate frame id")
     lsgrt.add_argument("--asset-label", default=None, help="Optional world asset label stored in the route")
     lsgrt.add_argument(
@@ -1019,8 +1019,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip COLMAP sparse preflight before gsplat training (not recommended)",
     )
 
-    # demo (end-to-end: images -> splat -> DreamWalker teleop)
-    dm = subparsers.add_parser("demo", help="End-to-end demo: images -> 3DGS -> DreamWalker robot teleop")
+    # demo (end-to-end: images -> splat -> Dynamic Map Viewer teleop)
+    dm = subparsers.add_parser("demo", help="End-to-end demo: images -> 3DGS -> Dynamic Map Viewer robot teleop")
     dm.add_argument("--images", default=None, help="Input image directory or video file")
     dm.add_argument("--ply", default=None, help="Skip training, stage an existing PLY file directly")
     dm.add_argument("--output", default="outputs", help="Root output directory (default: outputs)")
@@ -1206,7 +1206,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fixed seconds added to NMEA-derived timestamps for trajectory import.",
     )
     _add_external_slam_args(dm, context="demo")
-    dm.add_argument("--fragment", default="residency", help="DreamWalker fragment name (default: residency)")
+    dm.add_argument("--fragment", default="residency", help="Dynamic Map Viewer fragment name (default: residency)")
     dm.add_argument("--no-launch", action="store_true", help="Skip launching the Vite dev server")
     dm.add_argument(
         "--skip-data-check",
@@ -1215,7 +1215,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # robotics ROS2 node
-    rb = subparsers.add_parser("robotics-node", help="Launch the DreamWalker ROS2 bridge node scaffold")
+    rb = subparsers.add_parser("robotics-node", help="Launch the Dynamic Map Viewer ROS2 bridge node scaffold")
     rb.add_argument("--namespace", default="/dreamwalker", help="ROS topic namespace")
     rb.add_argument("--node-name", default="dreamwalker_bridge_node", help="ROS2 node name")
     rb.add_argument("--frame-id", default="dreamwalker_map", help="Expected map frame id")
@@ -1260,7 +1260,7 @@ def build_parser() -> argparse.ArgumentParser:
     # headless PLY render server
     sr = subparsers.add_parser(
         "sim2real-server",
-        help="Headless PLY renderer that publishes RGB + depth to DreamWalker ROS2 topics",
+        help="Headless PLY renderer that publishes RGB + depth to Dynamic Map Viewer ROS2 topics",
     )
     sr.add_argument("--ply", required=True, help="Path to the trained PLY point cloud")
     sr.add_argument("--namespace", default="/dreamwalker", help="ROS topic namespace")
@@ -3287,7 +3287,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 
 def cmd_demo(args: argparse.Namespace) -> None:
-    """Handle the demo subcommand (images -> splat -> DreamWalker teleop)."""
+    """Handle the demo subcommand (images -> splat -> Dynamic Map Viewer teleop)."""
     import subprocess
 
     ply_path = None
@@ -3369,9 +3369,9 @@ def cmd_demo(args: argparse.Namespace) -> None:
         print("Error: --images or --ply is required.")
         sys.exit(1)
 
-    # Step 3: Stage into DreamWalker
+    # Step 3: Stage into Dynamic Map Viewer
     print("\n" + "=" * 60)
-    print("Step 3/3: Staging for DreamWalker")
+    print("Step 3/3: Staging for Dynamic Map Viewer")
     print("=" * 60)
 
     from gs_sim2real.demo.stage_for_dreamwalker import stage_ply
@@ -3384,7 +3384,7 @@ def cmd_demo(args: argparse.Namespace) -> None:
     # Launch Vite dev server
     if not args.no_launch:
         dreamwalker_dir = Path(result["manifest"]).parent.parent.parent
-        print(f"\nStarting DreamWalker dev server in {dreamwalker_dir} ...")
+        print(f"\nStarting Dynamic Map Viewer dev server in {dreamwalker_dir} ...")
         print("Open your browser at:", result["launch_url"])
         print("Controls: WASD = move, Mouse = look, R = toggle robot mode")
         subprocess.run(["npm", "run", "dev"], cwd=dreamwalker_dir)

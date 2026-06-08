@@ -1,4 +1,4 @@
-"""ROS2 consumer node scaffold for DreamWalker robotics relay topics."""
+"""ROS2 consumer node scaffold for Dynamic Map Viewer robotics relay topics."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the argparse CLI for the ROS2 bridge node."""
     parser = argparse.ArgumentParser(
         prog="gs-sim2real robotics-node",
-        description="ROS2 node scaffold for DreamWalker robotics relay topics",
+        description="ROS2 node scaffold for Dynamic Map Viewer robotics relay topics",
     )
     parser.add_argument("--namespace", default="/dreamwalker", help="ROS topic namespace")
     parser.add_argument("--node-name", default="dreamwalker_bridge_node", help="ROS2 node name")
@@ -137,7 +137,7 @@ def _build_node_class(ros2: dict[str, Any]) -> type:
     Image = ros2["Image"]
 
     class DreamwalkerBridgeNode(Node):
-        """Minimal ROS2 node that consumes and produces DreamWalker relay topics."""
+        """Minimal ROS2 node that consumes and produces Dynamic Map Viewer relay topics."""
 
         def __init__(self, args: argparse.Namespace) -> None:
             super().__init__(args.node_name)
@@ -201,7 +201,7 @@ def _build_node_class(ros2: dict[str, Any]) -> type:
             self._publish_zone_summary()
             self._publish_semantic_costmap()
             self.get_logger().info(
-                f"DreamWalker bridge node ready namespace={self.topic_map.namespace} "
+                f"Dynamic Map Viewer bridge node ready namespace={self.topic_map.namespace} "
                 f"frame={self.args.frame_id} image_relay={self.args.enable_image_relay}"
             )
 

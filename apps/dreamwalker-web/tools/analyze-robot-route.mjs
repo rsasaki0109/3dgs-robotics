@@ -10,7 +10,7 @@ import { buildSemanticZoneMap } from '../src/semantic-zones.js';
 const analysisProtocolId = 'dreamwalker-robot-route-analysis/v1';
 
 function printUsage() {
-  console.log(`DreamWalker robot route analysis
+  console.log(`Dynamic Map Viewer robot route analysis
 
 Usage:
   node ./tools/analyze-robot-route.mjs --route ./public/robot-routes/residency-window-loop.json --zones ./public/manifests/robotics-residency.zones.json
@@ -246,7 +246,7 @@ function buildReport(route, zoneMap, analysis) {
 }
 
 function printTextReport(report, outputPath = '') {
-  console.log('DreamWalker Robot Route Analysis');
+  console.log('Dynamic Map Viewer Robot Route Analysis');
   console.log(`- route: ${report.route.label}`);
   console.log(
     `- fragment: ${report.route.fragmentId || '(none)'} / ${report.route.fragmentLabel || '(none)'}`

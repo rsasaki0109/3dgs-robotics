@@ -1,7 +1,7 @@
-"""Headless splat render server for DreamWalker sim2real topics.
+"""Headless splat render server for Dynamic Map Viewer sim2real topics.
 
 This module loads a trained PLY/3DGS point cloud, projects it from a supplied
-camera pose, and publishes RGB + depth frames to the standard DreamWalker ROS2
+camera pose, and publishes RGB + depth frames to the standard Dynamic Map Viewer ROS2
 topics. The first version uses a deterministic point-splat rasterizer so it can
 run even when the optional ``gsplat`` package is unavailable.
 """
@@ -1542,7 +1542,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the argparse CLI for the headless render server."""
     parser = argparse.ArgumentParser(
         prog="gs-sim2real sim2real-server",
-        description="Headless PLY renderer that publishes RGB + depth to DreamWalker ROS2 topics",
+        description="Headless PLY renderer that publishes RGB + depth to Dynamic Map Viewer ROS2 topics",
     )
     parser.add_argument("--ply", required=True, help="Path to the trained PLY point cloud")
     parser.add_argument("--namespace", default="/dreamwalker", help="ROS topic namespace")
