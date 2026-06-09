@@ -24,7 +24,7 @@ reviewable scenario CI artifacts.
 
 [![Dynamic map loading material rendered from the outdoor production regional mosaic](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
 
-Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic; white is the `.splat` footprint, green cells are resident, amber cells are preload, and the route overlay tracks the loading window. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic; each map cell shows its tile's real `.splat` content rendered top-down, green cells are resident, amber cells are preload, and the route overlay tracks the loading window as the robot drives (the inset shows the whole region). See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git

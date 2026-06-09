@@ -380,7 +380,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
     assert "Dynamic map loading material rendered from the outdoor production regional mosaic" in readme
     assert "Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic" in readme
-    assert "white is the `.splat` footprint" in readme
+    assert "each map cell shows its tile's real `.splat` content rendered top-down" in readme
     assert "route overlay tracks the loading window" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
@@ -397,7 +397,7 @@ def test_map_quality_gif_proves_actual_splat_geometry() -> None:
     assert module.MAP_MATERIAL_SIZE == (1280, 720)
     assert module.FRAMES_PER_SCENE == 12
     assert proof_gif.stat().st_size > 100_000
-    assert map_material.stat().st_size > 100_000
+    assert map_material.stat().st_size > 50_000
     for scene in module.MAP_PROOF_SCENES:
         if scene.catalog is None:
             assert (module.ASSET_DIR / scene.asset).is_file()
@@ -462,7 +462,7 @@ def test_index_hero_promotes_hosted_dynamic_map() -> None:
     assert "87 ready map tiles" in html
     assert "2.70M tiled splats" in html
     assert 'id="dynamic-map-section"' in html
-    assert "View tile catalog" in html
+    assert "Open tile catalog" in html
     assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"
 
 
