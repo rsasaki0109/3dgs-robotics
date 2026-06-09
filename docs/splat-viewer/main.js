@@ -748,13 +748,26 @@ async function main() {
         params.get("url") || "assets/outdoor-demo/outdoor-demo.splat",
         location.href,
     );
-    const req = await fetch(url, {
+    // ?refresh=<seconds> turns the page into a live viewer: it polls the
+    // splat (and its sibling state.json, when present) and swaps the buffer
+    // in place without resetting the camera. Used by the live mapping node.
+    const refreshSeconds = parseFloat(params.get("refresh") || "0") || 0;
+    let req = await fetch(url, {
         mode: "cors", // no-cors, *cors, same-origin
         credentials: "omit", // include, *same-origin, omit
     });
+    while (req.status != 200 && refreshSeconds > 0) {
+        document.getElementById("message").innerText =
+            "waiting for the first live map…";
+        await new Promise((resolve) =>
+            setTimeout(resolve, Math.max(refreshSeconds, 1) * 1000),
+        );
+        req = await fetch(url, { mode: "cors", credentials: "omit", cache: "no-store" });
+    }
     console.log(req);
     if (req.status != 200)
         throw new Error(req.status + " Unable to load " + req.url);
+    document.getElementById("message").innerText = "";
 
     const rowLength = 3 * 4 + 3 * 4 + 4 + 4;
     const reader = req.body.getReader();
@@ -1496,6 +1509,66 @@ async function main() {
                 vertexCount: Math.floor(bytesRead / rowLength),
             });
         }
+    }
+
+    if (refreshSeconds > 0) {
+        const stateUrl = new URL("state.json", url);
+        const liveStatus = document.createElement("div");
+        liveStatus.id = "liveStatus";
+        liveStatus.style.cssText =
+            "position:absolute;bottom:12px;left:15px;z-index:100;" +
+            "font-size:small;color:#8f8;text-shadow:0 0 3px black;";
+        liveStatus.innerText = "LIVE";
+        document.body.appendChild(liveStatus);
+
+        let lastPublishedRound = -1;
+        let refreshing = false;
+        const reloadSplat = async () => {
+            const res = await fetch(url, {
+                mode: "cors",
+                credentials: "omit",
+                cache: "no-store",
+            });
+            if (!res.ok) return;
+            const buffer = new Uint8Array(await res.arrayBuffer());
+            if (isPly(buffer) || buffer.length < rowLength) return;
+            worker.postMessage({
+                buffer: buffer.buffer,
+                vertexCount: Math.floor(buffer.length / rowLength),
+            });
+        };
+        setInterval(async () => {
+            if (refreshing) return;
+            refreshing = true;
+            try {
+                let publishedRound = null;
+                try {
+                    const res = await fetch(stateUrl, {
+                        mode: "cors",
+                        credentials: "omit",
+                        cache: "no-store",
+                    });
+                    if (res.ok) {
+                        const state = await res.json();
+                        const last = state.lastSuccessfulRound;
+                        publishedRound = last ? last.round : 0;
+                        liveStatus.innerText =
+                            `LIVE · round ${state.completedRounds}` +
+                            ` · ${state.keyframesTotal} keyframes` +
+                            (state.status === "building" ? " · building…" : "");
+                    }
+                } catch (err) {
+                    // no state.json next to the splat — fall back to blind reloads
+                }
+                if (publishedRound === null || publishedRound !== lastPublishedRound) {
+                    await reloadSplat();
+                    if (publishedRound !== null) lastPublishedRound = publishedRound;
+                }
+            } catch (err) {
+                console.warn("live refresh failed", err);
+            }
+            refreshing = false;
+        }, refreshSeconds * 1000);
     }
 }
 

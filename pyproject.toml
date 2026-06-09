@@ -58,6 +58,7 @@ gs-mapper = "gs_sim2real.cli:main"
 gs-sim2real = "gs_sim2real.cli:main"
 gs-mapper-robotics-node = "gs_sim2real.robotics.ros2_bridge_node:main"
 gs-sim2real-robotics-node = "gs_sim2real.robotics.ros2_bridge_node:main"
+gs-mapper-live-mapper = "gs_sim2real.robotics.live_mapper_node:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

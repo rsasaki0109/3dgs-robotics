@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GS Mapper — Live 3DGS Mapping</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0b0f14;
+      color: #e6edf3;
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+    }
+    main { max-width: 640px; padding: 24px; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+    h1 .live { color: #3fb950; }
+    p.sub { color: #8b949e; margin-top: 0; }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 14px 0;
+    }
+    .stats { display: flex; gap: 28px; flex-wrap: wrap; }
+    .stat .value { font-size: 1.7rem; font-weight: 700; }
+    .stat .label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
+    .building { color: #d29922; }
+    .ok { color: #3fb950; }
+    .err { color: #f85149; }
+    a.button {
+      display: inline-block;
+      background: #238636;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    input {
+      background: #0d1117;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    label { font-size: 0.8rem; color: #8b949e; }
+    code { background: #0d1117; padding: 2px 5px; border-radius: 4px; }
+    footer { font-size: 0.8rem; color: #8b949e; margin-top: 10px; }
+    footer a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1><span class="live">●</span> GS Mapper — Live 3DGS Mapping</h1>
+    <p class="sub">Watch the Gaussian-splat map grow while the robot drives.</p>
+
+    <div class="card">
+      <label for="base">Live mapping server (the <code>gs-mapper-live-mapper</code> output)</label>
+      <input id="base" value="" spellcheck="false" />
+    </div>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><div class="value" id="keyframes">–</div><div class="label">keyframes</div></div>
+        <div class="stat"><div class="value" id="rounds">–</div><div class="label">map rounds</div></div>
+        <div class="stat"><div class="value" id="buildTime">–</div><div class="label">last build</div></div>
+        <div class="stat"><div class="value" id="status">connecting…</div><div class="label">status</div></div>
+      </div>
+    </div>
+
+    <p>
+      <a class="button" id="openViewer" href="#" target="_blank" rel="noopener">Open the live 3D viewer</a>
+    </p>
+
+    <footer>
+      The viewer polls <code>latest.splat</code> + <code>state.json</code> and swaps the map in place
+      (camera stays put). Offline? Open your repo checkout's
+      <code>docs/splat.html?url=&lt;server&gt;/latest.splat&amp;refresh=2</code> instead. ·
+      <a href="https://github.com/rsasaki0109/gs-mapper">gs-mapper on GitHub</a>
+    </footer>
+  </main>
+
+  <script>
+    const VIEWER = "https://rsasaki0109.github.io/gs-mapper/splat.html";
+    const baseInput = document.getElementById("base");
+    const servedFromLiveDir = location.protocol.startsWith("http");
+    baseInput.value = servedFromLiveDir
+      ? location.origin + location.pathname.replace(/index\.html$/, "")
+      : "http://localhost:8765/";
+
+    function baseUrl() {
+      let value = baseInput.value.trim();
+      if (!value.endsWith("/")) value += "/";
+      return value;
+    }
+
+    function updateViewerLink() {
+      const splatUrl = baseUrl() + "latest.splat";
+      document.getElementById("openViewer").href =
+        VIEWER + "?url=" + encodeURIComponent(splatUrl) + "&refresh=2";
+    }
+    baseInput.addEventListener("input", updateViewerLink);
+    updateViewerLink();
+
+    async function poll() {
+      const statusEl = document.getElementById("status");
+      try {
+        const res = await fetch(baseUrl() + "state.json", { cache: "no-store" });
+        if (!res.ok) throw new Error(res.status);
+        const state = await res.json();
+        document.getElementById("keyframes").textContent = state.keyframesTotal;
+        document.getElementById("rounds").textContent = state.completedRounds;
+        const last = state.lastSuccessfulRound;
+        document.getElementById("buildTime").textContent =
+          last ? last.buildSeconds.toFixed(0) + "s" : "–";
+        statusEl.textContent = state.status === "building" ? "building…" : "idle";
+        statusEl.className = "value " + (state.status === "building" ? "building" : "ok");
+      } catch (err) {
+        statusEl.textContent = "offline";
+        statusEl.className = "value err";
+      }
+    }
+    poll();
+    setInterval(poll, 2000);
+  </script>
+</body>
+</html>
