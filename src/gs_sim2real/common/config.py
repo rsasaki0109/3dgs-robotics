@@ -55,14 +55,56 @@ def load_datasets_config() -> dict[str, Any]:
     return load_config(root / "configs" / "datasets.yaml")
 
 
+# Mirrors configs/training.yaml so pip-installed packages (no repo checkout,
+# e.g. the Hugging Face Space / Colab) can train without the YAML file.
+_DEFAULT_TRAINING_CONFIG: dict[str, Any] = {
+    "num_iterations": 30000,
+    "batch_size": 1,
+    "seed": 42,
+    "learning_rate": {
+        "position": 0.00016,
+        "feature": 0.0025,
+        "opacity": 0.05,
+        "scaling": 0.005,
+        "rotation": 0.001,
+    },
+    "lr_schedule": {
+        "position_lr_init": 0.00016,
+        "position_lr_final": 0.0000016,
+        "position_lr_delay_mult": 0.01,
+        "position_lr_max_steps": 30000,
+    },
+    "sh_degree": 3,
+    "densify_from_iter": 500,
+    "densify_until_iter": 15000,
+    "densify_interval": 100,
+    "densify_grad_threshold": 0.0002,
+    "opacity_reset_interval": 3000,
+    "min_opacity": 0.005,
+    "percent_dense": 0.01,
+    "max_screen_size": 20,
+    "lambda_dssim": 0.2,
+    "save_iterations": [7000, 15000, 30000],
+    "test_iterations": [7000, 15000, 30000],
+    "resolution": -1,
+    "white_background": False,
+}
+
+
 def load_training_config() -> dict[str, Any]:
     """Load the training configuration from configs/training.yaml.
+
+    Falls back to the built-in defaults when the repo checkout (and thus
+    configs/training.yaml) is not available, e.g. for pip installs.
 
     Returns:
         Dictionary of training hyperparameters.
     """
-    root = get_project_root()
-    return load_config(root / "configs" / "training.yaml")
+    try:
+        root = get_project_root()
+        return load_config(root / "configs" / "training.yaml")
+    except (RuntimeError, FileNotFoundError):
+        return dict(_DEFAULT_TRAINING_CONFIG)
 
 
 def get_dataset_config(name: str) -> dict[str, Any]:
