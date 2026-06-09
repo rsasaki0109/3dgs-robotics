@@ -1,10 +1,12 @@
 # GS Mapper zero-install demo — Hugging Face Space dependencies.
 # gsplat ships prebuilt CUDA wheels per torch/CUDA combo; keep the index in
-# sync with the pinned torch below (see https://docs.gsplat.studio/whl).
---extra-index-url https://docs.gsplat.studio/whl/pt25cu121
-torch==2.5.1
-torchvision==0.20.1
-gsplat==1.4.0
+# sync with the pinned torch below. Available combos are listed at
+# https://docs.gsplat.studio/whl/<ptXXcuYYY>/gsplat/ (pt24cu121 and pt24cu124
+# as of 2026-06).
+--extra-index-url https://docs.gsplat.studio/whl/pt24cu121
+torch==2.4.1
+torchvision==0.19.1
+gsplat==1.5.3+pt24cu121
 
 gradio>=5.0
 spaces
