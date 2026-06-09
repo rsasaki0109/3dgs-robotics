@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/github/license/rsasaki0109/gs-mapper)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Last commit](https://img.shields.io/github/last-commit/rsasaki0109/gs-mapper/main)](https://github.com/rsasaki0109/gs-mapper/commits/main)
+[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb)
 
 **Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI.**
 
@@ -12,7 +14,9 @@ GS Mapper turns photos, rosbags, and external SLAM outputs into browser-viewable
 `.splat` scenes. The same scenes can feed route-policy benchmarks and
 reviewable scenario CI artifacts.
 
-**Try it first:** [Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
+**Try it first:** [Build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/gs-mapper) |
+[Photos to splat in Colab](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb) |
+[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
 [Large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1) |
 [Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section) |
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
@@ -41,7 +45,11 @@ What ships:
 - Bundled large-scale 3DGS dynamic-map fixture: 9 production outdoor `.splat`
   results composed into a 25-placement regional mosaic with 1.75M Gaussians
   and 87 browser-ready route tiles.
-- `photos-to-splat` for image-folder to browser `.splat` runs.
+- `photos-to-splat` for image-folder to browser `.splat` runs — also as a
+  [zero-install HF Spaces demo](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
+  and a [Colab notebook](notebooks/photos_to_splat_colab.ipynb).
+- `gs-mapper-live-mapper`: ROS 2 live mapping node — the splat map grows in the
+  browser while the robot drives ([docs](docs/live-mapping.md)).
 - `splat-inspect` and `splat-filter` for cleaning cloudy browser splats.
 - Route-policy benchmark and scenario CI tooling for Physical AI review bundles.
 
@@ -56,6 +64,8 @@ release notes [v0.1.0](docs/releases/v0.1.0.md).
 | **A folder of photos** | `gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
 | **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `gs-mapper preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `gs-mapper route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
+| **A live ROS 2 camera topic** | `gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
+| **Just a browser** | [HF Spaces demo](https://huggingface.co/spaces/rsasaki0109/gs-mapper) or [Colab](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb) | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Full rosbag -> supervised outdoor splat is covered in
 [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
@@ -212,6 +222,41 @@ Preview locally from the repo root:
 ```bash
 python -m http.server
 # open http://localhost:8000/docs/splat.html?url=<path-to-splat>
+```
+
+## Zero-install demos (HF Spaces / Colab)
+
+No GPU, no install:
+
+- **[Hugging Face Space](https://huggingface.co/spaces/rsasaki0109/gs-mapper)** —
+  upload 8–16 photos or a short walkaround video in the browser and get a
+  `.splat` back with an embedded 3D preview. The Space contents live in
+  [`apps/hf-space/`](apps/hf-space/) and are synced by
+  [`sync-hf-space.yml`](.github/workflows/sync-hf-space.yml).
+- **[Colab notebook](notebooks/photos_to_splat_colab.ipynb)** — the full
+  `photos-to-splat` CLI on a free T4, including a bundled sample photo set.
+
+## Live Mapping (ROS 2) — watch the map grow
+
+`gs-mapper-live-mapper` subscribes to a camera topic (rosbag replay works the
+same), gates frames into keyframes, and rebuilds a draft splat in the
+background as the robot drives. The bundled polling viewer swaps the growing
+map in place without resetting the camera. Full docs: [docs/live-mapping.md](docs/live-mapping.md).
+
+```bash
+source /opt/ros/<distro>/setup.bash
+gs-mapper-live-mapper \
+  --image-topic /camera/image_raw/compressed \
+  --odom-topic /odom \
+  --port 8765
+# status page:  http://localhost:8765/
+# live viewer:  docs/splat.html?url=http://localhost:8765/latest.splat&refresh=2
+```
+
+No ROS at hand? Replay any image folder as a simulated camera stream:
+
+```bash
+python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765
 ```
 
 ## Import External SLAM Results
@@ -388,6 +433,9 @@ gs-mapper export --model outputs/train/point_cloud.ply --format splat --output o
 
 # Generate the Pages scene catalog.
 python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
+
+# ROS 2 live mapping (see docs/live-mapping.md).
+gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765
 ```
 
 More command details live in:
