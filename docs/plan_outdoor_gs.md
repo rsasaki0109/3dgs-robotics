@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-06-05（README first-view / shipped splat proof GIF / splat cleanup CLI / production splat health gate 反映）
+更新日: 2026-06-09（Istanbul Dynamic Map Viewer / large-scale 3DGS promotion / PR #192 merge 後ロードマップ反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -22,9 +22,14 @@
 - MCD `tuhh_day_04` の supervised GNSS 成功扱いは撤回済み。`/vn200/GPS` が all-zero なので production picker には入れない。
 - Valid GNSS supervised MCD demo は `ntu_day_02`。production asset は `docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat`。
 - External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM / Pi3X comparison splat まで実走済み。LoGeR profile も artifact resolver 側に候補追加済み。
+- 2026-06-09 時点の `main` は PR #192 merge commit `cf7a22e`。README / Pages / Dynamic Map Viewer には Istanbul real rosbag2 pilot の結果 media と viewer catalog が入った。
+- Dynamic Map Viewer は 2 系統を持つ。1 つは 9 production `.splat` から組んだ 87-tile regional mosaic、もう 1 つは Istanbul `rosbag2` 由来の 6-tile real-input pilot。
+- Istanbul pilot は 291 registered camera frames / GNSS-seeded poses / 100,000 sparse seed points / 6 trained source tiles / 6 browser `.splat` / 6 viewer PLY tiles。Viewer PLY は 438,796 Gaussians / 103.8 MiB。
+- `large-scale-3dgs-run` promotion は source XY tiles を viewer XZ PLY へ変換し、catalog に `viewerSplatUrl` / `viewerCoreBounds` / `viewerExpandedBounds` / `viewerTileIndex` / viewer metrics を載せる段階まで進んだ。
+- 次の最優先は **GitHub Pages 反映確認** と **live PlayCanvas GSplat 表示の実証**。asset / catalog / route / README media は固まったが、headless 検証では live canvas の 3DGS 表示がまだ完全には証明できていない。
 - 2026-04-24 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
 - Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption / adoption-aware review bundle まで分割済み。
-- 最新の merged Pages refresh は `ee42f7a`。Tier 2 chain (#121–#134) で env-hardening + correlation gate plumbing が完成し、Pages landing は outdoor GS demo-first に刷新済み。local full pytest / GitHub Actions CI / Pages deploy は green。
+- 最新の merged public refresh は `cf7a22e` / PR #192。Tier 2 chain (#121–#134) で env-hardening + correlation gate plumbing が完成した後、6 月 chain (#188〜#192) で Dynamic Map Viewer / large-scale 3DGS / Istanbul real-input pilot が public docs に載った。
 - adoption step + CLI (`gs-mapper route-policy-scenario-ci-workflow-adopt`) + adoption-aware review bundle まで実装済み。review には `--adoption-report` を渡すと Pages の `review.{json,md,html}` に trigger mode / branches / manual vs adopted YAML の unified diff が乗る。
 - Pages `/reviews/` には synthetic smoke fixture 由来の `docs/reviews/smoke-route-policy-ci/` sample bundle を置く方針に変更。`scripts/build_pages_sample_review_bundle.py` が smoke chain を回し、temp path を self-contained な `sample-artifacts/` 相対リンクへ書き換えて index も再生成する。
 - 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
@@ -57,23 +62,83 @@ public asset 側では、既存の `.splat` が見栄えを壊す要因を分け
 
 第五に、Physical AI scenario CI との接続を README first-view からより強く見せる。3DGS visual だけでは「綺麗な点群 demo」で終わる可能性がある。GS Mapper の差別化は、同じ scene catalog を policy benchmark / route-policy scenario CI / review bundle に流すところにある。したがって、visual proof の次は、scene → sim-scenes catalog → policy benchmark → Pages review の一連の成果を、短い animated proof または compact diagram で見せる。ここまで見せると、star する理由が「3DGS が見える」から「robotics evaluation stack として使えそう」に変わる。
 
+### 1.2 2026-06-09: Dynamic Map Viewer / large-scale 3DGS フェーズ
+
+6 月 9 日時点の主戦場は、単体 `.splat` demo から **dynamic map loading が見える 3DGS viewer** へ移った。README first-view の GIF を良くするだけではなく、実際に「広い地図を tile catalog と route playback で読み替える」体験を public demo として出すことが目的になっている。Autoware 風の dynamic map loading に寄せたい、ただし hero に lanelet2 vector layer のような説明過多な layer を載せる必要はない、という判断で、現在の README / Pages は 3DGS footprint と resident / preload / route window を中心に見せる方向へ整理した。
+
+このフェーズでまず作ったのは synthetic regional mosaic。9 production outdoor `.splat` を 25 placement の 5x5 X/Z region に並べ、87 browser-ready route tiles として Dynamic Map Viewer に載せた。これは「large-scale に見えるか」を検証する fixture であり、実ロボットログの連続 reconstruction ではない。価値は、tile catalog contract、route playback、resident/preload/evicted overlay、README media 生成、Pages URL の扱いを先に固めるところにある。結果として、dynamic map loading の UI / docs / validation path はかなり進んだが、実データとしての説得力には限界があった。
+
+その次に Istanbul `rosbag2` の real-input pilot を追加した。ここでは 291 registered camera frames、GNSS-seeded pose、100k sparse seed points から 6 source tiles を作り、browser `.splat` と viewer PLY の両方を promotion した。README には `docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif`、`large-scale-3dgs-result.png`、`dynamic-map-viewer-still.png` を載せた。ユーザーが指摘した「点群が何か分からない」「large-scale と言うには弱い」という問題に対し、まず real rosbag 由来であること、route と tiles が同じ座標系で動くこと、result still が大きな footprint として読めることを優先した。
+
+Istanbul pilot の重要な実装差分は、training output と viewer output を分けた点。large-scale 3DGS training は source tile を XY のような training frame で持つことがあるが、PlayCanvas / Dynamic Map Viewer 側では X/Z plane を地面として扱いたい。このため `src/gs_sim2real/train/large_scale_3dgs.py` の promotion path で binary PLY の `x/y/z` float を読み替え、viewer 用 PLY を生成するようにした。catalog には source splat metrics と viewer splat metrics を別々に持たせ、runtime は `viewerSplatUrl` と viewer bounds を優先する。これにより docs media と route playback が同じ viewer coordinate で揃う。
+
+Dynamic Map Viewer 側では `apps/dreamwalker-web/src/dynamic-map-loading.js` が viewer field を優先して読み、`App.jsx` は overview camera を viewer bounds から決める。catalog validator は optional `viewerSplatUrl` を public root と URL の両方で検証し、route coverage も viewer X/Z bounds を見て判断するようになった。`validate-dynamic-map-catalog` は Istanbul catalog + route playback で pass しており、sparse rectangular grid の warning だけが残る。これは 6 / 12 occupied tiles の構成なので仕様上許容する。
+
+ただし、ここで完了と言い切ってはいけない。README / Pages media、catalog、route、asset delivery は固まったが、live PlayCanvas GSplat の画面内表示はまだ最後まで潰しきれていない。headless smoke では assets が 200 で取れ、manager は splat を認識しているが、canvas pixel として「3DGS が見えている」証明が弱い。したがって次の大きな実装は、generated GIF を良くすることではなく、Dynamic Map Viewer の runtime renderer を実際に信用できる状態へ持っていくこと。
+
+次の Definition of Done は次の 5 点にする。
+
+1. GitHub Pages の deploy が `cf7a22e` 以降で成功し、README / docs landing / `/dreamwalker/` の Istanbul pilot URL が live で取れる。
+2. PlayCanvas GSplat path が desktop headed browser で非 blank canvas として確認でき、camera framing / scale / clipping / asset type のどこで詰まっていたかが documented される。
+3. Istanbul pilot の viewer PLY 6 tiles が live viewer 上でも route playback と同じ地面座標で見える。
+4. README の GIF / still は runtime で確認できた geometry と矛盾しない。proxy render だけで作った素材はその旨を明記するか、WebGL capture へ置き換える。
+5. その後に、real rosbag2 の tile 数 / frame 数 / spatial coverage を増やして、synthetic mosaic ではなく real large-scale 3DGS と呼べる規模へ広げる。
+
+短期ロードマップは、細かい UI polish ではなく次の順で進める。
+
+| 優先 | Task | 完了条件 |
+| ---: | --- | --- |
+| 1 | Pages deploy / live smoke | `gh run` または Actions で deploy success を確認し、hosted README / Dynamic Map Viewer URLs が 200 で Istanbul assets を返す |
+| 2 | Live GSplat renderer debug | PlayCanvas scene で actual splat pixels が出る。blank の場合は asset format / loader / material / camera / clipping の原因を 1 つに絞る |
+| 3 | Runtime capture pipeline | `docs/images/istanbul-bag6-pilot/` の GIF / still を runtime viewer 由来で再生成できる。proxy render と runtime capture の差分を減らす |
+| 4 | Real large-scale expansion | Istanbul pilot を 6 tiles から、より長い route / more registered frames / more tiles へ拡張する。catalog metrics と result media を同時更新 |
+| 5 | Physical AI 接続 | Dynamic Map Viewer の route / tile catalog を sim scene catalog / route-policy review bundle に接続し、「見える map」から「評価できる map」へ戻す |
+
+この順番にする理由は、今の blocker が「素材が足りない」ではなく「viewer runtime で見えることの信頼性」だから。素材を増やす前に renderer path を確定しないと、large-scale 化しても README media と live demo のズレが増える。逆に renderer が固まれば、real rosbag2 を増やす作業は catalog / route / media generation の反復で進められる。
+
 ## 2. 現在の主戦場
 
-今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Physical AI 用 simulation / evaluation environment** に寄せることです。
+今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
 
 1. Real-world robotics logs から 3DGS scene を作る。
-2. Browser / local renderer / headless environment で観測を返す。
-3. Route policy / navigation policy / query policy を benchmark する。
-4. Scenario matrix を小さな shard に分け、CI で回す。
-5. CI workflow 自体も生成、検証、activation、review publishing の段階に分ける。
-6. Review bundle を GitHub Pages に出し、workflow trigger を広げる前に人間が inspected artifact を見られるようにする。
-7. Promotion report で PR / branch trigger へ広げてよいかを記録し、trigger-enabled workflow の adoption を分離する。
+2. Large-scale 3DGS training output を browser-ready tile catalog / viewer PLY / route playback に promotion する。
+3. Dynamic Map Viewer で resident / preload / evicted tile を可視化し、広域 map loading を live demo として見せる。
+4. Browser / local renderer / headless environment で観測を返す。
+5. Route policy / navigation policy / query policy を benchmark する。
+6. Scenario matrix を小さな shard に分け、CI で回す。
+7. CI workflow 自体も生成、検証、activation、review publishing の段階に分ける。
+8. Review bundle を GitHub Pages に出し、workflow trigger を広げる前に人間が inspected artifact を見られるようにする。
+9. Promotion report で PR / branch trigger へ広げてよいかを記録し、trigger-enabled workflow の adoption を分離する。
 
 この構成にした理由は、開発がスケールすると「1 個の巨大 E2E が落ちる」よりも、「小さい scenario / shard / validation / activation / review gate がどこで落ちたか分かる」方が速いからです。ユーザーが求めていた「モジュール分割、関数分割、クラス分割、依存の局所化、テスト単位の分離」「影響範囲を閉じ込め、検証単位を細かく設計する」は、この route policy scenario CI chain の設計方針そのものです。
 
+2026-06-09 の実務上の主戦場は、まず Dynamic Map Viewer runtime です。Istanbul pilot の docs media と assets は merged したので、次は live Pages で deploy された状態を確認し、PlayCanvas GSplat 表示が browser pixels として成立しているかを潰す。そこが固まってから real-input 3DGS の範囲を広げる。Physical AI scenario CI は引き続き中核だが、しばらくは「見える dynamic map」を信頼できる基盤にすることが優先です。
+
 ## 3. Recent Commits / 現在地
 
-直近の主な流れ (2026-04-25 〜 26 の Tier 2 chain):
+直近の主な流れは 2 層ある。2026-06-09 時点では Dynamic Map Viewer / large-scale 3DGS promotion が最新の外向け mainline で、その下に 2026-04〜05 の Physical AI scenario CI chain が残っている。
+
+最新の Dynamic Map Viewer / large-scale 3DGS chain:
+
+| Commit / PR | 内容 |
+| --- | --- |
+| `cf7a22e` / PR #192 | Istanbul Dynamic Map Viewer media を README / Pages / docs に追加。6 transformed viewer PLY tiles、GIF / still、Istanbul catalog / route URL を public docs に反映。 |
+| `ae9a783` / PR #191 | Istanbul Bag6 3DGS pilot assets を追加。real rosbag2 capture 由来の tile catalog / route / browser assets を staged。 |
+| `460746b` / PR #190 | Real 3DGS input gate runbook を追加。real rosbag2 入力を large-scale 3DGS pilot に入れる前の確認手順を文書化。 |
+| `a62f793` / PR #189 | promoted grid route metadata を追加。large-scale tile catalog と route playback の metadata を viewer / docs で扱いやすくした。 |
+| `784abea` / PR #188 | 3DGS viewer asset promotion を追加。large-scale training output を browser viewer 用 assets / catalog に promotion する基礎を追加。 |
+
+この chain の到達点:
+
+- README の "Large-scale 3DGS Dynamic Map Result" と "Real Rosbag2 3DGS Pilot Result" が分離された。
+- `apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json` が viewer PLY / source splat 両方の metrics を持つ。
+- `apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json` は viewer X/Z 座標で route playback できる。
+- `scripts/build_istanbul_3dgs_media.py` が Istanbul result GIF / still を生成する。
+- `src/gs_sim2real/train/large_scale_3dgs.py` が source chunk PLY を探し、viewer axes へ transform して catalog/report に viewer metrics を出す。
+- `apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs` は viewer fields と route coverage を検証する。
+- validation snapshot: catalog validator pass、dynamic-map-loading tests 17/17 pass、dynamic-map-catalog tests 13/13 pass、`tests/test_large_scale_3dgs.py` 23 pass、Vite build pass、`git diff --check` clean。
+
+Historical Physical AI / scenario CI chain (2026-04-25 〜 26 の Tier 2 chain):
 
 | Commit | 内容 |
 | --- | --- |
@@ -128,30 +193,31 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 
 ### 3.1 Handoff snapshot
 
-- 基準にする local state は `main @ 13e3b56`(2026-05-17 セッション後)、`origin/main` と完全同期。Sprint 1〜4 + Sprint 4 follow-up step 1(per-step min-peer-separation 配線)まで push 済み。
-- working tree は clean。`git stash list` に `stash@{0}: On main: WIP: pairwise clearance histogram (incomplete, missing helpers)` が残っている。これは codex に引き継ぐ histogram PR の途中状態スナップショット — 「壊れた中途状態」なので、そのまま `git stash pop` するのではなく、§17.7 の設計を見て scratch から書き直す方が早い(後述)。
-- GitHub Actions:
-  - CI green on 2026-05-17 (`13e3b56` まで); nightly + scenario-ci-promote workflow も活きている。
-  - Deploy to GitHub Pages green on 2026-05-17。最新 sample bundle は `min-peer-separation-meters` を含む(perKeyStats に 2 key)。
-- local validation snapshot(`13e3b56` 時点):
-  - `python3 -m ruff check src/ tests/ scripts/`
-  - `python3 -m ruff format --check src/ tests/ scripts/`
-  - `git diff --check`
-  - `PYTHONPATH=src python3 -m pytest tests/ -q --ignore=tests/e2e` => `898 passed`
-  - `PYTHONPATH=src python3 -m pytest tests/test_smoke_route_policy_scenario_ci.py -x -q` => `3 passed`(smoke chain 単独)
-- mypy note:
-  - touched 個別モジュール(policy_scenario_multi_agent.py、policy_scenario_sharding.py、policy_scenario_set.py、policy_scenario_ci_review.py の追加部)は pass。
-  - `src/gs_sim2real/cli.py` を含む mypy は Waymo / MCD 周辺の既知型不整合で落ちる。今回 chain は regression を入れていない。
-- Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 はもとは `multi_3cam_300each_ba` (`/d455t/color/image_raw` 含む) として定義されていたが、MCDVIRAL Download page を 2026-04-26 に再確認したところ ATV rig は `d435i` + `d455b` の 2 camera 構成で `d455t` topic は upstream に存在しない (calibration_atv.yaml にも無い)。そのため `multi_2cam_300each_ba` (d455b + d435i) に redefine 済み。
-- 2026-04-26 セッション記録では `ntu_day_02_d435i.bag` (5.0 GB, drive id `1svtLKBcoxixWZjatwSP1MtJEmVTPE3wA`) は追加取得済みで、`rosbags.AnyReader` により `/d435i/color/image_raw` + IMU + infra topics を確認済み。残課題は GPU 実走 (preprocess/train/export) と gate report 更新。
-- 2026-05-17 セッション以降のオーナーは codex。次に触る candidate(優先順位順):
-  1. **Pairwise clearance histogram の実値化(§17.7)**: `InteractionMetricsSpec.pairwise_clearance_histogram_bins` は spec のみで aggregator / runtime / review surface 未実装。Sprint 4 follow-up step 2 として natural な次タスク。設計とコード断片は §17.7 に詳述、stash@{0} に途中状態あり。
-  2. **PR A2 production data**: production benchmark run の review.json が届いたら `scripts/publish_production_review_bundle.py` で `docs/reviews/<id>/` 公開。Pages index で `productionCount: 1` になる(data-blocked)。
-  3. **Sprint 4 staging extension**: smoke の 2-agent crossing を 4 → 16 → 32+ agent に段階的に拡張(§17.5 staging plan)。histogram 実値化後、production-shaped traffic で意味のある分布が確認できる。
-  4. **Sprint 5 設計**: real-vs-sim correlation の policy 行動レベル拡張、または env-side noise / sensor profile の更なる充実、Waymo E2E 等。
-  5. その後の backlog: LoGeR production comparison (§12.3)、MCD `ntu_day_02` `multi_2cam_300each_ba` GPU rerun、Applanix `read_gsof_ins_pose_stream` (vendor 依存)。
+- 基準にする repository state は `main @ cf7a22e`(PR #192 squash merge、2026-06-09)。`origin/main` と同期済み。PR branch `codex/istanbul-viewer-result-media` は merge 後に remote delete 済み。
+- PR #192 merge 直後の working tree は clean。`git stash list` も空。以後の doc refresh ではこのファイルの差分だけが発生する想定。
+- GitHub connector token は前セッションで expired していたが、`gh` CLI は利用可能。PR 作成 / merge / `gh pr view` / Actions 確認は CLI fallback で進める。
+- PR #192 local validation snapshot:
+  - `node apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json --public-root apps/dreamwalker-web/public --site-url http://localhost:5173/ --preload-mode metadata --route apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json --route-playback 1 --route-playback-ms 1200 --route-playback-loop 1` => pass、sparse rectangular grid warning 1 件のみ。
+  - `npm --prefix apps/dreamwalker-web run test:dynamic-map-loading` => 17/17 pass。
+  - `npm --prefix apps/dreamwalker-web run test:dynamic-map-catalog` => 13/13 pass。
+  - `PYTHONPATH=src pytest tests/test_large_scale_3dgs.py` => 23 pass。
+  - `npm --prefix apps/dreamwalker-web run build` => pass、Vite chunk-size warning のみ。
+  - `git diff --check` => clean。
+- Local dev smoke では catalog と first Istanbul PLY が HTTP 200 で配信されることを確認済み。ただし live PlayCanvas GSplat 表示については、「assets load / manager sees splats」までは確認済みで、headless canvas pixel としての visible splats はまだ完全には証明できていない。
+- MCD quality / Physical AI chain の古い状態も残る。Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) は 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 は `multi_2cam_300each_ba` (d455b + d435i) に redefine 済み。`ntu_day_02_d435i.bag` は取得 / topic 検証済みで、残課題は GPU 実走と gate report 更新。
+- 次に触る candidate(優先順位順):
+  1. **GitHub Pages 反映確認**: PR #192 merge 後の Pages deploy status を `gh run list` / Actions / live URL で確認。Istanbul GIF / still / catalog / PLY / `/dreamwalker/` pilot URL が hosted で 200 になることを smoke する。
+  2. **Live PlayCanvas GSplat 表示の実証**: blank canvas を潰す。asset format、PlayCanvas GSplat loader、camera bounds、near/far clip、scale、material visibility を順に切り分け、headed screenshot と pixel check を残す。
+  3. **Runtime capture pipeline**: `docs/images/istanbul-bag6-pilot/` の GIF / still を runtime viewer 由来で再生成できるようにする。proxy renderer は fallback とし、README media と live demo のズレを減らす。
+  4. **Real large-scale expansion**: Istanbul pilot を 6 tiles から、より長い route / more frames / more tiles へ拡張。`large-scale` と呼べる spatial coverage を実データで作る。
+  5. **Pairwise clearance histogram の実値化(§17.7)**: Dynamic Map Viewer の runtime blocker が解けたら Physical AI scenario CI 側へ戻る。`InteractionMetricsSpec.pairwise_clearance_histogram_bins` の runtime / aggregator / review surface はまだ未実装。
+  6. **PR A2 production data**: production benchmark run の review.json が届いたら `scripts/publish_production_review_bundle.py` で `docs/reviews/<id>/` 公開。Pages index で `productionCount: 1` になる(data-blocked)。
 - 反すべきでない方向:
-  - `src/gs_sim2real/datasets/mcd.py` の `DEFAULT_IMAGE_TOPICS` / `DEFAULT_IMU_TOPICS` から `/d455t/*` を削るのは scope 外。tolerant catalog として残しておく方が test_cli / test_mcd の synthetic-bag fixture を壊さない。詳細は PR #137 body の "Out of scope" 参照。
+  - Istanbul pilot を「完成した production-scale map」と言い切らない。現状は real-input pilot であり、large-scale fixture としては synthetic 87-tile mosaic と real 6-tile pilot を分けて説明する。
+  - Hero / README に lanelet2 vector layer や説明文を載せすぎない。Dynamic Map Viewer の first visual は 3DGS footprint、resident / preload、route playback に絞る。
+  - Generated media だけで live viewer の完成を主張しない。runtime renderer の visible proof を取るまでは、asset/catalog/route/media は pass、live 3DGS rendering は next blocker と書く。
+  - raw rosbags、MCD calibration YAML、training output directory は commit しない。commit するのは public viewer assets、catalog、route、docs media、reproducible scripts / tests。
+  - `src/gs_sim2real/datasets/mcd.py` の `DEFAULT_IMAGE_TOPICS` / `DEFAULT_IMU_TOPICS` から `/d455t/*` を削るのは scope 外。tolerant catalog として残しておく方が test_cli / test_mcd の synthetic-bag fixture を壊さない。
   - Profile 3 の `requires_full_folder=True` は「single d455b バッグ以外も要る」というヒントとして残す。リテラルに「14.8 GB 全部 download せよ」という意味ではない。
 
 ### 3.2 MCDVIRAL spec audit recipe (2026-04-26 d455t finding)
@@ -181,9 +247,10 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 
 | Layer | 目的 | 主な files |
 | --- | --- | --- |
-| Data / assets | public demo assets、scene manifests、Pages viewer | `docs/scenes-list.json`, `docs/sim-scenes.json`, `docs/assets/outdoor-demo/`, `docs/splat.html`, `docs/index.html` |
+| Data / assets | public demo assets、scene manifests、Pages viewer | `docs/scenes-list.json`, `docs/sim-scenes.json`, `docs/assets/outdoor-demo/`, `docs/splat.html`, `docs/index.html`, `docs/images/` |
 | Preprocess | image / video / rosbag / external SLAM artifact から COLMAP sparse 相当を作る | `src/gs_sim2real/datasets/`, `src/gs_sim2real/preprocess/`, `src/gs_sim2real/preprocess/external_slam_artifacts/` |
 | Train / export | gsplat / nerfstudio training、`.splat` / scene bundle export | `src/gs_sim2real/train/`, `src/gs_sim2real/viewer/web_export.py`, `src/gs_sim2real/cli.py` |
+| Dynamic map viewer | large-scale 3DGS tile catalog、viewer PLY promotion、route playback、resident/preload UI | `apps/dreamwalker-web/src/dynamic-map-loading.js`, `apps/dreamwalker-web/src/App.jsx`, `apps/dreamwalker-web/public/manifests/`, `apps/dreamwalker-web/public/robot-routes/`, `apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs` |
 | Physical AI sim contract | scene environment、sensor rig、headless env、observations/actions | `src/gs_sim2real/sim/contract.py`, `interfaces.py`, `headless.py`, `gym_adapter.py`, `occupancy.py`, `costmap.py` |
 | Policy benchmark | dataset、imitation、registry、benchmark、history gates | `policy_dataset.py`, `policy_imitation.py`, `policy_benchmark.py`, `policy_benchmark_history.py` |
 | Scenario execution | scenario-set、matrix expansion、sharding、merge | `policy_scenario_set.py`, `policy_scenario_matrix.py`, `policy_scenario_sharding.py` |
@@ -198,6 +265,8 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 - Generated workflow はすぐ active path に置かず、validation → activation → review publishing を通す。
 - Physical AI benchmark は single huge run にせず、scenario-set → matrix → shard → merge に分ける。
 - Public Pages に出すものは `docs/` 配下だけ。実データ、rosbag、calibration YAML、training output は commit しない。
+- Dynamic Map Viewer public assets は `apps/dreamwalker-web/public/` に置く。GitHub Pages build で `/dreamwalker/` 配下から配信されるので、catalog / route / splat path は Pages base path と local dev の両方で成立するように検証する。
+- Large-scale 3DGS promotion は training coordinate と viewer coordinate を混同しない。source metrics と viewer metrics は catalog/report で別 field として持ち、runtime は viewer field があればそちらを優先する。
 
 ## 5. Production Assets / Viewer Contract
 
@@ -218,6 +287,39 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 - `assets/outdoor-demo/mcd-tuhh-day04-supervised.splat` は diagnostic artifact として存在してもよいが、production picker / benchmark table に追加しない。
 - production scene を増やしたら、README table、viewer picker 3 種、preview PNG、hero GIF の source of truth は `docs/scenes-list.json` に揃える。
 - Drift は `tests/test_pages_assets.py` が検出する。
+
+Dynamic Map Viewer は上記 9 scene list とは別の contract を持つ。source of truth は `apps/dreamwalker-web/public/manifests/*-tile-catalog.json` と `apps/dreamwalker-web/public/robot-routes/*.json`。ここでは 1 scene = 1 `.splat` ではなく、route playback に沿って複数 tile を resident / preload / evict する。
+
+現行 public dynamic-map catalogs:
+
+| Catalog | Type | 状態 |
+| --- | --- | --- |
+| `outdoor-production-grid-large-tile-catalog.json` | synthetic regional mosaic | 9 production `.splat` results を 25 placement / 87 route tiles に展開。dynamic loading UI と route playback の大規模 fixture。 |
+| `istanbul-bag6-pilot-tile-catalog.json` | real rosbag2 pilot | Istanbul `rosbag2` 由来。6 ready tiles、12.5 MB browser `.splat`、6 viewer PLY、438,796 Gaussians / 103.8 MiB。 |
+
+Tile catalog contract:
+
+- `tiles[].splatUrl` は browser `.splat` tile の public URL。lightweight dynamic-map loading / metadata validation に使う。
+- `tiles[].viewerSplatUrl` がある場合、Dynamic Map Viewer runtime は viewer-ready PLY として優先する。
+- `coreBounds` / `expandedBounds` は source tile bounds。`viewerCoreBounds` / `viewerExpandedBounds` がある場合、route coverage と overview camera は viewer bounds を優先する。
+- `tiling.viewerAxes` が `xz` の場合、viewer ground plane は X/Z。training source が XY でも runtime には X/Z として渡す。
+- `viewerSplatBytes` / `viewerGaussianCount` は source `.splat` metrics と混ぜない。README では「browser `.splat` size」と「viewer PLY Gaussians / MiB」を別行で説明する。
+
+Dynamic Map Viewer の validation baseline:
+
+```bash
+node apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs \
+  apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json \
+  --public-root apps/dreamwalker-web/public \
+  --site-url http://localhost:5173/ \
+  --preload-mode metadata \
+  --route apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json \
+  --route-playback 1 \
+  --route-playback-ms 1200 \
+  --route-playback-loop 1
+```
+
+この validator が通ることは「catalog / route / asset path が整合している」という意味。PlayCanvas canvas 上に visible splat が描けていることの証明ではない。runtime rendering は headed browser smoke / screenshot / pixel check で別途見る。
 
 ## 6. Outdoor 3DGS Track
 
@@ -241,13 +343,20 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 - Pi3 / LoGeR profile / resolver candidate patterns。
 - Pi3 / LoGeR smoke は archive に記録済み。
 - README / Pages launch-kit / docs assets 整理。
+- Large-scale 3DGS promotion の browser tile catalog / route metadata / viewer PLY transform。
+- Dynamic Map Viewer の outdoor-production 87-tile synthetic regional mosaic。
+- Istanbul `rosbag2` real-input pilot の 6-tile catalog / route / README media / docs landing integration。
 
 ### 6.3 未完
 
 | Priority | Task | 状態 |
 | --- | --- | --- |
+| A | GitHub Pages PR #192 deploy smoke | merge 済み。次に Actions / hosted URL で README、docs landing、Istanbul GIF / still、catalog、PLY、`/dreamwalker/` URL を確認する。 |
+| A | PlayCanvas live GSplat visible proof | catalog / route / assets は pass。headless では live canvas rendering の visible proof が弱い。headed screenshot + pixel check で renderer path を詰める。 |
+| A | Runtime capture pipeline | Istanbul GIF / still は生成済み。次は actual viewer runtime 由来で再生成し、proxy render 依存を減らす。 |
+| A | Real large-scale Istanbul expansion | 現状 6 tiles / 438,796 Gaussians は pilot。より長い route / more frames / more tiles に増やして、real large-scale と呼べる coverage にする。 |
 | A | BYO photos / CoVLA mini 自己実証 | 外部入力待ち。ユーザ写真または HF access 承認が必要。 |
-| A | 8-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
+| A | 9-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
 | B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
 | B | Pi3 / LoGeR comparison production asset | Smoke は済み。production quality の full run は未実施。 |
 | C | `ntu_day_02` quality push | `scripts/plan_mcd_quality_runs.py` と collector はある。実データ再実走は未実施。 |
@@ -266,6 +375,10 @@ PR A2 だけは production benchmark データが届いていないため scaffo
 | Pages scene contract | `docs/scenes-list.json`, `scripts/pages_scene_manifest.py`, `tests/test_pages_assets.py` | README table、preview capture、hero GIF、viewer picker を manifest に揃える。 |
 | README preview capture | `scripts/capture_readme_splat_previews.py` | WebGL は headed Chromium 推奨。headless では黒 canvas になることがある。 |
 | Hero GIF | `scripts/record_demo_gif.py` | `docs/scenes-list.json` の production scenes を順に cycle する。 |
+| Large-scale 3DGS promotion | `src/gs_sim2real/train/large_scale_3dgs.py`, `tests/test_large_scale_3dgs.py` | training output から browser splats / viewer PLY / tile catalog / route metadata へ promotion。viewer axes transform と metrics emission が重要。 |
+| Dynamic map loading runtime | `apps/dreamwalker-web/src/dynamic-map-loading.js`, `apps/dreamwalker-web/src/App.jsx`, `apps/dreamwalker-web/src/DreamwalkerScene.jsx` | catalog fields、viewer bounds、PlayCanvas GSplat loading、overview camera、resident/preload overlay。 |
+| Dynamic map validator | `apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs`, `apps/dreamwalker-web/tests/validate-dynamic-map-catalog.test.mjs` | catalog URL / public root / route coverage / metadata preload / viewer fields を検証。 |
+| Istanbul media generation | `scripts/build_istanbul_3dgs_media.py` | README / Pages 用 GIF / still を生成。次は runtime viewer capture への置き換えが課題。 |
 
 ## 7. External SLAM Track
 
@@ -635,6 +748,9 @@ PYTHONPATH=src python3 scripts/publish_production_review_bundle.py \
 - `docs/index.html` は GS Mapper の public landing として整備済み。
 - `docs/launch-kit.md` / `docs/launch-kit.json` に external announcement 素材がある。
 - README 冒頭に MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR updates への star/watch callout がある。
+- README / Pages には Large-scale 3DGS Dynamic Map Result と Real Rosbag2 3DGS Pilot Result の 2 セクションがある。
+- Istanbul pilot media は `docs/images/istanbul-bag6-pilot/` にあり、Dynamic Map Viewer URL は `/dreamwalker/?tileCatalog=...istanbul-bag6-pilot...` で開く。
+- GitHub Pages 反映確認は PR #192 merge 後の次タスク。deploy が成功しても runtime GSplat visible proof は別途必要。
 
 ### 10.2 Star を増やすために効く方向
 
@@ -642,16 +758,19 @@ PYTHONPATH=src python3 scripts/publish_production_review_bundle.py \
 
 優先順:
 
-1. README top の live demo preview を安定させる。
-2. External SLAM comparison table を維持する。
-3. `docs/launch-kit.md` の copy を短くする。
-4. Pi3 / LoGeR production comparison asset を足す。
-5. Review bundle を Pages に出して、CI / benchmark の信頼性を見せる。
-6. 使い方を `photos-to-splat` / `external-slam import` / `physical-ai benchmark` の 3 入口に分ける。
+1. README / Pages の hosted Dynamic Map Viewer URLs を smoke し、broken asset / base path を潰す。
+2. Live GSplat renderer の visible proof を取り、README media と live demo のズレを減らす。
+3. Runtime capture 由来の Istanbul GIF / still に更新する。
+4. Real large-scale Istanbul pilot を 6 tiles より大きくする。
+5. External SLAM comparison table を維持する。
+6. `docs/launch-kit.md` の copy を短くする。
+7. Pi3 / LoGeR production comparison asset を足す。
+8. Review bundle を Pages に出して、CI / benchmark の信頼性を見せる。
+9. 使い方を `photos-to-splat` / `external-slam import` / `dynamic-map viewer` / `physical-ai benchmark` の 4 入口に分ける。
 
 ### 10.3 ただし今の主目的
 
-「告知機能」だけを作りすぎない。現在の主目的は Physical AI simulation environment の品質を上げること。外向けの整備は、実装された実体を見せるためにやる。
+「告知機能」だけを作りすぎない。現在の主目的は Dynamic Map Viewer と Physical AI simulation environment の品質を上げること。外向けの整備は、実装された実体を見せるためにやる。特に 2026-06-09 時点では、見た目を増やすより runtime renderer の信用を上げる方が優先。
 
 ## 11. Verification Commands
 
@@ -700,6 +819,34 @@ Viewer assets だけなら:
 PYTHONPATH=src pytest tests/test_pages_assets.py tests/test_viewer.py -q
 ```
 
+Dynamic Map Viewer / Istanbul pilot:
+
+```bash
+node apps/dreamwalker-web/tools/validate-dynamic-map-catalog.mjs \
+  apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json \
+  --public-root apps/dreamwalker-web/public \
+  --site-url http://localhost:5173/ \
+  --preload-mode metadata \
+  --route apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json \
+  --route-playback 1 \
+  --route-playback-ms 1200 \
+  --route-playback-loop 1
+npm --prefix apps/dreamwalker-web run test:dynamic-map-loading
+npm --prefix apps/dreamwalker-web run test:dynamic-map-catalog
+PYTHONPATH=src pytest tests/test_large_scale_3dgs.py
+npm --prefix apps/dreamwalker-web run build
+```
+
+Hosted Pages smoke(PR #192 以降):
+
+```bash
+gh run list --repo rsasaki0109/gs-mapper --branch main --limit 10
+curl -I https://rsasaki0109.github.io/gs-mapper/
+curl -I https://rsasaki0109.github.io/gs-mapper/dreamwalker/
+curl -I https://rsasaki0109.github.io/gs-mapper/manifests/istanbul-bag6-pilot-tile-catalog.json
+curl -I https://rsasaki0109.github.io/gs-mapper/splats/istanbul-bag6-pilot/tile_x000_y001.ply
+```
+
 ### 11.4 Physical AI / scenario CI まわり
 
 ```bash
@@ -731,6 +878,14 @@ python3 scripts/record_demo_gif.py
 python3 scripts/enhance_demo_sweep_previews.py --hero-gif
 ```
 
+Istanbul Dynamic Map Viewer media:
+
+```bash
+python3 scripts/build_istanbul_3dgs_media.py
+```
+
+現状この script は docs media の生成には使えるが、live PlayCanvas renderer の visible proof ではない。runtime capture に置き換える場合は、headed browser で `/dreamwalker/?tileCatalog=...istanbul...` を開き、canvas pixel check と screenshot を同時に残す。
+
 ### 11.6 MCD quality planning
 
 ```bash
@@ -749,6 +904,10 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
+| Pages deploy smoke for PR #192 | Istanbul pilot は merge 済みだが、hosted Pages の base path / asset path / deploy status は live で見る必要がある。 | `gh run list` で Pages workflow を確認し、README、`/dreamwalker/`、Istanbul catalog、first PLY、GIF / PNG を `curl -I` と browser smoke で確認。 |
+| Live PlayCanvas GSplat visible proof | catalog / route / assets の検証だけでは、Dynamic Map Viewer が実際に 3DGS を描けているとは言えない。 | headed Playwright か手元 browser で Istanbul URL を開き、nonblank canvas、camera framing、route playback、tile residency overlay を screenshot / pixel check で確認。 |
+| Runtime capture pipeline | README media が live viewer とズレると、見栄えは良くても demo の信用が落ちる。 | `scripts/build_istanbul_3dgs_media.py` の proxy generation を残しつつ、runtime screenshot / GIF capture script を追加する。 |
+| Real large-scale Istanbul expansion | 6-tile pilot は real-input proof だが、large-scale と呼ぶには coverage が足りない。 | longer route / more registered frames / more source tiles で rerun し、catalog metrics、route、docs media、README table を同時更新。 |
 | Review bundle sample under docs | 完了。Pages `/reviews/` が空ではなく scenario CI review / adoption diff の形を見せられる | `docs/reviews/smoke-route-policy-ci/` を `scripts/build_pages_sample_review_bundle.py` で生成。synthetic smoke fixture であり production benchmark ではないことを bundle 内に明示。 |
 | Real review bundle from production scenario CI | **進行中 (Sprint 1 / §17.2)**。GPT pro consultation で synthetic vs production の区別を `RoutePolicyScenarioCIReviewProvenance` で first-class 化し、`docs/reviews/<run-id>/` に production bundle を公開する PR A + PR A2 に分割。 | PR A: contract / CLI / Pages index 骨格 (`plan_review_bundle_provenance.md §1`). PR A2: 実 production run の `gs-mapper route-policy-scenario-ci-review --kind production --bundle-dir docs/reviews/<id>` 実行と index 再生成。 |
 
@@ -762,10 +921,13 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | Route policy replay viewer | 引き続き OOS。Policy trajectory と scene を Pages で inspect する viewer は未着手。 |
 | Real-vs-sim correlation report | ✅ 完了。`scripts/run_rosbag_correlation.py` (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface + regression gate (#125/#126) → per-bag overrides (#128) → translation/heading per-pair distribution + time stratification (#129〜#134) まで実装済み。`gs-mapper route-policy-scenario-ci-review --max-correlation-* --correlation-thresholds-config --correlation-pair-distribution-strata` が production rollout で使える。残課題は event-aligned stratification (#133 OOS、外部 event timestamp が必要)。 |
 
-### 12.3 B: Outdoor asset quality
+### 12.3 B: Outdoor / dynamic-map asset quality
 
-| Task | Status (2026-04-26) |
+| Task | Status |
 | --- | --- |
+| Outdoor production regional mosaic | 完了。9 production `.splat` を 25 placement / 87 browser route tiles に展開。synthetic fixture なので real-input large-scale とは区別して説明する。 |
+| Istanbul real rosbag2 pilot | 進行中。6 ready tiles、6 browser `.splat`、6 viewer PLY、438,796 Gaussians / 103.8 MiB、README media まで merge 済み。次は live renderer visible proof と real large-scale expansion。 |
+| PlayCanvas GSplat runtime | 未完。catalog / route / assets は validation pass。live canvas visible proof は次タスク。 |
 | Pi3 production comparison | 完了。Pi3X VO 20 frames → `external-slam` import → gsplat 15k → `docs/assets/outdoor-demo/bag6-pi3x-20-15k.splat`。 |
 | LoGeR production comparison | 引き続き OOS。External SLAM comparison の説得力が増す。要 GPU run。 |
 | MCD `ntu_day_02` quality reruns | 部分完了。`single_400_depth_long` (L1=0.1951) と `single_800_ba` (L1=0.2699) は gate pass。元の `multi_3cam_300each_ba` 案は `d455t` topic が MCDVIRAL ATV に存在しないことが 2026-04-26 に判明したため `multi_2cam_300each_ba` (d455b + d435i) に redefine。`d435i.bag` (5.0 GB, 5,014,702,681 bytes) は同日 evening に `data/mcd/ntu_day_02/` へ取得済 + topic 検証済み。残るのは GPU 実走 (1〜2h) と gate report 更新。 |
@@ -805,6 +967,8 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 - `docs/splat-viewer/main.js` など vendored viewer code は、compatibility fix 以外で大きく触らない。
 - Generated workflow は直接 `.github/workflows/` に置かず、validation / activation / review flow を通す。
 - `docs/scenes-list.json` の production scene 追加は README / viewer / tests とセットで扱う。
+- `apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/*.ply` のような public viewer PLY は例外的に commit 対象。raw bag / training outputs / private reconstruction directories は対象外。
+- Dynamic Map Viewer hero / README media に説明 layer を増やしすぎない。lanelet2 vector map 風 layer は、実際に必要な map contract として使う段階まで hero には載せない。
 
 ## 14. 既知の落とし穴
 
@@ -818,6 +982,10 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 - Waymo は code path があっても実データ E2E 未検証。Python 3.10 venv と dataset agreement を先に確認する。
 - Review bundle は CI workflow の信頼性を示す artifact であり、benchmark の実行そのものを代替しない。
 - Activation report の `activated=True` は workflow file が guardrail を通ったという意味。GitHub 上で workflow が成功したという意味ではない。
+- Dynamic Map Viewer の catalog validator pass は asset path と route coverage の証明であり、runtime GSplat が canvas に描けた証明ではない。
+- GitHub Pages では `/dreamwalker/` 配下の app から `/manifests/...` や `/splats/...` を読む。local dev と hosted Pages で base path が違うため、merge 後は必ず hosted URL を smoke する。
+- `viewerSplatUrl` がある tile では viewer PLY を優先する。source `.splat` metrics と viewer PLY metrics を README で混ぜると、「12.5 MB」と「103.8 MiB」が矛盾して見える。
+- Istanbul pilot は real-input proof だが 6 tiles なので、synthetic 87-tile mosaic と同じ意味の large-scale result として扱わない。docs では "pilot" と "regional mosaic" を分けて説明する。
 
 ## 15. Archive Map
 
@@ -848,25 +1016,32 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | `docs/plan_review_bundle_provenance.md` | PR A / PR B (production review bundle provenance + event-aligned stratification) の contract 差分メモ |
 | `docs/archive/plan_outdoor_gs_2026_04_full_handoff.md` | Full historical outdoor-GS handoff snapshot |
 
-## 17. Roadmap (2026-05〜, GPT pro consultation 後)
+## 17. Roadmap (2026-06〜, Dynamic Map Viewer / Physical AI)
 
-2026-05-15 の GPT pro consultation の結論を 4 sprint に分解。優先順位の根拠は「実屋外 scene を使った Physical AI policy evaluation が CI artifact として継続的に出ること」が現状の最大の説得力ボトルネックである、という判断。詳細な contract 差分は [`plan_review_bundle_provenance.md`](plan_review_bundle_provenance.md)。
+2026-05-15 の GPT pro consultation で切った Physical AI scenario CI roadmap は有効なまま残す。ただし 2026-06-09 時点では、外向けの説得力ボトルネックが「review bundle があるか」から「real 3DGS dynamic map が live viewer で見えるか」へ一時的に移っている。
+
+したがって 6 月前半の優先順位は、Dynamic Map Viewer runtime を信頼できる状態にすることを最上位に置く。その後、real large-scale 3DGS の coverage を増やし、最後に scenario CI / Physical AI evaluation へ再接続する。詳細な production review bundle contract 差分は引き続き [`plan_review_bundle_provenance.md`](plan_review_bundle_provenance.md)。
 
 ### 17.1 優先順位
 
 | 優先 | Sprint | Task | 狙い | 状態 |
 | ---: | --- | --- | --- | --- |
-| 1 | Sprint 1 | Real production review bundle 公開 (PR A + PR A2) | 外向け説得力 | PR A 完(`090ee16`)、PR A2 は scaffold 完(`e9d50a9`)、本実行は production benchmark データ着次第 |
-| 2 | Sprint 2 | Event-aligned stratification (PR B) | 評価品質 / policy 行動レベル correlation の土台 | 完(`2b79b5d`) |
-| 3 | Sprint 3 | Policy trace events (PR C → C6) | デバッグ・説明力、Sprint 4 viewer の入力 | 完(`ace6143` → `db0cb56`、6 PR) |
-| 4 | Sprint 4 | Multi-agent Tier 3 production matrix (PR D 系) | env hardening、Tier 3 候補の本丸 | 完(`2e8e738` → `b3784be`、6 PR)、staging は smoke で 2-agent 通過。production 4+ agent は次フェーズ |
-| 5 | — | Sprint 4 follow-up step 1: per-step min-peer-separation collection | aggregate を peer-count placeholder から実値に | 完(`13e3b56`、2026-05-17 セッション。`nearest-dynamic-obstacle-distance-meters` を rollout 全 step 最悪値で集計) |
-| 6 | — | Sprint 4 follow-up step 2: pairwise clearance histogram 実値化 | `InteractionMetricsSpec.pairwise_clearance_histogram_bins` を spec から runtime / aggregator / review 配線へ | **codex 次タスク**(§17.7 に full design + stash@{0} に WIP) |
-| 7 | — | LoGeR production comparison asset | asset 比較の厚み | §12.3 既存 backlog |
-| 8 | — | MCD `ntu_day_02` `multi_2cam_300each_ba` GPU rerun | asset 品質補完 | §12.3 既存 backlog |
-| 9 | — | Applanix `read_gsof_ins_pose_stream` | data input 拡張（vendor 依存） | §3.1 OOS |
+| 1 | DMap 1 | GitHub Pages deploy / hosted smoke for PR #192 | merge した Istanbul pilot が live で見える入口を保証 | 次タスク。Actions / hosted URLs / assets を確認 |
+| 2 | DMap 2 | PlayCanvas live GSplat visible proof | Dynamic Map Viewer runtime の信用 | catalog / route / assets は pass。canvas visible proof は未完 |
+| 3 | DMap 3 | Runtime capture pipeline | README GIF / still と live viewer のズレを減らす | `scripts/build_istanbul_3dgs_media.py` は proxy media 生成済み。runtime capture は未完 |
+| 4 | DMap 4 | Real large-scale Istanbul expansion | synthetic mosaic ではなく real-input large-scale へ広げる | 6-tile pilot 完。more frames / more route / more tiles が次 |
+| 5 | Bridge | Dynamic map -> Physical AI scene / route-policy review 接続 | 見える map から評価できる map へ戻す | 未着手。DMap 1〜4 後 |
+| 6 | Sprint 1 | Real production review bundle 公開 (PR A + PR A2) | 外向け説得力 | PR A 完(`090ee16`)、PR A2 は scaffold 完(`e9d50a9`)、本実行は production benchmark データ着次第 |
+| 7 | Sprint 2 | Event-aligned stratification (PR B) | 評価品質 / policy 行動レベル correlation の土台 | 完(`2b79b5d`) |
+| 8 | Sprint 3 | Policy trace events (PR C → C6) | デバッグ・説明力、Sprint 4 viewer の入力 | 完(`ace6143` → `db0cb56`、6 PR) |
+| 9 | Sprint 4 | Multi-agent Tier 3 production matrix (PR D 系) | env hardening、Tier 3 候補の本丸 | 完(`2e8e738` → `b3784be`、6 PR)、staging は smoke で 2-agent 通過。production 4+ agent は次フェーズ |
+| 10 | — | Sprint 4 follow-up step 1: per-step min-peer-separation collection | aggregate を peer-count placeholder から実値に | 完(`13e3b56`、2026-05-17 セッション。`nearest-dynamic-obstacle-distance-meters` を rollout 全 step 最悪値で集計) |
+| 11 | — | Sprint 4 follow-up step 2: pairwise clearance histogram 実値化 | `InteractionMetricsSpec.pairwise_clearance_histogram_bins` を spec から runtime / aggregator / review 配線へ | 後続タスク(§17.7 に design)。2026-06-09 時点の最優先ではない |
+| 12 | — | LoGeR production comparison asset | asset 比較の厚み | §12.3 既存 backlog |
+| 13 | — | MCD `ntu_day_02` `multi_2cam_300each_ba` GPU rerun | asset 品質補完 | §12.3 既存 backlog |
+| 14 | — | Applanix `read_gsof_ins_pose_stream` | data input 拡張（vendor 依存） | §3.1 OOS |
 
-「splat を 1 個増やす」より「実屋外 scene を使った policy evaluation が CI artifact として継続的に出る」方が GS Mapper の現在地では効く、という判断。
+「splat を 1 個増やす」だけでは弱い。一方で、live viewer が見えていない状態で evaluation stack を強調しても初見には刺さりにくい。現在の判断は、まず real-input dynamic map を live で信用できる状態にし、その上で policy evaluation / review bundle へ接続する、という順番。
 
 ### 17.2 Sprint 1: production-review-bundle-manifest
 
@@ -1001,14 +1176,14 @@ Sprint 1 完了前に nightly を走らせると synthetic と production を区
 
 ### 17.7 Sprint 4 follow-up step 2: pairwise clearance histogram(codex 引き継ぎ）
 
-このセクションは 2026-05-17 セッションで Claude → codex に渡される handoff 用 design doc です。**stash@{0}**(`WIP: pairwise clearance histogram (incomplete, missing helpers)`)に途中状態あり、ただし helper 2 個が未実装で broken state なので参考程度に。下記設計を見て scratch から書き直す方が早い。
+このセクションは 2026-05-17 セッションで Claude → codex に渡された handoff 用 design doc を、後続タスクとして残したものです。2026-06-09 時点の `git stash list` は空なので、途中状態を pop する前提はない。下記設計を見て scratch から書き直す方が早い。
 
 #### 17.7.1 ゴール / 完成定義
 
 - `InteractionMetricsSpec.pairwise_clearance_histogram_bins` を spec dataclass field("declared intent")から runtime → aggregator → review bundle まで実値化する。
 - smoke chain の 2-agent crossing scene で histogram が `perKeyHistograms["pairwise-clearance"] = {binEdges: [...], counts: [...]}` として review JSON / Markdown / HTML に surface し、`tests/test_smoke_route_policy_scenario_ci.py` が assert する。
 - `docs/reviews/smoke-route-policy-ci/` 公開 sample bundle が histogram を含む(`scripts/build_pages_sample_review_bundle.py` で regenerate)。
-- 898 既存 test + 新規 test ≥ 6 個 pass、`origin/main` まで push 済み。
+- 既存 test + 新規 test が pass し、対象 PR で validation command を明記する。
 
 #### 17.7.2 設計 — 全体像
 
@@ -1145,14 +1320,12 @@ if dynamic_obstacles is not None:
 
 #### 17.7.6 検証手順
 
-1. `git stash list` で WIP 確認。中身を見たいだけなら `git stash show -p stash@{0}`。pop はしない(broken state)。
-2. 上記 file change list 通りに実装(順序: multi_agent → __init__ → scenario_set → ci_review → smoke fixture → tests)。
-3. `PYTHONPATH=src python3 -m pytest tests/test_policy_scenario_multi_agent.py tests/test_policy_scenario_multi_agent_aggregate.py tests/test_policy_scenario_ci_review_multi_agent.py tests/test_smoke_route_policy_scenario_ci.py -x -q` で逐次 green を確認。
-4. `PYTHONPATH=src python3 scripts/build_pages_sample_review_bundle.py` で sample bundle を再生成。
-5. `PYTHONPATH=src python3 -m pytest tests/ -q --ignore=tests/e2e` で全 898 + 新規 test green を確認。
-6. `python3 -m ruff check src/ tests/ scripts/` + `python3 -m ruff format --check src/ tests/ scripts/` で lint clean。
-7. commit message テンプレ: `[codex] Wire pairwise clearance histogram through scenario CI chain`。CLAUDE.md 規約により Co-Authored-By trailer は付けない、PR 説明文に AI 生成表記は入れない。
-8. push は `git push origin main`。`main` 直 push が classifier に blocked された場合は人間に確認。
+1. 上記 file change list 通りに実装(順序: multi_agent → __init__ → scenario_set → ci_review → smoke fixture → tests)。
+2. `PYTHONPATH=src python3 -m pytest tests/test_policy_scenario_multi_agent.py tests/test_policy_scenario_multi_agent_aggregate.py tests/test_policy_scenario_ci_review_multi_agent.py tests/test_smoke_route_policy_scenario_ci.py -x -q` で逐次 green を確認。
+3. `PYTHONPATH=src python3 scripts/build_pages_sample_review_bundle.py` で sample bundle を再生成。
+4. `PYTHONPATH=src python3 -m pytest tests/ -q --ignore=tests/e2e` で full suite を確認。
+5. `python3 -m ruff check src/ tests/ scripts/` + `python3 -m ruff format --check src/ tests/ scripts/` で lint clean。
+6. commit message テンプレ: `[codex] Wire pairwise clearance histogram through scenario CI chain`。CLAUDE.md 規約により Co-Authored-By trailer は付けない、PR 説明文に AI 生成表記は入れない。
 
 #### 17.7.7 意図的に scope 外にしたもの
 
