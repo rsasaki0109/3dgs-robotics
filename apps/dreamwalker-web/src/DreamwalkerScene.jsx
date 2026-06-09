@@ -1,7 +1,7 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Application, Entity } from '@playcanvas/react';
-import { Camera, GSplat, Script } from '@playcanvas/react/components';
-import { useApp, useAppEvent, useSplat } from '@playcanvas/react/hooks';
+import { Camera, Script } from '@playcanvas/react/components';
+import { useApp, useAppEvent, useParent, useSplat } from '@playcanvas/react/hooks';
 import { CameraControls } from 'playcanvas/scripts/esm/camera-controls.mjs';
 import {
   BLEND_NONE,
@@ -92,8 +92,156 @@ function recordSplatLifecycleEvent(type, splatUrl) {
   });
 }
 
+function vectorToArray(vector) {
+  return vector ? [Number(vector.x), Number(vector.y), Number(vector.z)] : null;
+}
+
+function recordSplatAssetInfo(splatUrl, asset) {
+  updateDynamicMapDiagnostics((current) => {
+    const resource = asset?.resource ?? null;
+    const aabb = resource?.aabb ?? null;
+    return {
+      ...current,
+      splatAssetInfo: {
+        url: splatUrl,
+        loaded: Boolean(asset?.loaded),
+        numSplats: Number(resource?.numSplats ?? resource?.data?.numSplats ?? 0),
+        aabb: aabb
+          ? {
+              center: vectorToArray(aabb.center),
+              halfExtents: vectorToArray(aabb.halfExtents)
+            }
+          : null
+      }
+    };
+  });
+}
+
+function recordSplatEntityInfo(splatUrl, entity) {
+  updateDynamicMapDiagnostics((current) => {
+    const component = entity?.gsplat ?? null;
+    const instance = component?.instance ?? null;
+    const meshInstance = instance?.meshInstance ?? null;
+    const placement = component?._placement ?? null;
+    const app = component?.system?.app ?? null;
+    const director = app?.renderer?.gsplatDirector ?? null;
+    const managerInfo = [];
+    if (director?.camerasMap) {
+      for (const [camera, cameraData] of director.camerasMap.entries()) {
+        for (const [layer, layerData] of cameraData.layersMap.entries()) {
+          const manager = layerData.gsplatManager ?? null;
+          const renderer = manager?.renderer ?? null;
+          const sortedState = manager?.worldStates?.get?.(manager.sortedVersion) ?? null;
+          managerInfo.push({
+            cameraName: camera?.node?.name ?? '',
+            layerId: Number(layer?.id ?? -1),
+            layerPlacementCount: Number(layer?.gsplatPlacements?.length ?? 0),
+            managerPlacementCount: Number(manager?.layerPlacements?.length ?? 0),
+            sortedVersion: Number(manager?.sortedVersion ?? -1),
+            worldStateCount: Number(manager?.worldStates?.size ?? 0),
+            sortedActiveSplats: Number(sortedState?.totalActiveSplats ?? 0),
+            rendererVisible: Boolean(renderer?.meshInstance?.visible),
+            rendererInstancingCount: Number(renderer?.meshInstance?.instancingCount ?? 0),
+            rendererNumSplats: Number(
+              renderer?.material?.getParameter?.('numSplats')?.data ?? 0
+            )
+          });
+        }
+      }
+    }
+    return {
+      ...current,
+      splatEntityInfo: {
+        url: splatUrl,
+        hasEntity: Boolean(entity),
+        entityEnabled: Boolean(entity?.enabled),
+        hasGsplatComponent: Boolean(component),
+        componentEnabled: Boolean(component?.enabled),
+        hasInstance: Boolean(instance),
+        hasMeshInstance: Boolean(meshInstance),
+        hasPlacement: Boolean(placement),
+        placementVisible: Boolean(placement?.visible),
+        placementAabb: placement?.aabb
+          ? {
+              center: vectorToArray(placement.aabb.center),
+              halfExtents: vectorToArray(placement.aabb.halfExtents)
+            }
+          : null,
+        meshVisible: Boolean(meshInstance?.visible),
+        instancingCount: Number(meshInstance?.instancingCount ?? 0),
+        layers: Array.isArray(component?.layers) ? component.layers : [],
+        managerInfo
+      }
+    };
+  });
+}
+
+function recordCameraPresetInfo(label, cameraEntity) {
+  updateDynamicMapDiagnostics((current) => {
+    const cameraComponent = cameraEntity?.camera ?? null;
+    const aabbCenter = current.splatAssetInfo?.aabb?.center ?? null;
+    const projectedAabbCenter =
+      cameraComponent && Array.isArray(aabbCenter)
+        ? cameraComponent.worldToScreen(new Vec3(aabbCenter[0], aabbCenter[1], aabbCenter[2]))
+        : null;
+    const width = Number(cameraComponent?.system?.app?.graphicsDevice?.width ?? 0);
+    const height = Number(cameraComponent?.system?.app?.graphicsDevice?.height ?? 0);
+
+    return {
+      ...current,
+      cameraPresetInfo: {
+        label,
+        position: vectorToArray(cameraEntity?.getPosition?.()),
+        rotation: vectorToArray(cameraEntity?.getEulerAngles?.()),
+        forward: vectorToArray(cameraEntity?.forward),
+        projectedAabbCenter: projectedAabbCenter
+          ? {
+              point: vectorToArray(projectedAabbCenter),
+              normalized: width > 0 && height > 0
+                ? [
+                    Number((projectedAabbCenter.x / width).toFixed(4)),
+                    Number((projectedAabbCenter.y / height).toFixed(4)),
+                    Number(projectedAabbCenter.z.toFixed(4))
+                  ]
+                : null
+            }
+          : null
+      }
+    };
+  });
+}
+
+function GsplatAttachment({ asset, splatUrl }) {
+  const entity = useParent();
+  useLayoutEffect(() => {
+    if (!asset?.resource || !entity) {
+      return undefined;
+    }
+
+    entity.addComponent('gsplat', {
+      highQualitySH: true,
+      resource: asset.resource,
+      unified: true
+    });
+
+    window.setTimeout(() => recordSplatEntityInfo(splatUrl, entity), 0);
+    window.setTimeout(() => recordSplatEntityInfo(splatUrl, entity), 250);
+    window.setTimeout(() => recordSplatEntityInfo(splatUrl, entity), 1000);
+    window.setTimeout(() => recordSplatEntityInfo(splatUrl, entity), 3000);
+
+    return () => {
+      if (entity.gsplat) {
+        entity.removeComponent('gsplat');
+      }
+    };
+  }, [asset?.resource, entity, splatUrl]);
+
+  return null;
+}
+
 function SplatContent({ splatUrl, entityRef, onStatusChange }) {
   const { asset } = useSplat(splatUrl);
+  const rotation = splatUrl.toLowerCase().endsWith('.ply') ? [0, 0, 0] : [0, 0, 180];
 
   useEffect(() => {
     recordSplatLifecycleEvent('mount', splatUrl);
@@ -111,10 +259,11 @@ function SplatContent({ splatUrl, entityRef, onStatusChange }) {
 
     if (asset) {
       recordSplatLifecycleEvent('asset-ready', splatUrl);
+      recordSplatAssetInfo(splatUrl, asset);
     }
-  }, [asset, onStatusChange, splatUrl]);
+  }, [asset, entityRef, onStatusChange, splatUrl]);
 
-  if (!asset) {
+  if (!asset?.resource) {
     return null;
   }
 
@@ -122,8 +271,8 @@ function SplatContent({ splatUrl, entityRef, onStatusChange }) {
     <Entity
       ref={entityRef}
       position={[0, 0, 0]}
-      rotation={[0, 0, 180]}>
-      <GSplat asset={asset} />
+      rotation={rotation}>
+      <GsplatAttachment asset={asset} splatUrl={splatUrl} />
     </Entity>
   );
 }
@@ -730,6 +879,7 @@ function CameraPresetBridge({
 
       pendingSignatureRef.current = '';
       onPresetApplied(currentPreset.label);
+      recordCameraPresetInfo(currentPreset.label, walkCameraEntity);
       return;
     }
 
@@ -760,6 +910,9 @@ function CameraPresetBridge({
 
     pendingSignatureRef.current = '';
     onPresetApplied(currentPreset.label);
+    recordCameraPresetInfo(currentPreset.label, orbitCameraEntity);
+    window.setTimeout(() => recordCameraPresetInfo(currentPreset.label, orbitCameraEntity), 500);
+    window.setTimeout(() => recordCameraPresetInfo(currentPreset.label, orbitCameraEntity), 2000);
   });
 
   return null;

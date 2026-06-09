@@ -172,7 +172,8 @@ test('buildDynamicMapLoadPlan uses ready large-scale tile catalog as active spla
             id: 'tile_x001_y000',
             label: 'Tile East',
             status: 'ready',
-            splatUrl: '/splats/demo-scene/tile_x001_y000.splat'
+            splatUrl: '/splats/demo-scene/tile_x001_y000.splat',
+            viewerSplatUrl: '/splats/demo-scene/tile_x001_y000.ply'
           },
           {
             id: 'tile_x002_y000',
@@ -185,10 +186,12 @@ test('buildDynamicMapLoadPlan uses ready large-scale tile catalog as active spla
   );
 
   assert.equal(plan.strategy, 'large-scale-3dgs-tile-catalog');
-  assert.equal(plan.active.splatUrl, '/splats/demo-scene/tile_x001_y000.splat');
+  assert.equal(plan.active.splatUrl, '/splats/demo-scene/tile_x001_y000.ply');
   assert.equal(plan.active.splatSource, 'tile-catalog');
   assert.equal(plan.active.assetLabel, 'Demo Large Scene / Tile East');
   assert.equal(plan.active.assetBundle.splatSource, 'tile-catalog');
+  assert.equal(plan.active.sourceTile.splatUrl, '/splats/demo-scene/tile_x001_y000.splat');
+  assert.equal(plan.active.sourceTile.viewerSplatUrl, '/splats/demo-scene/tile_x001_y000.ply');
   assert.equal(plan.active.assetBundle.usesDemoFallback, false);
   assert.equal(plan.activeTile.id, 'tile_x001_y000');
   assert.equal(plan.tileCatalog.summary.readyTileCount, 2);
@@ -198,7 +201,7 @@ test('buildDynamicMapLoadPlan uses ready large-scale tile catalog as active spla
   );
   assert.equal(
     plan.runtimeKey,
-    'residency:tile_x001_y000:/splats/demo-scene/tile_x001_y000.splat:'
+    'residency:tile_x001_y000:/splats/demo-scene/tile_x001_y000.ply:'
   );
 });
 

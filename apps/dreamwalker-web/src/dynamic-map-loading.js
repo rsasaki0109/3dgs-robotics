@@ -40,13 +40,21 @@ function classifyAssetUrl(assetUrl) {
   return normalizeLocalAssetPath(assetUrl) ? 'local' : 'remote';
 }
 
+function resolveRuntimeSplatUrl(tile) {
+  return hasNonEmptyString(tile?.viewerSplatUrl) ? tile.viewerSplatUrl : tile?.splatUrl ?? '';
+}
+
 function normalizeCatalogTile(tileLike, index) {
   const tile = tileLike && typeof tileLike === 'object' ? tileLike : {};
   const id = hasNonEmptyString(tile.id) ? tile.id.trim() : `tile-${index + 1}`;
   const splatUrl = resolvePublicUrl(hasNonEmptyString(tile.splatUrl) ? tile.splatUrl : '');
+  const viewerSplatUrl = resolvePublicUrl(
+    hasNonEmptyString(tile.viewerSplatUrl) ? tile.viewerSplatUrl : ''
+  );
+  const runtimeSplatUrl = viewerSplatUrl || splatUrl;
   const status = hasNonEmptyString(tile.status)
     ? tile.status.trim()
-    : splatUrl
+    : runtimeSplatUrl
       ? 'ready'
       : 'missing-splat';
 
@@ -57,9 +65,16 @@ function normalizeCatalogTile(tileLike, index) {
     status,
     runStatus: hasNonEmptyString(tile.runStatus) ? tile.runStatus.trim() : 'unknown',
     splatUrl,
+    viewerSplatUrl,
     sourceSplat: hasNonEmptyString(tile.sourceSplat) ? tile.sourceSplat.trim() : '',
+    sourceViewerSplat: hasNonEmptyString(tile.sourceViewerSplat)
+      ? tile.sourceViewerSplat.trim()
+      : '',
     publicPath: hasNonEmptyString(tile.publicPath) ? tile.publicPath.trim() : '',
-    splatAssetKind: classifyAssetUrl(splatUrl),
+    viewerPublicPath: hasNonEmptyString(tile.viewerPublicPath)
+      ? tile.viewerPublicPath.trim()
+      : '',
+    splatAssetKind: classifyAssetUrl(runtimeSplatUrl),
     coreBounds: tile.coreBounds && typeof tile.coreBounds === 'object' ? tile.coreBounds : {},
     expandedBounds:
       tile.expandedBounds && typeof tile.expandedBounds === 'object' ? tile.expandedBounds : {},
@@ -68,7 +83,7 @@ function normalizeCatalogTile(tileLike, index) {
 }
 
 function isRuntimeReadyTile(tile) {
-  return hasNonEmptyString(tile?.splatUrl) && tile.status !== 'missing-splat';
+  return hasNonEmptyString(resolveRuntimeSplatUrl(tile)) && tile.status !== 'missing-splat';
 }
 
 function normalizeMapPosition(positionLike) {
@@ -92,12 +107,16 @@ function normalizeMapPosition(positionLike) {
 }
 
 function tileAxes(tile) {
-  const axes = hasNonEmptyString(tile?.axes) ? tile.axes.trim().toLowerCase() : '';
+  const axes = hasNonEmptyString(tile?.viewerAxes)
+    ? tile.viewerAxes.trim().toLowerCase()
+    : hasNonEmptyString(tile?.axes)
+      ? tile.axes.trim().toLowerCase()
+      : '';
   if (axes.length >= 2) {
     return axes.slice(0, 2).split('');
   }
 
-  const boundKeys = Object.keys(tile?.coreBounds ?? {});
+  const boundKeys = Object.keys(tile?.viewerCoreBounds ?? tile?.coreBounds ?? {});
   const discoveredAxes = boundKeys
     .map((key) => key.match(/^min([XYZ])$/)?.[1]?.toLowerCase())
     .filter(Boolean);
@@ -105,8 +124,22 @@ function tileAxes(tile) {
   return discoveredAxes.length >= 2 ? discoveredAxes.slice(0, 2) : ['x', 'z'];
 }
 
+function tileBoundsObject(tile, boundsName) {
+  if (boundsName === 'coreBounds' && tile?.viewerCoreBounds && typeof tile.viewerCoreBounds === 'object') {
+    return tile.viewerCoreBounds;
+  }
+  if (
+    boundsName === 'expandedBounds' &&
+    tile?.viewerExpandedBounds &&
+    typeof tile.viewerExpandedBounds === 'object'
+  ) {
+    return tile.viewerExpandedBounds;
+  }
+  return tile?.[boundsName] && typeof tile[boundsName] === 'object' ? tile[boundsName] : {};
+}
+
 function tileBoundsForAxes(tile, boundsName) {
-  const bounds = tile?.[boundsName] && typeof tile[boundsName] === 'object' ? tile[boundsName] : {};
+  const bounds = tileBoundsObject(tile, boundsName);
   const axes = tileAxes(tile);
 
   return axes.map((axis) => {
@@ -221,7 +254,12 @@ function collectRoutePreviewTileCandidates(tiles, activeTile, routePreviewPositi
 }
 
 function tileIndexForAxes(tile, axes) {
-  const tileIndex = tile?.tileIndex && typeof tile.tileIndex === 'object' ? tile.tileIndex : {};
+  const tileIndex =
+    tile?.viewerTileIndex && typeof tile.viewerTileIndex === 'object'
+      ? tile.viewerTileIndex
+      : tile?.tileIndex && typeof tile.tileIndex === 'object'
+        ? tile.tileIndex
+        : {};
   const values = axes.map((axis) => Number(tileIndex[axis]));
 
   return values.every(Number.isFinite) ? values : null;
@@ -282,12 +320,13 @@ function sortTilePreloadCandidates(tiles, activeTile, positionLike) {
 function buildTileCatalogLoadEntry(tile, baseEntry, catalog, role) {
   const tileLabel = hasNonEmptyString(tile.label) ? tile.label : tile.id;
   const assetLabel = `${catalog.label} / ${tileLabel}`;
+  const runtimeSplatUrl = resolveRuntimeSplatUrl(tile);
   const assetBundle = {
     ...baseEntry.assetBundle,
     assetLabel,
     worldNote: `large-scale 3DGS tile ${tile.id}`,
     manifestLabel: catalog.label,
-    splatUrl: tile.splatUrl,
+    splatUrl: runtimeSplatUrl,
     splatSource: 'tile-catalog',
     usesDemoFallback: false,
     hasConfiguredSplat: true,
@@ -306,9 +345,9 @@ function buildTileCatalogLoadEntry(tile, baseEntry, catalog, role) {
     ...baseEntry,
     role,
     assetLabel,
-    splatUrl: tile.splatUrl,
+    splatUrl: runtimeSplatUrl,
     splatSource: 'tile-catalog',
-    splatAssetKind: classifyAssetUrl(tile.splatUrl),
+    splatAssetKind: classifyAssetUrl(runtimeSplatUrl),
     usesDemoFallback: false,
     hasConfiguredSplat: true,
     tileId: tile.id,
@@ -316,7 +355,7 @@ function buildTileCatalogLoadEntry(tile, baseEntry, catalog, role) {
     tileStatus: tile.status,
     tileCatalogSceneId: catalog.sceneId,
     tileCatalogLabel: catalog.label,
-    preloadCacheKey: `${catalog.sceneId}:${tile.id}:${tile.splatUrl}`,
+    preloadCacheKey: `${catalog.sceneId}:${tile.id}:${runtimeSplatUrl}`,
     sourceTile: tile,
     assetBundle
   };

@@ -135,6 +135,55 @@ test('validateDynamicMapCatalog fails when a ready local splat is missing', asyn
   }
 });
 
+test('validateDynamicMapCatalog checks optional viewer splat assets', async () => {
+  const fixture = await createPublicRoot();
+
+  try {
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_west.splat'), 'west');
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_east.splat'), 'east');
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_west.ply'), 'ply');
+    const catalogPath = path.join(fixture.publicRoot, 'manifests', 'catalog.json');
+    await writeJson(
+      catalogPath,
+      createCatalog({
+        tiles: [
+          {
+            id: 'tile_west',
+            status: 'ready',
+            splatUrl: '/splats/demo-scene/tile_west.splat',
+            viewerSplatUrl: '/splats/demo-scene/tile_west.ply',
+            axes: 'xz',
+            tileIndex: { x: 0, z: 0 },
+            coreBounds: { minX: -10, maxX: 0, minZ: 0, maxZ: 10 },
+            expandedBounds: { minX: -12, maxX: 2, minZ: -2, maxZ: 12 }
+          },
+          {
+            id: 'tile_east',
+            status: 'ready',
+            splatUrl: '/splats/demo-scene/tile_east.splat',
+            viewerSplatUrl: '/splats/demo-scene/tile_east.ply',
+            axes: 'xz',
+            tileIndex: { x: 1, z: 0 },
+            coreBounds: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 },
+            expandedBounds: { minX: -2, maxX: 12, minZ: -2, maxZ: 12 }
+          }
+        ]
+      })
+    );
+
+    const result = await validateDynamicMapCatalog(catalogPath, {
+      publicRoot: fixture.publicRoot
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.errorCount, 1);
+    assert.ok(result.findings.some((finding) => finding.detail.includes('tile_east.ply')));
+    assert.ok(result.findings.some((finding) => finding.detail.includes('tile_west.ply')));
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 test('validateDynamicMapCatalog fails when the catalog has no ready tiles', async () => {
   const fixture = await createPublicRoot();
 
@@ -342,6 +391,80 @@ test('validateDynamicMapCatalog validates robot route coverage and prints a play
   }
 });
 
+test('validateDynamicMapCatalog validates viewer XZ route coverage for XY source tiles', async () => {
+  const fixture = await createPublicRoot();
+
+  try {
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_a.splat'), 'a');
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_b.splat'), 'b');
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_a.ply'), 'ply:a');
+    await writeFile(path.join(fixture.publicRoot, 'splats', 'demo-scene', 'tile_b.ply'), 'ply:b');
+    const catalogPath = path.join(fixture.publicRoot, 'manifests', 'catalog.json');
+    const routePath = path.join(fixture.publicRoot, 'robot-routes', 'demo-route.json');
+    await writeJson(
+      catalogPath,
+      createCatalog({
+        tiling: {
+          strategy: 'test-grid',
+          axes: 'xy',
+          viewerAxes: 'xz',
+          tileSize: 10,
+          overlap: 2,
+          minImages: 1,
+          worldBounds: { minX: 0, maxX: 20, minY: -20, maxY: -10 },
+          viewerWorldBounds: { minX: 0, maxX: 20, minZ: -20, maxZ: -10 }
+        },
+        tiles: [
+          {
+            id: 'tile_a',
+            status: 'ready',
+            splatUrl: '/splats/demo-scene/tile_a.splat',
+            viewerSplatUrl: '/splats/demo-scene/tile_a.ply',
+            axes: 'xy',
+            viewerAxes: 'xz',
+            tileIndex: { x: 0, y: 1 },
+            viewerTileIndex: { x: 0, z: 1 },
+            coreBounds: { minX: 0, maxX: 10, minY: -20, maxY: -10 },
+            expandedBounds: { minX: -2, maxX: 12, minY: -22, maxY: -8 },
+            viewerCoreBounds: { minX: 0, maxX: 10, minZ: -20, maxZ: -10 },
+            viewerExpandedBounds: { minX: -2, maxX: 12, minZ: -22, maxZ: -8 }
+          },
+          {
+            id: 'tile_b',
+            status: 'ready',
+            splatUrl: '/splats/demo-scene/tile_b.splat',
+            viewerSplatUrl: '/splats/demo-scene/tile_b.ply',
+            axes: 'xy',
+            viewerAxes: 'xz',
+            tileIndex: { x: 1, y: 1 },
+            viewerTileIndex: { x: 1, z: 1 },
+            coreBounds: { minX: 10, maxX: 20, minY: -20, maxY: -10 },
+            expandedBounds: { minX: 8, maxX: 22, minY: -22, maxY: -8 },
+            viewerCoreBounds: { minX: 10, maxX: 20, minZ: -20, maxZ: -10 },
+            viewerExpandedBounds: { minX: 8, maxX: 22, minZ: -22, maxZ: -8 }
+          }
+        ]
+      })
+    );
+    await writeJson(routePath, createRoute([[5, 0, -15], [15, 0, -15]]));
+
+    const result = await validateDynamicMapCatalog(catalogPath, {
+      publicRoot: fixture.publicRoot,
+      routeInput: routePath
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.errorCount, 0);
+    assert.deepEqual(result.routeTileSequence, ['tile_a', 'tile_b']);
+    assert.ok(result.findings.some((finding) =>
+      finding.scope === 'route:coverage' &&
+      finding.detail.includes('all route points')
+    ));
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 test('validateDynamicMapCatalog validates the bundled large outdoor route playback demo', async () => {
   const result = await validateDynamicMapCatalog(
     '/manifests/outdoor-production-grid-large-tile-catalog.json',
@@ -357,9 +480,9 @@ test('validateDynamicMapCatalog validates the bundled large outdoor route playba
 
   assert.equal(result.ok, true);
   assert.equal(result.errorCount, 0);
-  assert.equal(result.routeTileSequence.length, 34);
+  assert.equal(result.routeTileSequence.length, 87);
   assert.equal(result.routeTileSequence[0], 'tile_x000_z001');
-  assert.equal(result.routeTileSequence.at(-1), 'tile_x011_z010');
+  assert.equal(result.routeTileSequence.at(-1), 'tile_x023_z012');
   assert.ok(result.findings.some((finding) =>
     finding.scope === 'route:coverage' &&
     finding.detail.includes('all route points')

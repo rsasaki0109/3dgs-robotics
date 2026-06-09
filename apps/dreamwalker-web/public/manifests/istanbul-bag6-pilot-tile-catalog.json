@@ -1,7 +1,7 @@
 {
   "version": 1,
   "type": "large-scale-3dgs-tile-catalog",
-  "createdAt": "2026-06-08T23:23:03.550360+00:00",
+  "createdAt": "2026-06-09T00:54:53.265694+00:00",
   "sceneId": "istanbul-bag6-pilot",
   "label": "Istanbul Bag6 3DGS Pilot",
   "planPath": "outputs/istanbul_bag6_large/large_scale_3dgs_pilot_plan.json",
@@ -17,12 +17,22 @@
       "maxX": 81.23896322862228,
       "minY": -96.71822928494967,
       "maxY": -4.803967652717926
+    },
+    "viewerAxes": "xz",
+    "viewerWorldBounds": {
+      "minX": 3.999924864610902,
+      "maxX": 81.23896322862228,
+      "minZ": -96.71822928494967,
+      "maxZ": -4.803967652717926
     }
   },
   "summary": {
     "tileCount": 6,
     "readyTileCount": 6,
-    "missingSplatTileCount": 0
+    "missingSplatTileCount": 0,
+    "splatBytes": 13084384,
+    "viewerSplatBytes": 108830589,
+    "viewerGaussianCount": 438796
   },
   "tiles": [
     {
@@ -31,8 +41,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y003.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y003.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y003.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x000_y003/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y003.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y003.ply",
+      "splatBytes": 1711168,
+      "viewerSplatBytes": 13743210,
+      "viewerGaussianCount": 55410,
       "coreBounds": {
         "minX": 3.999924864610902,
         "maxX": 33.999924864610904,
@@ -45,9 +61,26 @@
         "minY": -11.718229284949672,
         "maxY": 28.281770715050328
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minZ": -6.718229284949672,
+        "maxZ": 23.281770715050328
+      },
+      "viewerExpandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minZ": -11.718229284949672,
+        "maxZ": 28.281770715050328
+      },
       "tileIndex": {
         "x": 0,
         "y": 3
+      },
+      "viewerTileIndex": {
+        "x": 0,
+        "z": 3
       },
       "axes": "xy",
       "imageCount": 33,
@@ -60,8 +93,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y002.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y002.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y002.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x000_y002/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y002.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y002.ply",
+      "splatBytes": 3898656,
+      "viewerSplatBytes": 31337819,
+      "viewerGaussianCount": 126356,
       "coreBounds": {
         "minX": 3.999924864610902,
         "maxX": 33.999924864610904,
@@ -74,9 +113,26 @@
         "minY": -41.71822928494967,
         "maxY": -1.7182292849496719
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minZ": -36.71822928494967,
+        "maxZ": -6.718229284949672
+      },
+      "viewerExpandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minZ": -41.71822928494967,
+        "maxZ": -1.7182292849496719
+      },
       "tileIndex": {
         "x": 0,
         "y": 2
+      },
+      "viewerTileIndex": {
+        "x": 0,
+        "z": 2
       },
       "axes": "xy",
       "imageCount": 117,
@@ -89,8 +145,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y001.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x000_y001.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x000_y001.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x000_y001/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y001.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x000_y001.ply",
+      "splatBytes": 2127456,
+      "viewerSplatBytes": 17128410,
+      "viewerGaussianCount": 69060,
       "coreBounds": {
         "minX": 3.999924864610902,
         "maxX": 33.999924864610904,
@@ -103,9 +165,26 @@
         "minY": -71.71822928494967,
         "maxY": -31.718229284949672
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 3.999924864610902,
+        "maxX": 33.999924864610904,
+        "minZ": -66.71822928494967,
+        "maxZ": -36.71822928494967
+      },
+      "viewerExpandedBounds": {
+        "minX": -1.000075135389098,
+        "maxX": 38.999924864610904,
+        "minZ": -71.71822928494967,
+        "maxZ": -31.718229284949672
+      },
       "tileIndex": {
         "x": 0,
         "y": 1
+      },
+      "viewerTileIndex": {
+        "x": 0,
+        "z": 1
       },
       "axes": "xy",
       "imageCount": 41,
@@ -118,8 +197,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y001.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y001.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x001_y001.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x001_y001/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y001.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y001.ply",
+      "splatBytes": 2826400,
+      "viewerSplatBytes": 23927826,
+      "viewerGaussianCount": 96477,
       "coreBounds": {
         "minX": 33.999924864610904,
         "maxX": 63.999924864610904,
@@ -132,9 +217,26 @@
         "minY": -71.71822928494967,
         "maxY": -31.718229284949672
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 33.999924864610904,
+        "maxX": 63.999924864610904,
+        "minZ": -66.71822928494967,
+        "maxZ": -36.71822928494967
+      },
+      "viewerExpandedBounds": {
+        "minX": 28.999924864610904,
+        "maxX": 68.9999248646109,
+        "minZ": -71.71822928494967,
+        "maxZ": -31.718229284949672
+      },
       "tileIndex": {
         "x": 1,
         "y": 1
+      },
+      "viewerTileIndex": {
+        "x": 1,
+        "z": 1
       },
       "axes": "xy",
       "imageCount": 88,
@@ -147,8 +249,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y000.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x001_y000.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x001_y000.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x001_y000/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y000.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x001_y000.ply",
+      "splatBytes": 1075840,
+      "viewerSplatBytes": 9124954,
+      "viewerGaussianCount": 36788,
       "coreBounds": {
         "minX": 33.999924864610904,
         "maxX": 63.999924864610904,
@@ -161,9 +269,26 @@
         "minY": -101.71822928494967,
         "maxY": -61.71822928494967
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 33.999924864610904,
+        "maxX": 63.999924864610904,
+        "minZ": -96.71822928494967,
+        "maxZ": -66.71822928494967
+      },
+      "viewerExpandedBounds": {
+        "minX": 28.999924864610904,
+        "maxX": 68.9999248646109,
+        "minZ": -101.71822928494967,
+        "maxZ": -61.71822928494967
+      },
       "tileIndex": {
         "x": 1,
         "y": 0
+      },
+      "viewerTileIndex": {
+        "x": 1,
+        "z": 0
       },
       "axes": "xy",
       "imageCount": 46,
@@ -176,8 +301,14 @@
       "status": "ready",
       "runStatus": "done",
       "splatUrl": "/splats/istanbul-bag6-pilot/tile_x002_y000.splat",
+      "viewerSplatUrl": "/splats/istanbul-bag6-pilot/tile_x002_y000.ply",
       "sourceSplat": "outputs/istanbul_bag6_large/splats/tile_x002_y000.splat",
+      "sourceViewerSplat": "outputs/istanbul_bag6_large/train/tile_x002_y000/point_cloud.ply",
       "publicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x002_y000.splat",
+      "viewerPublicPath": "apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/tile_x002_y000.ply",
+      "splatBytes": 1444864,
+      "viewerSplatBytes": 13568370,
+      "viewerGaussianCount": 54705,
       "coreBounds": {
         "minX": 63.999924864610904,
         "maxX": 93.9999248646109,
@@ -190,9 +321,26 @@
         "minY": -101.71822928494967,
         "maxY": -61.71822928494967
       },
+      "viewerAxes": "xz",
+      "viewerCoreBounds": {
+        "minX": 63.999924864610904,
+        "maxX": 93.9999248646109,
+        "minZ": -96.71822928494967,
+        "maxZ": -66.71822928494967
+      },
+      "viewerExpandedBounds": {
+        "minX": 58.999924864610904,
+        "maxX": 98.9999248646109,
+        "minZ": -101.71822928494967,
+        "maxZ": -61.71822928494967
+      },
       "tileIndex": {
         "x": 2,
         "y": 0
+      },
+      "viewerTileIndex": {
+        "x": 2,
+        "z": 0
       },
       "axes": "xy",
       "imageCount": 112,

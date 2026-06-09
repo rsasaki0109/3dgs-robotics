@@ -2529,9 +2529,12 @@ function resolveDynamicMapTileDepthStyle(zDepth, status) {
 }
 
 function readDynamicMapTileXzBounds(tile, boundsName = 'coreBounds') {
-  const bounds = tile?.[boundsName] && typeof tile[boundsName] === 'object'
-    ? tile[boundsName]
-    : {};
+  const viewerBoundsName = boundsName === 'coreBounds' ? 'viewerCoreBounds' : 'viewerExpandedBounds';
+  const bounds = tile?.[viewerBoundsName] && typeof tile[viewerBoundsName] === 'object'
+    ? tile[viewerBoundsName]
+    : tile?.[boundsName] && typeof tile[boundsName] === 'object'
+      ? tile[boundsName]
+      : {};
   const minX = Number(bounds.minX);
   const maxX = Number(bounds.maxX);
   const minZ = Number(bounds.minZ);
@@ -2554,7 +2557,7 @@ function resolveDynamicMapTileMapBounds(tileCatalog) {
     return null;
   }
 
-  const tilingBounds = tileCatalog.tiling?.worldBounds;
+  const tilingBounds = tileCatalog.tiling?.viewerWorldBounds ?? tileCatalog.tiling?.worldBounds;
   const explicitBounds = {
     minX: Number(tilingBounds?.minX),
     maxX: Number(tilingBounds?.maxX),
@@ -2583,6 +2586,40 @@ function resolveDynamicMapTileMapBounds(tileCatalog) {
     maxX: Math.max(...tileBounds.map((bounds) => bounds.maxX)),
     minZ: Math.min(...tileBounds.map((bounds) => bounds.minZ)),
     maxZ: Math.max(...tileBounds.map((bounds) => bounds.maxZ))
+  };
+}
+
+function buildDynamicMapOverviewPreset(tile) {
+  const bounds = readDynamicMapTileXzBounds(tile, 'expandedBounds') ??
+    readDynamicMapTileXzBounds(tile, 'coreBounds');
+
+  if (!bounds) {
+    return null;
+  }
+
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+  const spanX = bounds.maxX - bounds.minX;
+  const spanZ = bounds.maxZ - bounds.minZ;
+  const span = Math.max(spanX, spanZ, 12);
+  const height = Math.max(18, span * 0.9);
+  const distance = Math.max(20, span * 1.05);
+
+  return {
+    id: 'dynamic-map-overview',
+    label: 'Dynamic Map Overview',
+    position: [
+      Number(centerX.toFixed(3)),
+      Number(height.toFixed(3)),
+      Number((centerZ + distance).toFixed(3))
+    ],
+    rotation: [-58, 180, 0],
+    focusPoint: [
+      Number(centerX.toFixed(3)),
+      1.5,
+      Number(centerZ.toFixed(3))
+    ],
+    description: 'large-scale dynamic map overview'
   };
 }
 
@@ -3899,10 +3936,16 @@ export default function App() {
     ]
   );
 
+  const dynamicMapOverviewPreset = useMemo(
+    () => buildDynamicMapOverviewPreset(activeDynamicMapTile),
+    [activeDynamicMapTile]
+  );
   const currentPreset =
-    activeConfig.cameraPresets.find(
-      (preset) => preset.id === selectedPresetId
-    ) ?? activeConfig.cameraPresets[0];
+    mode !== 'robot' && cameraMode !== 'walk' && dynamicMapOverviewPreset
+      ? dynamicMapOverviewPreset
+      : activeConfig.cameraPresets.find(
+          (preset) => preset.id === selectedPresetId
+        ) ?? activeConfig.cameraPresets[0];
 
   const selectedRatio =
     activeConfig.photoRatios.find((ratio) => ratio.id === selectedRatioId) ??

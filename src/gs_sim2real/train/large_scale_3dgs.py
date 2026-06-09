@@ -6,6 +6,7 @@ import json
 import math
 import shutil
 import shlex
+import struct
 import subprocess
 import sys
 import time
@@ -2203,6 +2204,170 @@ def _run_report_done_ids(run_report: dict[str, Any] | None) -> set[str]:
     return {chunk["id"] for chunk in run_report.get("chunks", []) if chunk.get("status") in {"done", "skipped"}}
 
 
+def _chunk_viewer_splat_source(chunk: dict[str, Any]) -> Path | None:
+    """Return a PlayCanvas-readable Gaussian PLY for a chunk when training left one behind."""
+    train_output_dir = chunk.get("trainOutputDir")
+    if not train_output_dir:
+        return None
+
+    candidate = Path(str(train_output_dir)) / "point_cloud.ply"
+    return candidate if candidate.exists() else None
+
+
+_PLY_PROPERTY_SIZES = {
+    "char": 1,
+    "uchar": 1,
+    "int8": 1,
+    "uint8": 1,
+    "short": 2,
+    "ushort": 2,
+    "int16": 2,
+    "uint16": 2,
+    "int": 4,
+    "uint": 4,
+    "int32": 4,
+    "uint32": 4,
+    "float": 4,
+    "float32": 4,
+    "double": 8,
+    "float64": 8,
+}
+
+
+def _viewer_coordinate_axes(axes: tuple[str, str]) -> tuple[str, str, str]:
+    vertical_axes = [axis for axis in ("x", "y", "z") if axis not in axes]
+    vertical_axis = vertical_axes[0] if vertical_axes else "y"
+    return axes[0], vertical_axis, axes[1]
+
+
+def _viewer_bounds(bounds: dict[str, Any], axes: tuple[str, str]) -> dict[str, float]:
+    axis_a, axis_b = axes
+    return {
+        "minX": float(bounds[f"min{axis_a.upper()}"]),
+        "maxX": float(bounds[f"max{axis_a.upper()}"]),
+        "minZ": float(bounds[f"min{axis_b.upper()}"]),
+        "maxZ": float(bounds[f"max{axis_b.upper()}"]),
+    }
+
+
+def _viewer_tile_index(tile_index: dict[str, Any], axes: tuple[str, str]) -> dict[str, int]:
+    axis_a, axis_b = axes
+    return {
+        "x": int(tile_index[axis_a]),
+        "z": int(tile_index[axis_b]),
+    }
+
+
+def _ply_vertex_layout(header_lines: list[str]) -> tuple[int, dict[str, int], int]:
+    vertex_count = 0
+    in_vertex = False
+    property_offsets: dict[str, int] = {}
+    row_size = 0
+
+    for line in header_lines:
+        parts = line.split()
+        if not parts:
+            continue
+        if parts[:2] == ["element", "vertex"]:
+            vertex_count = int(parts[2])
+            in_vertex = True
+            row_size = 0
+            property_offsets = {}
+            continue
+        if parts[0] == "element" and in_vertex:
+            in_vertex = False
+            continue
+        if in_vertex and parts[0] == "property" and len(parts) >= 3 and parts[1] != "list":
+            property_type = parts[1].lower()
+            property_name = parts[2]
+            property_offsets[property_name] = row_size
+            row_size += _PLY_PROPERTY_SIZES[property_type]
+
+    return vertex_count, property_offsets, row_size
+
+
+def _ply_vertex_count(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        with path.open("rb") as f:
+            data = f.read(16384)
+    except OSError:
+        return 0
+    header_end = data.find(b"end_header\n")
+    if header_end >= 0:
+        data = data[:header_end]
+    try:
+        header_text = data.decode("ascii", errors="strict")
+    except UnicodeDecodeError:
+        return 0
+    for line in header_text.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[:2] == ["element", "vertex"]:
+            try:
+                return int(parts[2])
+            except ValueError:
+                return 0
+    return 0
+
+
+def _file_size(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def _write_viewer_splat_ply(source_path: Path, output_path: Path, axes: tuple[str, str], link_mode: str) -> None:
+    if axes == ("x", "z"):
+        _link_or_copy(source_path, output_path, link_mode)
+        return
+
+    data = bytearray(source_path.read_bytes())
+    header_end = data.find(b"end_header\n")
+    if header_end < 0:
+        _link_or_copy(source_path, output_path, "copy")
+        return
+
+    header_size = header_end + len(b"end_header\n")
+    header_text = bytes(data[:header_size]).decode("ascii", errors="strict")
+    header_lines = header_text.splitlines()
+    if "format binary_little_endian 1.0" not in header_lines:
+        _link_or_copy(source_path, output_path, "copy")
+        return
+
+    vertex_count, property_offsets, row_size = _ply_vertex_layout(header_lines)
+    if not vertex_count or not row_size or not all(axis in property_offsets for axis in ("x", "y", "z")):
+        _link_or_copy(source_path, output_path, "copy")
+        return
+
+    viewer_x_axis, viewer_y_axis, viewer_z_axis = _viewer_coordinate_axes(axes)
+    source_offsets = {
+        "x": property_offsets[viewer_x_axis],
+        "y": property_offsets[viewer_y_axis],
+        "z": property_offsets[viewer_z_axis],
+    }
+    target_offsets = {axis: property_offsets[axis] for axis in ("x", "y", "z")}
+    expected_size = header_size + vertex_count * row_size
+    if expected_size > len(data):
+        _link_or_copy(source_path, output_path, "copy")
+        return
+
+    for vertex_index in range(vertex_count):
+        row_offset = header_size + vertex_index * row_size
+        values = {
+            axis: struct.unpack_from("<f", data, row_offset + source_offsets[axis])[0]
+            for axis in ("x", "y", "z")
+        }
+        for axis, value in values.items():
+            struct.pack_into("<f", data, row_offset + target_offsets[axis], value)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(data)
+
+
 def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dict[str, Any]:
     """Build a web-facing tile catalog from a large-scale 3DGS plan."""
     plan = load_large_scale_3dgs_plan(Path(options.plan_path))
@@ -2217,13 +2382,18 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
         if chunk.get("status") != "ready":
             continue
 
+        chunk_axes = _validate_axes(str(chunk.get("axes") or plan["tiling"].get("axes") or "xz"))
         source_splat = Path(chunk["splatOutput"])
         has_splat = source_splat.exists()
+        source_viewer_splat = _chunk_viewer_splat_source(chunk)
+        has_viewer_splat = source_viewer_splat is not None and source_viewer_splat.exists()
         if options.require_splats and not has_splat:
             continue
 
         public_url = str(source_splat)
         public_path = None
+        viewer_public_url = str(source_viewer_splat) if source_viewer_splat is not None else ""
+        viewer_public_path = None
         if options.public_root is not None:
             public_path = (
                 Path(options.public_root) / options.public_url_prefix.strip("/") / scene_id / source_splat.name
@@ -2231,6 +2401,31 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
             if has_splat:
                 _link_or_copy(source_splat, public_path, options.link_mode)
             public_url = _join_public_url(options.public_url_prefix, scene_id, source_splat.name)
+            if has_viewer_splat and source_viewer_splat is not None:
+                viewer_public_path = (
+                    Path(options.public_root)
+                    / options.public_url_prefix.strip("/")
+                    / scene_id
+                    / f"{chunk['id']}.ply"
+                )
+                _write_viewer_splat_ply(
+                    source_viewer_splat,
+                    viewer_public_path,
+                    chunk_axes,
+                    options.link_mode,
+                )
+                viewer_public_url = _join_public_url(
+                    options.public_url_prefix,
+                    scene_id,
+                    f"{chunk['id']}.ply",
+                )
+        public_splat_path = public_path if public_path is not None else source_splat
+        public_viewer_splat_path = (
+            viewer_public_path if viewer_public_path is not None else source_viewer_splat
+        )
+        splat_bytes = _file_size(public_splat_path) if has_splat else 0
+        viewer_splat_bytes = _file_size(public_viewer_splat_path) if has_viewer_splat else 0
+        viewer_gaussian_count = _ply_vertex_count(public_viewer_splat_path) if has_viewer_splat else 0
 
         tiles.append(
             {
@@ -2239,11 +2434,21 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
                 "status": "ready" if has_splat else "missing-splat",
                 "runStatus": "done" if chunk["id"] in done_ids else "unknown",
                 "splatUrl": public_url,
+                "viewerSplatUrl": viewer_public_url if has_viewer_splat else "",
                 "sourceSplat": str(source_splat),
+                "sourceViewerSplat": str(source_viewer_splat) if source_viewer_splat is not None else "",
                 "publicPath": str(public_path) if public_path is not None else "",
+                "viewerPublicPath": str(viewer_public_path) if viewer_public_path is not None else "",
+                "splatBytes": splat_bytes,
+                "viewerSplatBytes": viewer_splat_bytes,
+                "viewerGaussianCount": viewer_gaussian_count,
                 "coreBounds": chunk["coreBounds"],
                 "expandedBounds": chunk["expandedBounds"],
+                "viewerAxes": "xz",
+                "viewerCoreBounds": _viewer_bounds(chunk["coreBounds"], chunk_axes),
+                "viewerExpandedBounds": _viewer_bounds(chunk["expandedBounds"], chunk_axes),
                 "tileIndex": chunk["tileIndex"],
+                "viewerTileIndex": _viewer_tile_index(chunk["tileIndex"], chunk_axes),
                 "axes": chunk["axes"],
                 "imageCount": chunk["imageCount"],
                 "coreImageCount": chunk["coreImageCount"],
@@ -2259,11 +2464,18 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
         "label": options.label,
         "planPath": str(options.plan_path),
         "runReportPath": str(options.run_report_path) if options.run_report_path else "",
-        "tiling": plan["tiling"],
+        "tiling": {
+            **plan["tiling"],
+            "viewerAxes": "xz",
+            "viewerWorldBounds": _viewer_bounds(plan["tiling"]["worldBounds"], _validate_axes(plan["tiling"]["axes"])),
+        },
         "summary": {
             "tileCount": len(tiles),
             "readyTileCount": sum(1 for tile in tiles if tile["status"] == "ready"),
             "missingSplatTileCount": sum(1 for tile in tiles if tile["status"] == "missing-splat"),
+            "splatBytes": sum(int(tile.get("splatBytes") or 0) for tile in tiles),
+            "viewerSplatBytes": sum(int(tile.get("viewerSplatBytes") or 0) for tile in tiles),
+            "viewerGaussianCount": sum(int(tile.get("viewerGaussianCount") or 0) for tile in tiles),
         },
         "tiles": tiles,
     }
@@ -2283,10 +2495,10 @@ def write_large_scale_3dgs_catalog(catalog: dict[str, Any], options: LargeScale3
 
 def _catalog_route_axes(catalog: dict[str, Any]) -> tuple[str, str]:
     tiling = catalog.get("tiling") if isinstance(catalog.get("tiling"), dict) else {}
-    axes = str(tiling.get("axes") or "").strip().lower()
+    axes = str(tiling.get("viewerAxes") or tiling.get("axes") or "").strip().lower()
     if not axes:
         for tile in catalog.get("tiles", []):
-            axes = str(tile.get("axes") or "").strip().lower()
+            axes = str(tile.get("viewerAxes") or tile.get("axes") or "").strip().lower()
             if axes:
                 break
     return _validate_axes(axes or "xz")
@@ -2310,7 +2522,7 @@ def _ready_catalog_route_tiles(catalog: dict[str, Any], *, include_missing_splat
 def _tile_axis_center(tile: dict[str, Any], axis: str) -> float:
     min_key = f"min{axis.upper()}"
     max_key = f"max{axis.upper()}"
-    for bounds_key in ("coreBounds", "expandedBounds"):
+    for bounds_key in ("viewerCoreBounds", "coreBounds", "viewerExpandedBounds", "expandedBounds"):
         bounds = tile.get(bounds_key)
         if not isinstance(bounds, dict):
             continue
@@ -2329,7 +2541,7 @@ def _tile_center_position(tile: dict[str, Any], axes: tuple[str, str], *, defaul
 
 
 def _tile_index_pair(tile: dict[str, Any], axes: tuple[str, str]) -> tuple[int, int] | None:
-    tile_index = tile.get("tileIndex")
+    tile_index = tile.get("viewerTileIndex") if isinstance(tile.get("viewerTileIndex"), dict) else tile.get("tileIndex")
     if not isinstance(tile_index, dict):
         return None
 
@@ -2814,6 +3026,12 @@ def build_large_scale_3dgs_promotion(options: LargeScale3DGSPromoteOptions) -> d
             "missingSplatTileCount": summary["missingSplatTileCount"],
             "routePointCount": len(route.get("route", [])) if route is not None else 0,
             "publicSplatCount": sum(1 for tile in catalog["tiles"] if tile.get("publicPath")),
+            "publicViewerSplatCount": sum(
+                1 for tile in catalog["tiles"] if tile.get("viewerPublicPath")
+            ),
+            "publicSplatBytes": summary.get("splatBytes", 0),
+            "publicViewerSplatBytes": summary.get("viewerSplatBytes", 0),
+            "publicViewerGaussianCount": summary.get("viewerGaussianCount", 0),
         },
         "next": {
             "catalogPath": str(written_catalog_path),
@@ -2847,6 +3065,13 @@ def format_large_scale_3dgs_promotion_text(report: dict[str, Any], report_path: 
         f"  catalog: {report['catalogPath']}",
         f"  tiles: {summary['readyTileCount']} ready / {summary['tileCount']} total",
     ]
+    if summary.get("publicViewerSplatCount"):
+        lines.append(
+            "  viewer splats: "
+            f"{summary['publicViewerSplatCount']} PLY / "
+            f"{summary.get('publicViewerGaussianCount', 0):,} Gaussians / "
+            f"{_format_bytes(summary.get('publicViewerSplatBytes', 0))}"
+        )
     if report.get("routePath"):
         lines.append(f"  route: {report['routePath']}")
         lines.append(f"  route points: {summary['routePointCount']}")
