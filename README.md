@@ -110,7 +110,15 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 
 An Istanbul `rosbag2` capture is also staged as a real-input 3DGS pilot:
 291 registered camera frames, GNSS-seeded poses, 100,000 sparse seed points,
-6 ready XY tiles, and 6 browser `.splat` files.
+6 trained XY source tiles, 6 browser `.splat` files, and 6 transformed viewer
+PLY tiles for the Dynamic Map Viewer.
+
+[![Istanbul Bag6 Dynamic Map Viewer](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif)](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif)
+
+[`large-scale-3dgs-result.png`](docs/images/istanbul-bag6-pilot/large-scale-3dgs-result.png)
+is the full-resolution result still, and
+[`dynamic-map-viewer-still.png`](docs/images/istanbul-bag6-pilot/dynamic-map-viewer-still.png)
+is the static poster frame for the GIF.
 
 Open the hosted Dynamic Map Viewer pilot:
 
@@ -125,6 +133,8 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 | Source capture | Istanbul rosbag2, 20.2 s, 3 camera topics, LiDAR, GNSS, TF, IMU |
 | Ready tiles | 6 / 6 ready tiles, 0 missing |
 | Tile bytes | 12.5 MB total across 6 browser tile `.splat` files |
+| Viewer PLY assets | 438,796 Gaussians / 103.8 MiB across 6 transformed viewer tiles |
+| Result media | [`dynamic-map-viewer.gif`](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif), [`large-scale-3dgs-result.png`](docs/images/istanbul-bag6-pilot/large-scale-3dgs-result.png) |
 | Pipeline | `preprocess --method mcd` -> GNSS-seeded COLMAP sparse -> `large-scale-3dgs-run` -> Dynamic Map Viewer promotion |
 
 Run it locally:

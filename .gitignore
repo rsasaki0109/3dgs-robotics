@@ -88,6 +88,7 @@ cache/
 *.pcd
 *.las
 *.laz
+!apps/dreamwalker-web/public/splats/istanbul-bag6-pilot/*.ply
 !docs/assets/**/*.splat
 
 # OS
@@ -102,4 +103,3 @@ apps/**/coverage/
 # Personal consultation / handoff scratchpads (point-in-time snapshots;
 # source of truth is docs/plan_outdoor_gs.md)
 /*_handoff.md
-

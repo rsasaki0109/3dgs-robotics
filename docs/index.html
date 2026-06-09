@@ -7,13 +7,13 @@
 <meta name="description" content="GS Mapper turns real outdoor robot logs into browser-ready large-scale 3DGS dynamic maps, route-driven tile loading demos, scene contracts, and CI review bundles.">
 <link rel="canonical" href="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
-<meta property="og:description" content="Open the hosted Dynamic Map Viewer with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
+<meta property="og:description" content="Open the hosted Dynamic Map Viewer with real rosbag2 3DGS tiles, an 87-tile regional mosaic, route playback, and live dynamic-map loading.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="GS Mapper - Large-scale 3DGS dynamic maps">
-<meta name="twitter:description" content="Open the hosted Dynamic Map Viewer with 34 browser-ready Gaussian-splat tiles, route playback, and live dynamic-map loading.">
+<meta name="twitter:description" content="Open the hosted Dynamic Map Viewer with real rosbag2 3DGS tiles, an 87-tile regional mosaic, route playback, and live dynamic-map loading.">
 <meta name="twitter:image" content="https://rsasaki0109.github.io/gs-mapper/images/social-card.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1419,7 +1419,7 @@ footer a:hover { text-decoration: underline; }
   <div class="dynamic-map-inner">
     <div class="dynamic-map-layout">
       <div class="dynamic-map-media">
-        <img src="images/demo-sweep/dynamic-map-material.png" alt="Rendered large-scale dynamic map material with resident and preload tile coverage">
+        <img src="images/istanbul-bag6-pilot/dynamic-map-viewer.gif" alt="Istanbul Bag6 real rosbag2 3DGS Dynamic Map Viewer result with active and resident tile loading">
         <div class="dynamic-map-caption">
           <span>white: splat footprint</span>
           <span>green: resident</span>
@@ -1428,25 +1428,26 @@ footer a:hover { text-decoration: underline; }
       </div>
       <div class="dynamic-map-copy">
         <div class="hero-kicker">Hosted result</div>
-        <h2>Large-scale 3DGS, served as a live dynamic map.</h2>
-        <p>The Pages demo now ships the Dynamic Map Viewer app plus its public assets through the static GitHub Pages build. The route playback loads the catalog, resolves tile URLs, checks splat metadata, and swaps active/preload tiles from static GitHub Pages files.</p>
+        <h2>Real rosbag2 3DGS, served as a live dynamic map.</h2>
+        <p>The Pages demo now ships the Dynamic Map Viewer app plus its public assets through the static GitHub Pages build. The Istanbul pilot promotes trained 3DGS chunks into viewer PLY tiles, then route playback loads active, resident, and preload map tiles from static files.</p>
         <div class="dynamic-map-stats">
-          <div class="dynamic-map-stat"><span>Ready tiles</span><strong>87 / 87</strong></div>
-          <div class="dynamic-map-stat"><span>Composite input</span><strong>1.75M splats</strong></div>
-          <div class="dynamic-map-stat"><span>Tiled output</span><strong>2.70M splats</strong></div>
-          <div class="dynamic-map-stat"><span>Tile payload</span><strong>86.3 MB</strong></div>
+          <div class="dynamic-map-stat"><span>Istanbul tiles</span><strong>6 / 6</strong></div>
+          <div class="dynamic-map-stat"><span>Viewer Gaussians</span><strong>438,796</strong></div>
+          <div class="dynamic-map-stat"><span>Viewer payload</span><strong>103.8 MiB</strong></div>
+          <div class="dynamic-map-stat"><span>Regional mosaic</span><strong>87 tiles</strong></div>
         </div>
         <div class="dynamic-map-pilot">
           <div>
             <span>Real log pilot</span>
-            <h3>Stage trained route chunks directly into the Dynamic Map Viewer.</h3>
+            <h3>Istanbul Bag6 route chunks load directly in the Dynamic Map Viewer.</h3>
           </div>
-          <code>gs-mapper large-scale-3dgs-promote --plan outputs/autoware_large/large_scale_3dgs_plan.json --public-root apps/dreamwalker-web/public</code>
+          <code>gs-mapper large-scale-3dgs-promote --plan outputs/istanbul_bag6_large/large_scale_3dgs_pilot_plan.json --public-root apps/dreamwalker-web/public</code>
         </div>
         <div class="dynamic-map-actions">
-          <a class="dynamic-map-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open hosted map &rarr;</a>
-          <a class="dynamic-map-action" href="dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json">View tile catalog &rarr;</a>
-          <a class="dynamic-map-action" href="images/demo-sweep/map-quality.gif">Open result GIF &rarr;</a>
+          <a class="dynamic-map-action primary" href="dreamwalker/?tileCatalog=%2Fmanifests%2Fistanbul-bag6-pilot-tile-catalog.json&amp;tilePreload=metadata&amp;robotRoute=%2Frobot-routes%2Fistanbul-bag6-pilot-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open Istanbul map &rarr;</a>
+          <a class="dynamic-map-action" href="dreamwalker/manifests/istanbul-bag6-pilot-tile-catalog.json">View Istanbul catalog &rarr;</a>
+          <a class="dynamic-map-action" href="images/istanbul-bag6-pilot/large-scale-3dgs-result.png">Open result still &rarr;</a>
+          <a class="dynamic-map-action" href="dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&amp;tilePreload=metadata&amp;tilePreloadLimit=4&amp;tileResidentLimit=6&amp;robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&amp;robotRoutePlayback=1&amp;robotRoutePlaybackMs=1200&amp;robotRoutePlaybackLoop=1">Open 87-tile map &rarr;</a>
         </div>
       </div>
     </div>

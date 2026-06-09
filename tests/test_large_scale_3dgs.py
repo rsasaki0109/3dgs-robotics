@@ -627,6 +627,9 @@ def test_build_large_scale_3dgs_catalog_copies_ready_splats_to_public_root(tmp_p
     first_splat = Path(first_chunk["splatOutput"])
     first_splat.parent.mkdir(parents=True, exist_ok=True)
     first_splat.write_bytes(b"splat")
+    first_viewer_splat = Path(first_chunk["trainOutputDir"]) / "point_cloud.ply"
+    first_viewer_splat.parent.mkdir(parents=True, exist_ok=True)
+    first_viewer_splat.write_bytes(b"ply")
     plan_path = write_large_scale_3dgs_plan(plan, output_dir)
     run_report_path = output_dir / "large_scale_3dgs_run_report.json"
     run_report_path.write_text(
@@ -659,13 +662,21 @@ def test_build_large_scale_3dgs_catalog_copies_ready_splats_to_public_root(tmp_p
         "tileCount": 2,
         "readyTileCount": 1,
         "missingSplatTileCount": 1,
+        "splatBytes": 5,
+        "viewerSplatBytes": 3,
+        "viewerGaussianCount": 0,
     }
     assert catalog_path == tmp_path / "catalog.json"
     assert json.loads(catalog_path.read_text(encoding="utf-8"))["sceneId"] == "demo-scene-01"
     assert catalog["tiles"][0]["runStatus"] == "done"
     assert catalog["tiles"][0]["status"] == "ready"
     assert catalog["tiles"][0]["splatUrl"] == "/assets/splats/demo-scene-01/tile_x000_y000.splat"
+    assert catalog["tiles"][0]["viewerSplatUrl"] == "/assets/splats/demo-scene-01/tile_x000_y000.ply"
     assert Path(catalog["tiles"][0]["publicPath"]).read_bytes() == b"splat"
+    assert Path(catalog["tiles"][0]["viewerPublicPath"]).read_bytes() == b"ply"
+    assert catalog["tiles"][0]["splatBytes"] == 5
+    assert catalog["tiles"][0]["viewerSplatBytes"] == 3
+    assert catalog["tiles"][0]["viewerGaussianCount"] == 0
     assert catalog["tiles"][1]["status"] == "missing-splat"
 
 
@@ -719,6 +730,9 @@ def test_build_large_scale_3dgs_promotion_writes_dynamic_map_assets_from_bootstr
         splat_path = Path(chunk["splatOutput"])
         splat_path.parent.mkdir(parents=True, exist_ok=True)
         splat_path.write_bytes(f"splat:{chunk['id']}".encode("utf-8"))
+        viewer_splat_path = Path(chunk["trainOutputDir"]) / "point_cloud.ply"
+        viewer_splat_path.parent.mkdir(parents=True, exist_ok=True)
+        viewer_splat_path.write_bytes(f"ply:{chunk['id']}".encode("utf-8"))
 
     plan_path = write_large_scale_3dgs_plan(plan, output_dir)
     run_report_path = output_dir / "large_scale_3dgs_run_report.json"
@@ -764,10 +778,16 @@ def test_build_large_scale_3dgs_promotion_writes_dynamic_map_assets_from_bootstr
     assert report["source"]["planPath"] == str(plan_path)
     assert report["summary"]["readyTileCount"] == 2
     assert report["summary"]["publicSplatCount"] == 2
+    assert report["summary"]["publicViewerSplatCount"] == 2
+    assert report["summary"]["publicSplatBytes"] > 0
+    assert report["summary"]["publicViewerSplatBytes"] > 0
+    assert report["summary"]["publicViewerGaussianCount"] == 0
     assert catalog["sceneId"] == "demo-large"
     assert catalog["summary"]["missingSplatTileCount"] == 0
+    assert catalog["summary"]["viewerSplatBytes"] == report["summary"]["publicViewerSplatBytes"]
     assert catalog["tiles"][0]["runStatus"] == "done"
     assert Path(catalog["tiles"][0]["publicPath"]).read_bytes().startswith(b"splat:")
+    assert Path(catalog["tiles"][0]["viewerPublicPath"]).read_bytes().startswith(b"ply:")
     assert route["sourceCatalog"]["sceneId"] == "demo-large"
     assert route["sourceCatalog"]["order"] == "row-major"
     assert len(route["route"]) == 2
@@ -776,6 +796,7 @@ def test_build_large_scale_3dgs_promotion_writes_dynamic_map_assets_from_bootstr
     assert "robotRoutePlayback=1" in report["next"]["launchUrl"]
     assert "Large-scale 3DGS Dynamic Map promotion" in text
     assert "status: viewer-ready" in text
+    assert "viewer splats: 2 PLY / 0 Gaussians" in text
 
 
 def _write_grid_catalog_fixture(catalog_path: Path) -> None:

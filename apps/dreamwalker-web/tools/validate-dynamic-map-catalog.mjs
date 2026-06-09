@@ -216,6 +216,17 @@ function catalogAxes(catalog) {
   return inferTileAxes(tileWithAxes);
 }
 
+function catalogRouteAxes(catalog, fallbackAxes) {
+  const tilingViewerAxes = normalizeAxes(catalog?.tiling?.viewerAxes);
+  if (tilingViewerAxes.length >= 2) {
+    return tilingViewerAxes;
+  }
+
+  const tileWithViewerAxes = catalog?.tiles?.find((tile) => normalizeAxes(tile?.viewerAxes).length >= 2);
+  const tileViewerAxes = normalizeAxes(tileWithViewerAxes?.viewerAxes);
+  return tileViewerAxes.length >= 2 ? tileViewerAxes : fallbackAxes;
+}
+
 function readAxisRange(boundsLike, axis) {
   const bounds = boundsLike && typeof boundsLike === 'object' ? boundsLike : {};
   const upperAxis = axis.toUpperCase();
@@ -234,6 +245,11 @@ function readTileRanges(tile, boundsName, axes) {
   return Object.fromEntries(
     axes.map((axis) => [axis, readAxisRange(tile?.[boundsName], axis)])
   );
+}
+
+function readFirstValidTileRanges(tile, boundsNames, axes) {
+  const results = boundsNames.map((boundsName) => readTileRanges(tile, boundsName, axes));
+  return results.find((ranges) => areRangesValid(ranges, axes)) ?? results[0];
 }
 
 function areRangesValid(ranges, axes) {
@@ -303,14 +319,14 @@ function isPositionInsideRanges(position, ranges, axes) {
 
 function selectReadyTileForRoutePosition(readyTiles, position, axes) {
   const coreMatches = readyTiles.filter((tile) =>
-    isPositionInsideRanges(position, readTileRanges(tile, 'coreBounds', axes), axes)
+    isPositionInsideRanges(position, readFirstValidTileRanges(tile, ['viewerCoreBounds', 'coreBounds'], axes), axes)
   );
   if (coreMatches.length > 0) {
     return coreMatches[0];
   }
 
   const expandedMatches = readyTiles.filter((tile) =>
-    isPositionInsideRanges(position, readTileRanges(tile, 'expandedBounds', axes), axes)
+    isPositionInsideRanges(position, readFirstValidTileRanges(tile, ['viewerExpandedBounds', 'expandedBounds'], axes), axes)
   );
   return expandedMatches[0] ?? null;
 }
@@ -734,6 +750,29 @@ export async function validateDynamicMapCatalog(catalogInput, options = {}) {
   const boundsResults = [];
   const boundsByTileId = new Map();
 
+  async function validateLocalAssetUrl(scope, url, label) {
+    if (isRemoteUrl(url)) {
+      findings.push(createFinding('WARN', scope, `remote ${label} not checked: ${url}`));
+      return;
+    }
+
+    if (!isLocalPublicUrl(url)) {
+      findings.push(createFinding('WARN', scope, `${label} is not a public URL: ${url}`));
+      return;
+    }
+
+    if (!url.startsWith('/splats/')) {
+      findings.push(createFinding('WARN', scope, `local ${label} is outside /splats: ${url}`));
+    }
+
+    const assetPath = toPublicFilePath(publicRoot, url);
+    if (await fileExists(assetPath)) {
+      findings.push(createFinding('OK', scope, `${url} -> ${assetPath}`));
+    } else {
+      findings.push(createFinding('ERROR', scope, `missing local ${label}: ${url} -> ${assetPath}`));
+    }
+  }
+
   for (const tile of catalog.tiles) {
     const scope = `tile:${tile.id}`;
     const isReadyTile = Boolean(tile.splatUrl) && tile.status !== 'missing-splat';
@@ -777,25 +816,10 @@ export async function validateDynamicMapCatalog(catalogInput, options = {}) {
       indexedTiles.push(indexedTile);
     }
 
-    if (isRemoteUrl(tile.splatUrl)) {
-      findings.push(createFinding('WARN', scope, `remote splat not checked: ${tile.splatUrl}`));
-      continue;
-    }
+    await validateLocalAssetUrl(scope, tile.splatUrl, 'splatUrl');
 
-    if (!isLocalPublicUrl(tile.splatUrl)) {
-      findings.push(createFinding('WARN', scope, `splatUrl is not a public URL: ${tile.splatUrl}`));
-      continue;
-    }
-
-    if (!tile.splatUrl.startsWith('/splats/')) {
-      findings.push(createFinding('WARN', scope, `local splatUrl is outside /splats: ${tile.splatUrl}`));
-    }
-
-    const splatPath = toPublicFilePath(publicRoot, tile.splatUrl);
-    if (await fileExists(splatPath)) {
-      findings.push(createFinding('OK', scope, `${tile.splatUrl} -> ${splatPath}`));
-    } else {
-      findings.push(createFinding('ERROR', scope, `missing local splat: ${tile.splatUrl} -> ${splatPath}`));
+    if (tile.viewerSplatUrl) {
+      await validateLocalAssetUrl(scope, tile.viewerSplatUrl, 'viewerSplatUrl');
     }
   }
 
@@ -814,7 +838,7 @@ export async function validateDynamicMapCatalog(catalogInput, options = {}) {
   const routeValidation = await validateRouteAgainstCatalog(
     options.routeInput ?? options.route,
     catalog,
-    axes,
+    catalogRouteAxes(catalog, axes),
     findings,
     { publicRoot }
   );
