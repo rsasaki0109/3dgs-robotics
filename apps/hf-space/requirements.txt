@@ -1,0 +1,26 @@
+# GS Mapper zero-install demo — Hugging Face Space dependencies.
+# gsplat ships prebuilt CUDA wheels per torch/CUDA combo; keep the index in
+# sync with the pinned torch below (see https://docs.gsplat.studio/whl).
+--extra-index-url https://docs.gsplat.studio/whl/pt25cu121
+torch==2.5.1
+torchvision==0.20.1
+gsplat==1.4.0
+
+gradio>=5.0
+spaces
+
+# gs-mapper itself (pulls numpy/opencv/Pillow/tqdm/pyyaml/...)
+gs-mapper @ git+https://github.com/rsasaki0109/gs-mapper.git@main
+
+# DUSt3R runtime deps (the clone happens at app startup)
+numpy==1.26.4
+opencv-python-headless
+roma
+einops
+scipy
+trimesh
+safetensors
+huggingface-hub
+
+# allow gsplat to JIT-compile if no prebuilt wheel matches the runtime
+ninja

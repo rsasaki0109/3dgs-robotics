@@ -1,0 +1,42 @@
+name: Sync HF Space
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/hf-space/**"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Push apps/hf-space to the Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID || 'rsasaki0109/gs-mapper' }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "HF_TOKEN secret not configured; skipping sync."
+            exit 0
+          fi
+          pip install -q "huggingface_hub>=0.26"
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space_id = os.environ["HF_SPACE_ID"]
+          api.create_repo(space_id, repo_type="space", space_sdk="gradio", exist_ok=True)
+          api.upload_folder(
+              folder_path="apps/hf-space",
+              repo_id=space_id,
+              repo_type="space",
+              commit_message=f"Sync from gs-mapper@{os.environ.get('GITHUB_SHA', 'manual')[:12]}",
+          )
+          print(f"Synced to https://huggingface.co/spaces/{space_id}")
+          EOF
