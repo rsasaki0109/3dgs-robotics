@@ -16,6 +16,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from gs_sim2real.datasets import rosbag_frames
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,20 +66,8 @@ def _apply_antenna_offset_base_link(
 class MCDLoader:
     """Load and process MCD rosbag recordings for 3DGS reconstruction."""
 
-    IMAGE_MSGTYPES = frozenset(
-        {
-            "sensor_msgs/msg/Image",
-            "sensor_msgs/Image",
-            "sensor_msgs/msg/CompressedImage",
-            "sensor_msgs/CompressedImage",
-        }
-    )
-    COMPRESSED_IMAGE_MSGTYPES = frozenset(
-        {
-            "sensor_msgs/msg/CompressedImage",
-            "sensor_msgs/CompressedImage",
-        }
-    )
+    IMAGE_MSGTYPES = rosbag_frames.IMAGE_MSGTYPES
+    COMPRESSED_IMAGE_MSGTYPES = rosbag_frames.COMPRESSED_IMAGE_MSGTYPES
     POINTCLOUD_MSGTYPES = frozenset(
         {
             "sensor_msgs/msg/PointCloud2",
@@ -1222,54 +1212,22 @@ class MCDLoader:
     @staticmethod
     def _get_anyreader():
         """Return the rosbags AnyReader class."""
-        from rosbags.highlevel import AnyReader
-
-        return AnyReader
+        return rosbag_frames.get_anyreader()
 
     @classmethod
     def _create_reader(cls, reader_cls: type[Any], bag_paths: list[Path]):
         """Instantiate AnyReader with a default typestore for bags lacking definitions."""
-        kwargs = cls._get_reader_kwargs(bag_paths)
-        if not kwargs:
-            return reader_cls(bag_paths)
-        try:
-            return reader_cls(bag_paths, **kwargs)
-        except TypeError as exc:
-            if "default_typestore" not in str(exc):
-                raise
-            return reader_cls(bag_paths)
+        return rosbag_frames.create_reader(reader_cls, bag_paths)
 
     @staticmethod
     def _get_reader_kwargs(bag_paths: list[Path]) -> dict[str, Any]:
         """Build AnyReader kwargs based on rosbag format."""
-        if not bag_paths:
-            return {}
-
-        try:
-            from rosbags.typesys import Stores, get_typestore
-        except ImportError:
-            return {}
-
-        if any(path.suffix == ".bag" for path in bag_paths):
-            return {"default_typestore": get_typestore(Stores.ROS1_NOETIC)}
-        if any(path.is_dir() for path in bag_paths):
-            return {"default_typestore": get_typestore(Stores.ROS2_HUMBLE)}
-        return {}
+        return rosbag_frames.reader_kwargs(bag_paths)
 
     @staticmethod
     def _find_bag_paths(data_dir: Path) -> list[Path]:
         """Find rosbag1 files or rosbag2 directories under the input path."""
-        if data_dir.is_file() and data_dir.suffix == ".bag":
-            return [data_dir]
-        if data_dir.is_file() and data_dir.suffix == ".db3" and (data_dir.parent / "metadata.yaml").exists():
-            return [data_dir.parent]
-        if data_dir.is_dir() and (data_dir / "metadata.yaml").exists():
-            return [data_dir]
-        if data_dir.is_dir():
-            bag1_paths = sorted(data_dir.rglob("*.bag"))
-            bag2_dirs = sorted({path.parent for path in data_dir.rglob("metadata.yaml")})
-            return bag2_dirs or bag1_paths
-        return []
+        return rosbag_frames.find_bag_paths(data_dir)
 
     def _load_pre_extracted(self, output_dir: Path, max_frames: int) -> str:
         """Load pre-extracted images from ``images/`` or the dataset root."""
@@ -1330,114 +1288,34 @@ class MCDLoader:
         allowed_msgtypes: frozenset[str],
     ):
         """Pick the first matching connection for the requested or preferred topics."""
-        if requested_topic:
-            info = topics.get(requested_topic)
-            if info is None:
-                raise ValueError(f"Requested topic not found: {requested_topic}")
-            for connection in info.connections:
-                if connection.msgtype in allowed_msgtypes:
-                    return connection
-            raise ValueError(f"Requested topic {requested_topic} has unsupported type(s).")
+        return rosbag_frames.select_connection(topics, requested_topic, preferred_topics, allowed_msgtypes)
 
-        for topic_name in preferred_topics:
-            info = topics.get(topic_name)
-            if info is None:
-                continue
-            for connection in info.connections:
-                if connection.msgtype in allowed_msgtypes:
-                    return connection
-
-        for info in topics.values():
-            for connection in info.connections:
-                if connection.msgtype in allowed_msgtypes:
-                    return connection
-        return None
-
-    @classmethod
+    @staticmethod
     def _select_connections(
-        cls,
         topics: dict[str, Any],
         requested_topics: list[str] | None,
         preferred_topics: tuple[str, ...],
         allowed_msgtypes: frozenset[str],
     ) -> list[Any]:
         """Pick one or more matching connections."""
-        if requested_topics:
-            selected = []
-            for requested_topic in requested_topics:
-                connection = cls._select_connection(
-                    topics,
-                    requested_topic=requested_topic,
-                    preferred_topics=preferred_topics,
-                    allowed_msgtypes=allowed_msgtypes,
-                )
-                if connection is None:
-                    raise ValueError(f"Requested topic not found: {requested_topic}")
-                selected.append(connection)
-            return selected
-
-        connection = cls._select_connection(
-            topics,
-            requested_topic=None,
-            preferred_topics=preferred_topics,
-            allowed_msgtypes=allowed_msgtypes,
-        )
-        return [] if connection is None else [connection]
+        return rosbag_frames.select_connections(topics, requested_topics, preferred_topics, allowed_msgtypes)
 
     @staticmethod
     def _normalize_requested_topics(
         requested_topic: str | list[str] | tuple[str, ...] | None,
     ) -> list[str] | None:
         """Normalize a requested topic argument into a list."""
-        if requested_topic is None:
-            return None
-        if isinstance(requested_topic, (list, tuple)):
-            topics = [str(topic).strip() for topic in requested_topic if str(topic).strip()]
-            return topics or None
-        topics = [topic.strip() for topic in str(requested_topic).split(",") if topic.strip()]
-        return topics or None
+        return rosbag_frames.normalize_requested_topics(requested_topic)
 
     @staticmethod
     def _sanitize_topic_name(topic_name: str) -> str:
         """Convert a ROS topic name into a filesystem-friendly folder label."""
-        parts = [part for part in topic_name.split("/") if part]
-        if not parts:
-            return "images"
-        return "__".join(parts)
+        return rosbag_frames.sanitize_topic_name(topic_name)
 
     @classmethod
     def _decode_image_message(cls, msg: Any, msgtype: str) -> tuple[np.ndarray | None, str]:
         """Decode a ROS image message into an OpenCV image."""
-        if msgtype in cls.COMPRESSED_IMAGE_MSGTYPES:
-            img = cv2.imdecode(np.frombuffer(bytes(msg.data), dtype=np.uint8), cv2.IMREAD_UNCHANGED)
-            if img is None:
-                return None, ".jpg"
-            if img.ndim == 2:
-                return img, ".png"
-            return img, ".jpg"
-
-        encoding = str(getattr(msg, "encoding", "")).lower()
-        height = int(msg.height)
-        width = int(msg.width)
-        step = int(getattr(msg, "step", 0))
-        data = bytes(msg.data)
-
-        if encoding == "rgb8":
-            image = cls._reshape_image_buffer(data, height, width, np.uint8, 3, step)
-            return cv2.cvtColor(image, cv2.COLOR_RGB2BGR), ".jpg"
-        if encoding == "bgr8":
-            return cls._reshape_image_buffer(data, height, width, np.uint8, 3, step), ".jpg"
-        if encoding in {"mono8", "8uc1"}:
-            return cls._reshape_image_buffer(data, height, width, np.uint8, 1, step), ".png"
-        if encoding in {"mono16", "16uc1"}:
-            image16 = cls._reshape_image_buffer(data, height, width, np.uint16, 1, step)
-            scale = 255.0 / max(1.0, float(np.max(image16)))
-            return cv2.convertScaleAbs(image16, alpha=scale), ".png"
-
-        # Fall back to raw bytes interpreted as BGR8, which is a common case.
-        if len(data) == height * width * 3:
-            return np.frombuffer(data, dtype=np.uint8).reshape(height, width, 3), ".jpg"
-        return None, ".png"
+        return rosbag_frames.decode_image_message(msg, msgtype)
 
     @staticmethod
     def _reshape_image_buffer(
@@ -1449,13 +1327,7 @@ class MCDLoader:
         step: int,
     ) -> np.ndarray:
         """Reshape image bytes using the ROS step size when present."""
-        itemsize = np.dtype(dtype).itemsize
-        row_items = width * channels if step <= 0 else step // itemsize
-        array = np.frombuffer(data, dtype=dtype).reshape(height, row_items)
-        array = array[:, : width * channels]
-        if channels == 1:
-            return array.reshape(height, width)
-        return array.reshape(height, width, channels)
+        return rosbag_frames.reshape_image_buffer(data, height, width, dtype, channels, step)
 
     @classmethod
     def _pointcloud2_to_numpy(cls, msg: Any) -> np.ndarray:

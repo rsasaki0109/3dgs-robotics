@@ -50,9 +50,10 @@ Repository = "https://github.com/rsasaki0109/3dgs-robotics"
 nerfstudio = ["nerfstudio"]
 gsplat = ["gsplat"]
 vggt = []
+rosbag = ["rosbags"]
 app = ["streamlit>=1.30", "plotly>=5.0"]
 metrics = ["lpips"]
-dev = ["pytest", "ruff", "mypy"]
+dev = ["pytest", "ruff", "mypy", "rosbags"]
 
 [project.scripts]
 3dgs-robotics = "gs_sim2real.cli:main"

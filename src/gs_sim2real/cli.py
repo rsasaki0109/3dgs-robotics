@@ -169,11 +169,19 @@ def _add_photos_to_splat_arguments(
 def _register_video_to_splat_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register ``video-to-splat`` and the shorter ``map`` alias."""
     for name, help_text in (
-        ("video-to-splat", "One-shot: mp4/mov -> frame extract -> pose-free -> gsplat train -> .splat file"),
-        ("map", "Alias for video-to-splat: one video file -> browser-ready .splat"),
+        ("video-to-splat", "One-shot: video or rosbag -> frame extract -> pose-free -> gsplat train -> .splat file"),
+        ("map", "Alias for video-to-splat: one video file or rosbag -> browser-ready .splat"),
     ):
         parser = subparsers.add_parser(name, help=help_text)
-        parser.add_argument("video", help="Input video file (.mp4, .mov, .mkv, ...)")
+        parser.add_argument(
+            "video",
+            help="Input video file (.mp4, .mov, ...) or rosbag (.bag / .db3 / .mcap file, rosbag2 directory)",
+        )
+        parser.add_argument(
+            "--image-topic",
+            default=None,
+            help="Image topic to extract when the input is a rosbag (auto when the bag has exactly one)",
+        )
         _add_photos_to_splat_arguments(parser, num_frames_default=32, output_default=None)
         parser.add_argument(
             "--open-viewer",
@@ -3003,41 +3011,65 @@ def _open_local_splat_viewer(splat_path: Path, *, port: int = 8000) -> None:
 def cmd_video_to_splat(args: argparse.Namespace) -> None:
     """Handle the video-to-splat / map subcommands.
 
-    One-shot pipeline: video file -> frame extraction -> pose-free sparse -> gsplat training
-    -> antimatter15 ``.splat`` binary, optionally opened in the local docs viewer.
+    One-shot pipeline: video file or rosbag -> frame extraction -> pose-free sparse
+    -> gsplat training -> antimatter15 ``.splat`` binary, optionally opened in the
+    local docs viewer.
     """
+    from gs_sim2real.datasets import rosbag_frames
     from gs_sim2real.preprocess.extract_frames import VIDEO_EXTENSIONS, extract_frames, plan_video_frame_sampling
 
     video_path = Path(args.video)
-    if not video_path.is_file():
-        print(f"Error: video file not found: {video_path}")
+    is_bag = rosbag_frames.is_rosbag_path(video_path)
+    if not is_bag and not video_path.is_file():
+        print(f"Error: input not found (expected a video file or rosbag): {video_path}")
         sys.exit(2)
-
-    suffix = video_path.suffix.lower()
-    if suffix and suffix not in VIDEO_EXTENSIONS:
-        print(f"Warning: {suffix} is not a known video extension; trying OpenCV anyway.")
 
     output_dir = Path(args.output) if args.output else Path("outputs") / f"{video_path.stem}_splat"
     frames_dir = output_dir / video_path.stem
     sampling_target = args.num_frames if args.num_frames > 0 else 32
-    plan = plan_video_frame_sampling(video_path, target_frames=sampling_target)
 
     print("=" * 60)
     print(f"Step 1/4: Extract frames from {video_path.name}")
     print("=" * 60)
-    print(
-        f"Sampling plan: every_n={plan.every_n}, max_frames={plan.max_frames}, "
-        f"video_frames={plan.total_frames}, fps={plan.video_fps:.1f}"
-    )
-    extracted = extract_frames(
-        video_path,
-        frames_dir,
-        every_n=plan.every_n,
-        max_frames=plan.max_frames,
-    )
-    if not extracted:
-        print("Error: no frames were extracted from the video.")
-        sys.exit(2)
+    if is_bag:
+        try:
+            topic = rosbag_frames.resolve_image_topic(video_path, args.image_topic)
+            every_n = rosbag_frames.plan_bag_frame_sampling(topic.msgcount, sampling_target)
+            print(
+                f"Sampling plan: topic={topic.topic}, every_n={every_n}, "
+                f"max_frames={sampling_target}, bag_messages={topic.msgcount}"
+            )
+            extracted = rosbag_frames.extract_bag_frames(
+                video_path,
+                frames_dir,
+                topic.topic,
+                target_frames=sampling_target,
+                every_n=every_n,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"Error: {exc}")
+            sys.exit(2)
+        if not extracted:
+            print("Error: no frames were extracted from the rosbag.")
+            sys.exit(2)
+    else:
+        suffix = video_path.suffix.lower()
+        if suffix and suffix not in VIDEO_EXTENSIONS:
+            print(f"Warning: {suffix} is not a known video extension; trying OpenCV anyway.")
+        plan = plan_video_frame_sampling(video_path, target_frames=sampling_target)
+        print(
+            f"Sampling plan: every_n={plan.every_n}, max_frames={plan.max_frames}, "
+            f"video_frames={plan.total_frames}, fps={plan.video_fps:.1f}"
+        )
+        extracted = extract_frames(
+            video_path,
+            frames_dir,
+            every_n=plan.every_n,
+            max_frames=plan.max_frames,
+        )
+        if not extracted:
+            print("Error: no frames were extracted from the video.")
+            sys.exit(2)
 
     photos_args = argparse.Namespace(**vars(args))
     photos_args.images = str(frames_dir)

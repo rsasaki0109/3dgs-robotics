@@ -37,6 +37,7 @@ Details: `docs/plan_outdoor_gs.md`, `docs/live-mapping.md`, `docs/physical-ai-si
 | --- | --- | --- |
 | **A walkaround video** | `3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat` | [Video to splat](#video-to-splat-one-shot-pose-free) |
 | **A folder of photos** | `3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
+| **A rosbag from your robot** | `3dgs-robotics map my_drive_bag/` (one-shot) or `python3 scripts/run_live_mapping_demo.py --bag my_drive_bag/ --port 8765` (live replay) — no ROS install needed | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
 | **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `3dgs-robotics preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 | **A live ROS 2 camera topic** | `3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
@@ -77,6 +78,7 @@ Preview PNGs: `DISPLAY=:0 python3 scripts/capture_readme_splat_previews.py` · p
 ```bash
 3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat
 3dgs-robotics map my_drive.mp4 --quality balanced --no-open-viewer   # alias
+3dgs-robotics map my_drive_bag/ --image-topic /camera/image_raw      # rosbag input (.bag/.db3/.mcap)
 ```
 
 Optional DUSt3R clone for the default backend; use `--preprocess vggt` with a local
@@ -107,8 +109,9 @@ Localize query frames against a finished session: `3dgs-robotics localize --map 
 (see [docs/live-mapping.md](docs/live-mapping.md#3dgs-localization)).
 
 ```bash
-3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765
-python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765
+3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765       # live ROS 2 topic
+python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765 # image-folder replay
+python3 scripts/run_live_mapping_demo.py --bag ./my_drive_bag --port 8765               # rosbag replay, no ROS needed
 ```
 
 ## Import External SLAM Results

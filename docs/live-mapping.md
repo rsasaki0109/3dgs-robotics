@@ -42,8 +42,9 @@ viewer) — or the viewer directly:
 https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=http://localhost:8765/latest.splat&refresh=2
 ```
 
-Replaying a rosbag works the same way: `ros2 bag play my_drive` in another
-terminal.
+Replaying a rosbag through the node works the same way: `ros2 bag play
+my_drive` in another terminal. If you only have the bag file, skip ROS
+entirely — see the direct replay below.
 
 DUSt3R backend setup matches `photos-to-splat`: clone
 [naver/dust3r](https://github.com/naver/dust3r) (`--recursive`) and either set
@@ -65,6 +66,24 @@ Replay any image folder as a simulated camera stream:
 ```bash
 python3 scripts/run_live_mapping_demo.py \
   --images ./my_drive_frames --fps 2 --port 8765
+```
+
+Or replay a rosbag directly — no ROS 2 installation required (`pip install
+rosbags` is enough; ROS 1 `.bag`, rosbag2 directories, and bare `.db3` /
+`.mcap` files all work). Frames are paced by the recorded timestamps
+(`--rate 4` plays 4x):
+
+```bash
+python3 scripts/run_live_mapping_demo.py \
+  --bag ./my_drive_bag --image-topic /camera/image_raw --port 8765
+```
+
+When the bag has exactly one image topic, `--image-topic` can be omitted;
+otherwise the error message lists the candidates. For a one-shot bag → splat
+conversion without the live session, use the CLI instead:
+
+```bash
+3dgs-robotics map my_drive_bag/   # works on .bag / .db3 / .mcap too
 ```
 
 Per-round splats are kept under `<workdir>/rounds/round_*/scene.splat`, which
