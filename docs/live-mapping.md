@@ -402,9 +402,38 @@ in, autonomous driving out:
   --output nav/nav_result.json
 ```
 
+Or skip the copy-paste entirely — `--to` runs the query and drives to the
+best hit in one command:
+
+```bash
+3dgs-robotics navigate --map outputs/live_mapping/session --to "car" \
+  --output nav/nav_result.json
+```
+
 Dynamic objects smear along their motion (a car driving ahead appears as a
 chain of hits down the street); lower `--threshold` for fainter concepts and
 raise `--min-cluster-gaussians` to suppress speckle.
+
+### Erasing objects by language ("remove the car")
+
+![splat-clean before/after](images/robotics/splat-clean.gif)
+
+The same prompt machinery works as an eraser. Dynamic objects are the classic
+mapping artifact — a car driving ahead of the rig smears into a ghost streak
+along the road. `splat-clean` scores every gaussian against the prompt,
+clusters the matches, dilates each cluster to catch the transparent smear
+around it, and drops the matching rows from the raw gsplat PLY (every other
+attribute survives untouched):
+
+```bash
+3dgs-robotics splat-clean "car" --map outputs/live_mapping/session --output clean/no_car.ply
+```
+
+Outputs the cleaned `.ply` plus a top-down preview PNG with the removed
+gaussians in red. The cleaned map keeps the original gauge, so `navigate`,
+`export-grid`, and `merge-maps` keep working against it. Knobs: `--threshold`
+(CLIPSeg relevance, default 0.5), `--min-cluster-gaussians` (speckle
+suppression), `--dilate` (smear shell in camera-height units, default 0.125).
 
 ## How rounds are scheduled
 

@@ -1261,6 +1261,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--goal-keyframe", type=int, default=-1, help="Index into the mapped keyframes for the goal position"
     )
     nav.add_argument("--goal", default=None, help="Explicit goal as grid-plane x,y (overrides --goal-keyframe)")
+    nav.add_argument(
+        "--to",
+        default=None,
+        help='Language goal, e.g. "car": run an open-vocabulary query and drive to the best hit (overrides --goal)',
+    )
     nav.add_argument("--robot-radius", type=float, default=0.4, help="Robot radius in camera-height units")
     nav.add_argument("--speed", type=float, default=1.5, help="Cruise speed in camera heights per second")
     nav.add_argument("--goal-tolerance", type=float, default=1.0, help="Goal radius in camera-height units")
@@ -1327,6 +1332,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-cluster-gaussians", type=int, default=20, help="Smallest gaussian cluster reported as a hit"
     )
     qmp.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
+
+    spc = subparsers.add_parser(
+        "splat-clean",
+        help='Erase objects from a map by language prompt ("car" -> cleaned splat without the ghost car)',
+    )
+    spc.add_argument("prompt", help="Free-text prompt describing what to remove, e.g. 'car'")
+    spc.add_argument("--map", required=True, help="Live-mapping session directory")
+    spc.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    spc.add_argument("--output", required=True, help="Output cleaned .ply path (a .png preview lands next to it)")
+    spc.add_argument("--threshold", type=float, default=0.5, help="CLIPSeg relevance threshold in [0, 1]")
+    spc.add_argument("--min-views", type=int, default=1, help="Keyframes a gaussian must score in before removal")
+    spc.add_argument("--max-keyframes", type=int, default=12, help="Keyframes scored with CLIPSeg")
+    spc.add_argument(
+        "--min-cluster-gaussians", type=int, default=20, help="Smallest connected gaussian blob that gets erased"
+    )
+    spc.add_argument(
+        "--dilate",
+        type=float,
+        default=0.125,
+        help="Dilation radius in camera-height units pulling in the transparent smear around hits",
+    )
+    spc.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
 
     stc = subparsers.add_parser(
         "splat-tile-catalog",
@@ -4031,7 +4058,22 @@ def cmd_navigate(args: argparse.Namespace) -> None:
         return world_to_pose2d(np.asarray(record.center, dtype=np.float64), rotation_wc, grid)
 
     start = record_pose2d(args.start_keyframe)
-    if args.goal:
+    if args.to:
+        from gs_sim2real.robotics.language_query import query_map
+
+        try:
+            query_result, _ = query_map(Path(args.map), args.to, round_index=args.round, device=args.device)
+        except ImportError as error:
+            raise SystemExit(f"--to needs the optional `transformers` package: {error}") from error
+        if not query_result.hits:
+            raise SystemExit(f'no hits for "{args.to}" - explore with query-map and a lower --threshold first')
+        best = query_result.hits[0]
+        goal_xy = np.asarray(best.goal_xy, dtype=np.float64)
+        print(
+            f'"{args.to}" -> goal ({goal_xy[0]:.3f}, {goal_xy[1]:.3f}) '
+            f"from {best.gaussians} gaussians (mean score {best.mean_score:.2f})"
+        )
+    elif args.goal:
         try:
             goal_xy = np.asarray([float(part) for part in args.goal.split(",")], dtype=np.float64)
             if goal_xy.shape != (2,):
@@ -4225,6 +4267,44 @@ def cmd_query_map(args: argparse.Namespace) -> None:
         "Drive there: 3dgs-robotics navigate "
         f"--map {args.map} --goal {best.goal_xy[0]:.3f},{best.goal_xy[1]:.3f} --output nav/nav_result.json"
     )
+
+
+def cmd_splat_clean(args: argparse.Namespace) -> None:
+    """Handle the splat-clean subcommand."""
+    from gs_sim2real.robotics.splat_clean import CleanParams, clean_map, write_clean_preview
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".ply":
+        raise SystemExit(f"--output must be a .ply path: {output_path}")
+
+    params = CleanParams(
+        score_threshold=args.threshold,
+        min_views=args.min_views,
+        max_keyframes=args.max_keyframes,
+        min_cluster_gaussians=args.min_cluster_gaussians,
+        dilate_camera_heights=args.dilate,
+    )
+    try:
+        stats, points, mask = clean_map(
+            Path(args.map), args.prompt, output_path, round_index=args.round, params=params, device=args.device
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(f"splat-clean needs the optional `transformers` package: {error}") from error
+
+    import numpy as np
+
+    preview = write_clean_preview(points, mask, np.asarray(stats["basis"]), output_path.with_suffix(".png"))
+    print(f"Wrote {stats['output']} + {preview.name}")
+    if stats["removed"] == 0:
+        print(f'Nothing matched "{args.prompt}" at threshold {args.threshold} - the output equals the input map.')
+        return
+    print(
+        f'Removed {stats["removed"]:,} of {stats["gaussians"]:,} gaussians matching "{args.prompt}" '
+        f"({stats['clusters']} cluster(s), dilation {args.dilate} camera heights)"
+    )
+    print("The cleaned map keeps the original gauge - navigate/export-grid/merge-maps work unchanged.")
 
 
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
@@ -4979,6 +5059,7 @@ def main(argv: list[str] | None = None) -> None:
         "navigate": cmd_navigate,
         "merge-maps": cmd_merge_maps,
         "query-map": cmd_query_map,
+        "splat-clean": cmd_splat_clean,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

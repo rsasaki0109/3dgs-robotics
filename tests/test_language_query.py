@@ -179,3 +179,45 @@ class TestQueryMap:
         assert "navigate --map" in out.replace("3dgs-robotics navigate --map", "navigate --map")
         assert (tmp_path / "query.json").is_file()
         assert (tmp_path / "query.png").is_file()
+
+
+class TestNavigateTo:
+    def test_cli_navigate_to_language_goal(self, tmp_path, capsys, monkeypatch):
+        """`navigate --to "object"` resolves the goal through query_map and drives there."""
+        from gs_sim2real import cli
+        from gs_sim2real.robotics.language_query import QueryHit, QueryResult
+
+        session = tmp_path / "session"
+        _write_fake_session(session)
+
+        def fake_query_map(session_dir, prompt, *, round_index=None, params=None, heatmap_fn=None, device="cuda"):
+            result = QueryResult(prompt=prompt)
+            # grid-plane coords of the last keyframe (basis maps world (x,y,z) -> (z, -x))
+            result.hits = [
+                QueryHit(
+                    centroid=(0.0, -0.5, 2.0), extent=(0.5, 0.5, 0.5), gaussians=30, mean_score=0.8, goal_xy=(2.0, 0.0)
+                )
+            ]
+            return result, np.zeros((1, 3))
+
+        monkeypatch.setattr("gs_sim2real.robotics.language_query.query_map", fake_query_map)
+        args = cli.build_parser().parse_args(
+            [
+                "navigate",
+                "--map",
+                str(session),
+                "--to",
+                "object",
+                "--localize-every",
+                "0",
+                "--odom-noise",
+                "0",
+                "--output",
+                str(tmp_path / "nav.json"),
+            ]
+        )
+        cli.cmd_navigate(args)
+        out = capsys.readouterr().out
+        assert '"object" -> goal (2.000, 0.000)' in out
+        assert "reached the goal" in out
+        assert (tmp_path / "nav.json").is_file()
