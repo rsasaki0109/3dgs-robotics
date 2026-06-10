@@ -1,8 +1,9 @@
 name: Publish to PyPI
 
+# PyPI publication is on hold; trigger manually once a trusted publisher
+# is configured on pypi.org for this repository.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
