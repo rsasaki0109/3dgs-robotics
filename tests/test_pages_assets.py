@@ -410,6 +410,22 @@ def test_map_quality_gif_proves_actual_splat_geometry() -> None:
         assert image.size == module.MAP_MATERIAL_SIZE
 
 
+def test_live_mapping_grow_gif_is_real_and_linked() -> None:
+    """The live-mapping GIF must come from a real per-round session timeline."""
+    module = _load_script_module(REPO_ROOT / "scripts" / "build_live_mapping_gif.py")
+    grow_gif = REPO_ROOT / "docs" / "images" / "live-mapping" / "live-mapping-grow.gif"
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    live_doc = (REPO_ROOT / "docs" / "live-mapping.md").read_text(encoding="utf-8")
+    assert "docs/images/live-mapping/live-mapping-grow.gif" in readme
+    assert "images/live-mapping/live-mapping-grow.gif" in live_doc
+    assert "build_live_mapping_gif.py" in readme
+    assert module.FRAME_SIZE == (960, 420)
+    assert grow_gif.stat().st_size > 200_000
+    with Image.open(grow_gif) as image:
+        assert image.size == module.FRAME_SIZE
+        assert image.n_frames >= 4, "growth needs several rebuild rounds"
+
+
 def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
     """The share image should be a real 1200x630 card, not an arbitrary scene thumbnail."""
     card = REPO_ROOT / "docs" / "images" / "social-card.png"

@@ -244,6 +244,14 @@ same), gates frames into keyframes, and rebuilds a draft splat in the
 background as the robot drives. The bundled polling viewer swaps the growing
 map in place without resetting the camera. Full docs: [docs/live-mapping.md](docs/live-mapping.md).
 
+![Live mapping: the 3DGS map grows as the robot drives](docs/images/live-mapping/live-mapping-grow.gif)
+
+*Real run on KITTI drive 0056 through this exact pipeline: every rebuild round
+(DUSt3R + gsplat) extends the mapped street, shown as a top-down orthographic
+gsplat render with the recovered camera trajectory in blue and the onboard
+camera inset. Reproduce with `scripts/run_live_mapping_demo.py` +
+`scripts/build_live_mapping_gif.py`.*
+
 ```bash
 source /opt/ros/<distro>/setup.bash
 gs-mapper-live-mapper \

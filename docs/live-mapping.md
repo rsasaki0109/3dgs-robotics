@@ -2,6 +2,12 @@
 
 Watch the Gaussian-splat map grow in the browser while the robot drives.
 
+![Live mapping: the 3DGS map grows as the robot drives](images/live-mapping/live-mapping-grow.gif)
+
+*Real KITTI drive 0056 replayed through `scripts/run_live_mapping_demo.py`:
+each rebuild round extends the mapped street (top-down orthographic gsplat
+render, camera trajectory in blue, onboard camera inset).*
+
 `gs-mapper-live-mapper` subscribes to a camera topic, gates incoming frames
 into keyframes, and rebuilds a draft-quality splat in a background thread
 whenever enough new keyframes arrive. Each round covers the whole trajectory
@@ -56,7 +62,20 @@ python3 scripts/run_live_mapping_demo.py \
 ```
 
 Per-round splats are kept under `<workdir>/rounds/round_*/scene.splat`, which
-doubles as an offline timeline for GIF capture.
+doubles as an offline timeline for GIF capture. The README GIF above is built
+from that timeline:
+
+```bash
+python3 scripts/build_live_mapping_gif.py \
+  --session outputs/live_mapping_demo \
+  --output docs/images/live-mapping/live-mapping-grow.gif
+```
+
+Each round is a full pose-free rebuild and therefore lives in its own gauge;
+the builder chains per-round similarity transforms (rotation from the shared
+keyframes' camera orientations, scale/translation from their centers) onto the
+final round, then renders every aligned round from one fixed top-down
+orthographic camera so the strip visibly extends.
 
 ## How rounds are scheduled
 
