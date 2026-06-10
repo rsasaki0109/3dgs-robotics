@@ -14,11 +14,11 @@ rosbag / video / photos ──> 3DGS map (PLY) ──> export-isaac ──> USDZ
 
 The export wraps NVIDIA's official converter from
 [nv-tlabs/3dgrut](https://github.com/nv-tlabs/3dgrut). Only its transcode
-path is used — no CUDA build, just a clone and three pip packages:
+path is used — no CUDA build, just a clone and a few pip packages:
 
 ```bash
 git clone https://github.com/nv-tlabs/3dgrut.git ~/3dgrut
-pip install plyfile msgpack usd-core
+pip install plyfile msgpack usd-core "nvidia-ncore>=19.0.0" simplejpeg tensorboard
 export THREEDGRUT_ROOT=~/3dgrut   # or pass --threedgrut-root each time
 ```
 

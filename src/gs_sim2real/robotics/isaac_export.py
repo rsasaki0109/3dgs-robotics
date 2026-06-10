@@ -8,7 +8,7 @@ live-mapping session round (or any standard 3DGS PLY) becomes a drag-and-drop
 USDZ for Isaac Sim.
 
 Only the transcode path of 3dgrut is used — it needs no CUDA build, just a
-clone plus ``pip install plyfile msgpack usd-core`` (torch/numpy already come
+clone plus a few pip packages (see ``_CLONE_HINT``; torch/numpy already come
 with this package).
 """
 
@@ -30,7 +30,7 @@ _CLONE_HINT = (
     "3dgrut is required for USDZ export. Clone it and point --threedgrut-root "
     f"(or ${THREEDGRUT_ENV_VAR}) at the clone:\n"
     "  git clone https://github.com/nv-tlabs/3dgrut.git\n"
-    "  pip install plyfile msgpack usd-core"
+    '  pip install plyfile msgpack usd-core "nvidia-ncore>=19.0.0" simplejpeg tensorboard'
 )
 
 
