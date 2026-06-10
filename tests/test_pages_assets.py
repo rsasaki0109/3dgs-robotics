@@ -378,9 +378,9 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
     assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
     assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
-    assert "Dynamic map loading material rendered from the outdoor production regional mosaic" in readme
-    assert "Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic" in readme
-    assert "each map cell shows its tile's real `.splat` content rendered top-down" in readme
+    assert "Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)" in readme
+    assert "Lead GIF: dynamic map loading on real robot data" in readme
+    assert "true top-down (orthographic gsplat) render" in readme
     assert "route overlay tracks the loading window" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 

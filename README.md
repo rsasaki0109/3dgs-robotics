@@ -22,9 +22,9 @@ reviewable scenario CI artifacts.
 [Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
 [Physical AI docs](docs/physical-ai-sim.md)
 
-[![Dynamic map loading material rendered from the outdoor production regional mosaic](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
+[![Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
 
-Lead GIF: dynamic map loading over the 87-tile outdoor production regional mosaic; each map cell shows its tile's real `.splat` content rendered top-down, green cells are resident, amber cells are preload, and the route overlay tracks the loading window as the robot drives (the inset shows the whole region). See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: dynamic map loading on real robot data — the base layer is a true top-down (orthographic gsplat) render of the Istanbul Bag6 rosbag2 pilot scene, 30 m map tiles light up as the robot drives the actual route, green cells are resident, amber cells are preload, and the route overlay tracks the loading window. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
@@ -89,11 +89,12 @@ The repo also ships a browser-ready large-scale dynamic-map fixture in
 sampled into a 5x5 X/Z regional mosaic, tiled into 87 ready browser splats,
 and played back through the Dynamic Map Viewer route UI.
 
-[![Large-scale 3DGS dynamic map loading result](docs/images/demo-sweep/map-quality.gif)](docs/images/demo-sweep/map-quality.gif)
-
 Result media lives in [`docs/images/demo-sweep/`](docs/images/demo-sweep/):
 [`map-quality.gif`](docs/images/demo-sweep/map-quality.gif) is the dynamic-map
-loading GIF, [`dynamic-map-material.png`](docs/images/demo-sweep/dynamic-map-material.png)
+loading GIF (Istanbul Bag6 pilot, real top-down render),
+[`istanbul-bag6-ortho-base.png`](docs/images/demo-sweep/istanbul-bag6-ortho-base.png)
+is its orthographic base layer,
+[`dynamic-map-material.png`](docs/images/demo-sweep/dynamic-map-material.png)
 is the standalone still, and [`hero.gif`](docs/images/demo-sweep/hero.gif) is
 the older scene-sweep hero.
 
