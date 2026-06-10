@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "3dgs-robotics"
-version = "0.1.0"
+version = "0.2.0"
 description = "Map, localize, and simulate — 3D Gaussian Splatting for robotics"
 authors = [{ name = "rsasaki0109" }]
 readme = "README.md"
