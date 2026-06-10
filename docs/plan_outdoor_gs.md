@@ -152,7 +152,13 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 
 - **言語 3 部作の完結(2026-06-11、ユーザー「1,2,3! all!」で 3 案全承認)**: ① `splat-clean "car"` `b21c2f8` = 言語プロンプトで物体除去。query-map のスコア持ち上げ → クラスタ化 → 膨張シェル(`--dilate`、透明スメアを巻き込む)→ raw PLY 行削除(map_merge の機構を再利用、他属性は無傷・ゲージ不変)。e2e_bag_live3: "car" で 12,056/173,671 gaussians・14 クラスタ除去 — **道路中央の先行車ゴーストが消えて奥の路面が見える**(kf8 レンダ比較、docs/images/robotics/splat-clean.gif)。除去は走行軌跡上に等間隔の塊=動的物体の滲み跡と整合。② `navigate --to "car"` (同コミット)= query→goal→走行のワンコマンド化。e2e: goal (1.380, 0.092) 自動解決 → **762 步で到達**(fix 3 回)。③ ビューワオーバレイ `52c328d` = `export-overlay` がゲージチェーン(gauge_transform.json)+ 凍結ビューワ正規化(リベースアンカー round から再計算)を再構築して nav 軌跡/planned path/クエリヒットを splat 座標系 JSON に投影、`splat.html?overlay=` が viewProj で 2D キャンバスに描画(ラベル・スクリーン半径付き、?refresh= と併用可)。ヘッドレス Chrome で実描画確認済み(docs/images/robotics/viewer-overlay.png)。pose-graph refinement 後の古い round の微ズレは docs に明記。全 1188 テストパス。
 
-- **robotics デモ GIF(README 看板、同日続投)**: `scripts/build_robotics_demo_gif.py`。1 つのセッションから closed-loop を 1 GIF に合成 — 上段 = GS カメラシミュレータの仮想視点(キーフレーム間は lerp+slerp 補間でスムーズに)、下段 = nav2 occupancy grid 背景に GT 軌跡(緑)と localizer 推定(オレンジ)が蓄積。localize はキーフレーム視点のみ(補間視点は retrieval シードから遠く photometric 収束域を外れるため render only、ノードと同じ seed-distance ゲート付き)。e2e_bag_live3 で 34 フレーム / 2.7MB、中央値誤差 0.043 gauge units = 0.24 キーフレーム間隔(12 中 2 キーフレームは街路の視覚エイリアシングで ~0.47 — 正直にそのまま掲載)。README に「Robotics applications — one map, four pillars」セクション+4 本柱コマンド表を追加。**Show HN 第 2 弾用 before/after GIF はユーザー判断で不採用(2026-06-11)**。メトリックスケール対応(nav_msgs/Odometry からスケール係数 1 個を拝借する設計)はユーザーに提示済み、判断待ち。
+- **robotics デモ GIF(README 看板、同日続投)**: `scripts/build_robotics_demo_gif.py`。1 つのセッションから closed-loop を 1 GIF に合成 — 上段 = GS カメラシミュレータの仮想視点(キーフレーム間は lerp+slerp 補間でスムーズに)、下段 = nav2 occupancy grid 背景に GT 軌跡(緑)と localizer 推定(オレンジ)が蓄積。localize はキーフレーム視点のみ(補間視点は retrieval シードから遠く photometric 収束域を外れるため render only、ノードと同じ seed-distance ゲート付き)。e2e_bag_live3 で 34 フレーム / 2.7MB、中央値誤差 0.043 gauge units = 0.24 キーフレーム間隔(12 中 2 キーフレームは街路の視覚エイリアシングで ~0.47 — 正直にそのまま掲載)。README に「Robotics applications — one map, four pillars」セクション+4 本柱コマンド表を追加。**Show HN 第 2 弾用 before/after GIF はユーザー判断で不採用(2026-06-11)**。メトリックスケール対応(nav_msgs/Odometry からスケール係数 1 個を拝借する設計)は**ユーザー判断でスキップ確定(2026-06-11)** — PyPI / ZeroGPU / 告知と同様、ユーザーから話が出るまで再提案しない。
+
+### 1.7 2026-06-11(夜): v0.2.0 リリースと次開発 4 案(保留)
+
+- **GitHub Release v0.2.0 公開済み**(ユーザー「release しようよ」)。バージョンバンプ `ebf7b86`(pyproject.toml + `__version__`)→ タグ `v0.2.0` push → `gh release create`。ノートは v0.1.0(旧 GS Mapper、2026-03-20)以降 319 コミットの総括で、ブランド改名と robotics スタック(live mapping / 4 本柱 / 言語 3 部作 / zero-install demo)を柱にした構成。リリース後の CI / Pages はグリーン。
+- **PyPI スキップの再確認と `publish.yml` の手動化 `3be92c2`**: release トリガーだった `publish.yml`(PyPI trusted publishing)がリリース作成で自動起動し失敗(pypi.org に trusted publisher 未設定、claims は `environment: MISSING`)。ユーザー「pypi は skip!」で改めてスキップ確定し、トリガーを `workflow_dispatch:` 専用に変更 — 今後のリリースで赤い失敗ランが付かない。将来公開する場合は pypi.org で trusted publisher(project `3dgs-robotics` / workflow `publish.yml`)を登録して手動実行するだけ。
+- **次開発の提案済み 4 案(未着手・保留、再開時はここから選ぶ)**: ① splat-grab/paste(言語でオブジェクト切り出し→別マップへ配置、query-map + merge-maps の組み合わせ)② ブラウザ click-to-go(splat.html クリック→navigate ゴール、overlay 基盤の逆写像)③ patrol(navigate + カメラシム + detect-changes を 1 コマンドに束ねた巡回点検)④ Isaac 連携深化(USDZ に nav 経路を USD レイヤ焼き込み)。おすすめ順は ①→②→③、④はユーザーの Isaac 興味シグナルあり。
 
 ## 2. 現在の主戦場
 
@@ -1606,5 +1612,5 @@ PR 分割案:
 - 着手順: **A(rosbag 入力)→ B Step 1 → B Step 2 → B Step 3**。A と B Step 1 は独立なので逆転可。B の途中でも告知第 1 弾(ユーザー実行)は並行で打てる。
 - **ROS 2 localizer ノード**(§18.4 PR 分割案 3): rosbag 入力を優先するユーザー判断(2026-06-10)で保留。robotics 文脈の完結としての価値は変わらないので、B 完了後に再検討。
 - **スマホ実写動画デモ**: 今期は未採用。§18.2 の「縦動画 × DUSt3R/VGGT の 512 リサイズ」リスクは**未消化のまま残っている**ので、video-to-splat を告知に使う前に 1 本実写で確認するのが安全。
-- **小粒(.spz 等圧縮 export / v0.1 GitHub Release)**: 保留。Release タグは告知第 1 弾の口実として有効なので、ユーザーが告知を打つタイミングで再提案してよい(これは §18.5 の「再提案しない」対象ではない)。
+- **小粒(.spz 等圧縮 export / v0.1 GitHub Release)**: .spz は引き続き保留。Release は **v0.2.0 として 2026-06-11 に公開済み**(§1.7)。
 - **PyPI 公開 / ZeroGPU / 告知の代行**: §18.5 のとおり。再提案しない。
