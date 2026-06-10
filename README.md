@@ -1,10 +1,7 @@
 # GS Mapper
 
 [![CI](https://github.com/rsasaki0109/gs-mapper/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsasaki0109/gs-mapper/actions/workflows/ci.yml)
-[![Pages](https://github.com/rsasaki0109/gs-mapper/actions/workflows/pages.yml/badge.svg?branch=main)](https://rsasaki0109.github.io/gs-mapper/)
 [![License: MIT](https://img.shields.io/github/license/rsasaki0109/gs-mapper)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Last commit](https://img.shields.io/github/last-commit/rsasaki0109/gs-mapper/main)](https://github.com/rsasaki0109/gs-mapper/commits/main)
 [![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb)
 
@@ -14,17 +11,13 @@ GS Mapper turns photos, rosbags, and external SLAM outputs into browser-viewable
 `.splat` scenes. The same scenes can feed route-policy benchmarks and
 reviewable scenario CI artifacts.
 
-**Try it first:** [Build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/gs-mapper) |
-[Photos to splat in Colab](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb) |
-[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
-[Large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1) |
-[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section) |
-[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/) |
-[Physical AI docs](docs/physical-ai-sim.md)
+**Try it first:** [build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/gs-mapper) |
+[live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
+[large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1)
 
 [![Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
 
-Lead GIF: dynamic map loading on real robot data — the base layer is a true top-down (orthographic gsplat) render of the Istanbul Bag6 rosbag2 pilot scene, and the resident (green) / preload (amber) tile window moves along the camera trajectory recovered from the mapped street, so 30 m map tiles light up as the camera drives. See the standalone [dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png).
+Lead GIF: dynamic map loading on real robot data — the base layer is a true top-down (orthographic gsplat) render of the Istanbul Bag6 rosbag2 pilot scene, and the resident (green) / preload (amber) tile window moves along the camera trajectory recovered from the mapped street, so 30 m map tiles light up as the camera drives. Standalone still: `docs/images/demo-sweep/dynamic-map-material.png`.
 
 ```bash
 git clone https://github.com/rsasaki0109/gs-mapper.git
@@ -45,17 +38,12 @@ What ships:
 - Bundled large-scale 3DGS dynamic-map fixture: 9 production outdoor `.splat`
   results composed into a 25-placement regional mosaic with 1.75M Gaussians
   and 87 browser-ready route tiles.
-- `photos-to-splat` for image-folder to browser `.splat` runs — also as a
-  [zero-install HF Spaces demo](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
-  and a [Colab notebook](notebooks/photos_to_splat_colab.ipynb).
+- `photos-to-splat` for image-folder to browser `.splat` runs — also zero-install
+  via the HF Spaces and Colab badges above.
 - `gs-mapper-live-mapper`: ROS 2 live mapping node — the splat map grows in the
-  browser while the robot drives ([docs](docs/live-mapping.md)).
+  browser while the robot drives.
 - `splat-inspect` and `splat-filter` for cleaning cloudy browser splats.
 - Route-policy benchmark and scenario CI tooling for Physical AI review bundles.
-
-Project notes: [Physical AI sim contract](docs/physical-ai-sim.md),
-[outdoor pipeline handoff](docs/plan_outdoor_gs.md), [launch kit](docs/launch-kit.md),
-release notes [v0.1.0](docs/releases/v0.1.0.md).
 
 ## Quickstart — pick your entry point
 
@@ -65,7 +53,7 @@ release notes [v0.1.0](docs/releases/v0.1.0.md).
 | **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `gs-mapper preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `gs-mapper route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 | **A live ROS 2 camera topic** | `gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
-| **Just a browser** | [HF Spaces demo](https://huggingface.co/spaces/rsasaki0109/gs-mapper) or [Colab](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb) | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
+| **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Full rosbag -> supervised outdoor splat is covered in
 [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
@@ -89,14 +77,10 @@ The repo also ships a browser-ready large-scale dynamic-map fixture in
 sampled into a 5x5 X/Z regional mosaic, tiled into 87 ready browser splats,
 and played back through the Dynamic Map Viewer route UI.
 
-Result media lives in [`docs/images/demo-sweep/`](docs/images/demo-sweep/):
-[`map-quality.gif`](docs/images/demo-sweep/map-quality.gif) is the dynamic-map
-loading GIF (Istanbul Bag6 pilot, real top-down render),
-[`istanbul-bag6-ortho-base.png`](docs/images/demo-sweep/istanbul-bag6-ortho-base.png)
-is its orthographic base layer,
-[`dynamic-map-material.png`](docs/images/demo-sweep/dynamic-map-material.png)
-is the standalone still, and [`hero.gif`](docs/images/demo-sweep/hero.gif) is
-the older scene-sweep hero.
+Result media lives in `docs/images/demo-sweep/`: `map-quality.gif` (the
+dynamic-map loading GIF, real top-down render), `istanbul-bag6-ortho-base.png`
+(its orthographic base layer), `dynamic-map-material.png` (the standalone
+still), and `hero.gif` (the older scene-sweep hero).
 
 Open the hosted Dynamic Map Viewer result:
 
@@ -106,8 +90,8 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 
 | Result | Value |
 | --- | --- |
-| Tile catalog | [`outdoor-production-grid-large-tile-catalog.json`](apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json) |
-| Route playback | [`outdoor-production-grid-large-route.json`](apps/dreamwalker-web/public/robot-routes/outdoor-production-grid-large-route.json) |
+| Tile catalog | `apps/dreamwalker-web/public/manifests/outdoor-production-grid-large-tile-catalog.json` |
+| Route playback | `apps/dreamwalker-web/public/robot-routes/outdoor-production-grid-large-route.json` |
 | Source scenes | 9 shipped outdoor production `.splat` results |
 | Composite splats | 1,750,000 splats / 56.0 MB generated composite |
 | Ready tiles | 87 / 87 ready tiles, 0 missing |
@@ -124,12 +108,11 @@ An Istanbul `rosbag2` capture is also staged as a real-input 3DGS pilot:
 6 trained XY source tiles, 6 browser `.splat` files, and 6 transformed viewer
 PLY tiles for the Dynamic Map Viewer.
 
-[![Istanbul Bag6 Dynamic Map Viewer](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif)](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif)
+![Istanbul Bag6 Dynamic Map Viewer](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif)
 
-[`large-scale-3dgs-result.png`](docs/images/istanbul-bag6-pilot/large-scale-3dgs-result.png)
-is the full-resolution result still, and
-[`dynamic-map-viewer-still.png`](docs/images/istanbul-bag6-pilot/dynamic-map-viewer-still.png)
-is the static poster frame for the GIF.
+`docs/images/istanbul-bag6-pilot/` also holds the full-resolution result still
+(`large-scale-3dgs-result.png`) and the static poster frame
+(`dynamic-map-viewer-still.png`).
 
 Open the hosted Dynamic Map Viewer pilot:
 
@@ -139,13 +122,13 @@ https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2F
 
 | Result | Value |
 | --- | --- |
-| Tile catalog | [`istanbul-bag6-pilot-tile-catalog.json`](apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json) |
-| Route playback | [`istanbul-bag6-pilot-route.json`](apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json) |
+| Tile catalog | `apps/dreamwalker-web/public/manifests/istanbul-bag6-pilot-tile-catalog.json` |
+| Route playback | `apps/dreamwalker-web/public/robot-routes/istanbul-bag6-pilot-route.json` |
 | Source capture | Istanbul rosbag2, 20.2 s, 3 camera topics, LiDAR, GNSS, TF, IMU |
 | Ready tiles | 6 / 6 ready tiles, 0 missing |
 | Tile bytes | 12.5 MB total across 6 browser tile `.splat` files |
 | Viewer PLY assets | 438,796 Gaussians / 103.8 MiB across 6 transformed viewer tiles |
-| Result media | [`dynamic-map-viewer.gif`](docs/images/istanbul-bag6-pilot/dynamic-map-viewer.gif), [`large-scale-3dgs-result.png`](docs/images/istanbul-bag6-pilot/large-scale-3dgs-result.png) |
+| Result media | `docs/images/istanbul-bag6-pilot/` (`dynamic-map-viewer.gif`, `large-scale-3dgs-result.png`) |
 | Pipeline | `preprocess --method mcd` -> GNSS-seeded COLMAP sparse -> `large-scale-3dgs-run` -> Dynamic Map Viewer promotion |
 
 Run it locally:
@@ -160,8 +143,8 @@ Then open:
 http://127.0.0.1:5173/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1
 ```
 
-The scene picker is defined once in [`docs/scenes-list.json`](docs/scenes-list.json)
-and reused by the viewers, README previews, and GIF scripts.
+The scene picker is defined once in `docs/scenes-list.json` and reused by the
+viewers, README previews, and GIF scripts.
 
 | Scene | Preview | Pipeline |
 |-------|---------|----------|
@@ -232,10 +215,9 @@ No GPU, no install:
 - **[Hugging Face Space](https://huggingface.co/spaces/rsasaki0109/gs-mapper)** —
   upload 8–16 photos or a short walkaround video in the browser and get a
   `.splat` back with an embedded 3D preview. The Space contents live in
-  [`apps/hf-space/`](apps/hf-space/) and are synced by
-  [`sync-hf-space.yml`](.github/workflows/sync-hf-space.yml).
-- **[Colab notebook](notebooks/photos_to_splat_colab.ipynb)** — the full
-  `photos-to-splat` CLI on a free T4, including a bundled sample photo set.
+  `apps/hf-space/`.
+- **[Colab notebook](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb)** —
+  the full `photos-to-splat` CLI on a free T4, including a bundled sample photo set.
 
 ## Live Mapping (ROS 2) — watch the map grow
 
@@ -284,8 +266,7 @@ gs-mapper preprocess \
 ```
 
 Supported profiles include MASt3R-SLAM, VGGT-SLAM 2.0, Pi3/Pi3X, and LoGeR.
-See [`docs/plan_outdoor_gs.md`](docs/plan_outdoor_gs.md) for the current
-external-SLAM matrix.
+The current external-SLAM matrix is in `docs/plan_outdoor_gs.md`.
 
 ## Physical AI benchmark path
 
@@ -305,7 +286,7 @@ gs-mapper route-policy-benchmark \
 ```
 
 For matrix, shard, workflow, activation, promotion, adoption, and review-bundle
-details, use [docs/physical-ai-sim.md](docs/physical-ai-sim.md).
+details, use `docs/physical-ai-sim.md`.
 
 ## Outdoor pipeline quickstart (Autoware Leo Drive)
 
@@ -340,8 +321,8 @@ python3 scripts/check_large_scale_3dgs_inputs.py \
   --scene-id autoware-large
 ```
 
-See [`docs/large-scale-3dgs-real-run.md`](docs/large-scale-3dgs-real-run.md) for
-the real-input staging and Dynamic Map Viewer promotion runbook.
+The real-input staging and Dynamic Map Viewer promotion runbook is
+`docs/large-scale-3dgs-real-run.md`.
 
 For manual control, preflight the COLMAP sparse model before launching many
 tile jobs:
@@ -447,12 +428,8 @@ python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
 gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765
 ```
 
-More command details live in:
-
-- [docs/physical-ai-sim.md](docs/physical-ai-sim.md)
-- [docs/plan_outdoor_gs.md](docs/plan_outdoor_gs.md)
-- [docs/launch-kit.md](docs/launch-kit.md)
-- [CONTRIBUTING.md](CONTRIBUTING.md)
+More command details live in `docs/physical-ai-sim.md`,
+`docs/plan_outdoor_gs.md`, and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 

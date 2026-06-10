@@ -372,17 +372,16 @@ def test_demo_sweep_enhancement_script_and_hero_gif_cover_production_scenes() ->
 
 
 def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
-    """The README first screen should quickly answer what to click and why to star."""
+    """The README first screen should quickly answer what to click — few, strong links."""
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI." in readme
-    assert "[Open live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
-    assert "[Mission Control proof](https://rsasaki0109.github.io/gs-mapper/#mission-control-section)" in readme
-    assert "[Scenario CI reviews](https://rsasaki0109.github.io/gs-mapper/reviews/)" in readme
+    assert "[live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
+    assert "huggingface.co/spaces/rsasaki0109/gs-mapper" in readme
     assert "Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)" in readme
     assert "Lead GIF: dynamic map loading on real robot data" in readme
     assert "true top-down (orthographic gsplat) render" in readme
     assert "tile window moves along the camera trajectory" in readme
-    assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
+    assert "docs/images/demo-sweep/dynamic-map-material.png" in readme
 
 
 def test_map_quality_gif_proves_actual_splat_geometry() -> None:
