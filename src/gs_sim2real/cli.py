@@ -1285,6 +1285,34 @@ def build_parser() -> argparse.ArgumentParser:
     nav.add_argument("--gif", default=None, help="Optional GIF path animating the run (camera view + map)")
     nav.add_argument("--device", default="cuda", help="torch device for rendering and localization")
 
+    mgm = subparsers.add_parser(
+        "merge-maps",
+        help="Merge two 3DGS maps of the same place into one splat (collaborative mapping)",
+    )
+    mgm.add_argument("--map-a", required=True, help="Reference live-mapping session (defines the merged gauge)")
+    mgm.add_argument("--round-a", type=int, default=None, help="Round of map A (default: last successful)")
+    mgm.add_argument("--map-b", required=True, help="Session merged into map A's gauge")
+    mgm.add_argument("--round-b", type=int, default=None, help="Round of map B (default: last successful)")
+    mgm.add_argument(
+        "--align",
+        choices=["auto", "shared", "localize"],
+        default="auto",
+        help="Gauge alignment: shared keyframes, or 3DGS localization (GPU) for independent sessions",
+    )
+    mgm.add_argument("--output", required=True, help="Output merged .ply path")
+    mgm.add_argument(
+        "--dedup-radius",
+        type=float,
+        default=0.0,
+        help="Drop B gaussians within this radius (camera-height units) of an A gaussian (0 = keep all)",
+    )
+    mgm.add_argument(
+        "--dc-only",
+        action="store_true",
+        help="Zero map B's SH rest coefficients (fully rotation-consistent shading, more matte)",
+    )
+    mgm.add_argument("--device", default="cuda", help="torch device for --align localize")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -4099,6 +4127,48 @@ def cmd_navigate(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_merge_maps(args: argparse.Namespace) -> None:
+    """Handle the merge-maps subcommand."""
+    from gs_sim2real.robotics.map_merge import merge_sessions
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".ply":
+        raise SystemExit(f"--output must be a .ply path: {output_path}")
+
+    localize_config = None
+    if args.align in ("auto", "localize"):
+        from gs_sim2real.robotics.localize import LocalizeConfig
+
+        localize_config = LocalizeConfig(device=args.device, refine_iters=40, pyramid_scales=(0.25, 0.5))
+
+    try:
+        stats = merge_sessions(
+            Path(args.map_a),
+            Path(args.map_b),
+            output_path,
+            round_a=args.round_a,
+            round_b=args.round_b,
+            align=args.align,
+            dedup_radius_camera_heights=args.dedup_radius,
+            dc_only_b=args.dc_only,
+            localize_config=localize_config,
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+
+    alignment = stats["alignment"]
+    print(f"Wrote {stats['output']} ({Path(stats['output']).stat().st_size / 1e6:.1f} MB)")
+    print(
+        f"Merged {stats['gaussians_a']:,} (A) + {stats['gaussians_b']:,} (B) gaussians "
+        f"-> {stats['merged']:,} ({stats['deduplicated']:,} deduplicated)"
+    )
+    print(
+        f"Alignment: {alignment['mode']} ({alignment['matched_keyframes']} keyframes, "
+        f"scale {alignment['scale']:.3f}); merged map lives in map A's gauge"
+    )
+    print("Inspect it: 3dgs-robotics splat-inspect after converting, or load the PLY in your viewer.")
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4849,6 +4919,7 @@ def main(argv: list[str] | None = None) -> None:
         "export-grid": cmd_export_grid,
         "detect-changes": cmd_detect_changes,
         "navigate": cmd_navigate,
+        "merge-maps": cmd_merge_maps,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

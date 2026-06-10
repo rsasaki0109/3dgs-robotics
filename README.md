@@ -49,6 +49,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **nav2 needs a map** | `3dgs-robotics export-grid --map outputs/live_mapping --output nav2_map/map.yaml` | [docs/live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | **Two patrols, what changed?** | `3dgs-robotics detect-changes --map-a run1 --map-b run2 --output changes/changes.json` | [docs/live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 | **Drive a robot through your map** | `3dgs-robotics navigate --map outputs/live_mapping --output nav/nav_result.json` | [docs/live-mapping.md](docs/live-mapping.md#autonomous-navigation-in-the-map) |
+| **Two robots, one map** | `3dgs-robotics merge-maps --map-a run1 --map-b run2 --output merged/merged.ply` | [docs/live-mapping.md](docs/live-mapping.md#merging-two-maps-collaborative-mapping) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).

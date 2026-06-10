@@ -319,6 +319,26 @@ Draft 1500-iteration rounds re-place splats noisily — raise
 `--min-cluster-voxels` / `--min-count` (e.g. 25 / 5) to suppress the
 speckle, or retrain both rounds at higher quality for fine-grained diffs.
 
+### Merging two maps (collaborative mapping)
+
+`3dgs-robotics merge-maps` fuses two maps of the same place into one splat —
+two robots split a route, or a new patrol extends an old map:
+
+```bash
+3dgs-robotics merge-maps --map-a outputs/robot1 --map-b outputs/robot2 \
+  --align localize --dedup-radius 0.1 --output merged/merged.ply
+```
+
+Map B is aligned onto map A's gauge with the same Sim3 machinery as change
+detection (`--align shared` for overlapping rounds, `localize` across
+independent sessions), its gaussians are transformed at the raw PLY level
+(positions, normals, quaternions, log-scales), `--dedup-radius` (camera-height
+units) drops B gaussians that duplicate A's coverage, and one merged gsplat
+PLY comes out in A's gauge. Caveat: B's spherical-harmonic rest coefficients
+are copied unrotated, so after a large gauge rotation its view-dependent
+shading is slightly off — `--dc-only` zeroes them for a fully consistent (if
+more matte) result.
+
 ### Autonomous navigation in the map
 
 `3dgs-robotics navigate` drives a simulated robot through the map with no
