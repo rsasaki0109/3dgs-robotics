@@ -270,6 +270,29 @@ trajectory and the localizer re-estimates its poses from pixels alone:
 Compare `/gs_localizer/pose` against `/gs_camera_sim/gt_pose` (both in the
 map frame) to measure the loop's accuracy.
 
+### nav2 occupancy grid export
+
+`3dgs-robotics export-grid` projects a session round onto its estimated
+ground plane and writes the standard `map.pgm` + `map.yaml` pair that nav2's
+`map_server` loads directly (plus a `map.json` sidecar recording the 3D
+grid frame):
+
+```bash
+3dgs-robotics export-grid --map outputs/live_mapping/session --output nav2_map/map.yaml
+ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=nav2_map/map.yaml
+```
+
+Pose-free maps have no metric scale, so the export anchors everything to the
+**camera height above ground** (estimated from the mapped poses): the
+default cell size is 1/20 of it, and `--obstacle-band 0.2,2.0` marks cells
+occupied when enough gaussians sit between 0.2 and 2.0 camera-heights above
+the estimated ground. Free space comes from ground-level gaussians plus a
+swept corridor along the camera trajectory; everything else stays unknown.
+Tune `--min-opacity` / `--min-points-per-cell` upward if floaters from a
+draft round speckle the map, or retrain the round at higher quality first.
+If the map was built with metric poses, the units are metres and the yaml
+drops straight into a nav2 bringup.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |

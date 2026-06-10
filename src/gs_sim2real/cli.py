@@ -1192,6 +1192,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local clone of github.com/nv-tlabs/3dgrut (or set $THREEDGRUT_ROOT)",
     )
 
+    exg = subparsers.add_parser(
+        "export-grid",
+        help="Export a live-mapping session as a nav2 occupancy grid (map.pgm + map.yaml)",
+    )
+    exg.add_argument("--map", required=True, help="Live-mapping session directory")
+    exg.add_argument("--round", type=int, default=None, help="Rebuild round to export (default: last successful)")
+    exg.add_argument("--output", required=True, help="Output map.yaml path (map.pgm/.json land next to it)")
+    exg.add_argument(
+        "--resolution",
+        type=float,
+        default=None,
+        help="Cell size in map gauge units (default: camera height above ground / 20)",
+    )
+    exg.add_argument("--min-opacity", type=float, default=0.3, help="Ignore gaussians more transparent than this")
+    exg.add_argument(
+        "--obstacle-band",
+        default="0.2,2.0",
+        help="Obstacle height band as min,max in camera-height units (default: 0.2,2.0)",
+    )
+    exg.add_argument(
+        "--min-points-per-cell", type=int, default=2, help="Gaussians in the band needed to mark a cell occupied"
+    )
+    exg.add_argument(
+        "--ground-percentile",
+        type=float,
+        default=30.0,
+        help="Percentile of below-camera gaussian heights taken as the ground level",
+    )
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -3744,6 +3773,46 @@ def cmd_export_isaac(args: argparse.Namespace) -> None:
     print("Isaac Sim 5.0+: File > Import (or drag-and-drop) the USDZ, then add a ground plane for physics.")
 
 
+def cmd_export_grid(args: argparse.Namespace) -> None:
+    """Handle the export-grid subcommand."""
+    from gs_sim2real.robotics.occupancy_grid import GridParams, export_occupancy_grid
+
+    try:
+        band = tuple(float(part) for part in args.obstacle_band.split(","))
+        if len(band) != 2 or band[0] >= band[1]:
+            raise ValueError
+    except ValueError:
+        raise SystemExit(f"--obstacle-band must be min,max with min < max: {args.obstacle_band!r}") from None
+
+    params = GridParams(
+        resolution=args.resolution,
+        min_opacity=args.min_opacity,
+        obstacle_band=(band[0], band[1]),
+        ground_percentile=args.ground_percentile,
+        min_points_per_cell=args.min_points_per_cell,
+    )
+    try:
+        grid, yaml_path = export_occupancy_grid(
+            Path(args.map), Path(args.output), round_index=args.round, params=params
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+
+    height, width = grid.data.shape
+    total = height * width
+    print(f"Wrote {yaml_path} + {yaml_path.with_suffix('.pgm').name} + {yaml_path.with_suffix('.json').name}")
+    print(
+        f"Grid {width}x{height} cells @ {grid.resolution:.4f} gauge units/cell "
+        f"(camera height above ground = {grid.camera_height:.4f})"
+    )
+    print(
+        f"Occupied {grid.occupied_cells / total:.1%}, free {grid.free_cells / total:.1%}, "
+        f"unknown {(total - grid.occupied_cells - grid.free_cells) / total:.1%}"
+    )
+    print("Units follow the map's reconstruction gauge (not metres) unless the map was built with metric poses.")
+    print(f"Serve it: ros2 run nav2_map_server map_server --ros-args -p yaml_filename:={yaml_path}")
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4491,6 +4560,7 @@ def main(argv: list[str] | None = None) -> None:
         "splat-filter": cmd_splat_filter,
         "localize": cmd_localize,
         "export-isaac": cmd_export_isaac,
+        "export-grid": cmd_export_grid,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,
