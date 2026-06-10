@@ -83,6 +83,47 @@ keyframes' camera orientations, scale/translation from their centers) onto the
 final round, then renders every aligned round from one fixed top-down
 orthographic camera so the strip visibly extends.
 
+## 3DGS localization
+
+After a live-mapping session finishes, localize query frames against the
+final round's trained gaussians (`train/point_cloud.ply`, same gauge as
+`images.txt`). Stage 1 picks the nearest mapped keyframe thumbnail; stage 2
+refines pose with differentiable gsplat rendering (L1 + SSIM).
+
+Draft maps from the default `--iterations 1500` rebuilds are often too blurry
+for tight photometric alignment. For demo-quality localization, retrain the
+final round's sparse input at **7k–15k** iterations first:
+
+```bash
+# backup the draft map, then retrain round 006 in place
+cp outputs/live_demo_kitti0056/session/rounds/round_006/train/point_cloud.ply \
+   outputs/live_demo_kitti0056/session/rounds/round_006/train/point_cloud_iter_1500.ply
+
+PYTHONPATH=src gs-mapper train \
+  --data outputs/live_demo_kitti0056/session/rounds/round_006/sparse_input \
+  --output outputs/live_demo_kitti0056/session/rounds/round_006/train \
+  --iterations 10000
+
+# localize non-round keyframes + trajectory GIF
+PYTHONPATH=src gs-mapper localize \
+  --map outputs/live_demo_kitti0056/session \
+  --non-round-keyframes \
+  --output /tmp/localization-kitti0056.json
+
+python3 scripts/build_localization_gif.py \
+  --session outputs/live_demo_kitti0056/session \
+  --output docs/images/live-mapping/localization-kitti0056.gif
+```
+
+![3DGS localization on KITTI drive 0056](images/live-mapping/localization-kitti0056.gif)
+
+*Blue: mapped keyframe trajectory. Green: interpolated GT for query frames.
+Orange: estimated poses (gauge-relative error in the HUD).*
+
+Evaluation is **gauge-relative** (median spacing between mapped keyframe
+centers). Pose-free monocular maps are not metric — do not report meter-level
+accuracy.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |

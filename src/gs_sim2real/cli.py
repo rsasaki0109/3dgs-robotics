@@ -1128,6 +1128,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     si.add_argument("--json", action="store_true", help="Print machine-readable JSON")
 
+    loc = subparsers.add_parser(
+        "localize",
+        help="Localize query images against a live-mapping 3DGS session (retrieval + photometric refine)",
+    )
+    loc.add_argument(
+        "--map",
+        required=True,
+        help="Live-mapping session directory (contains keyframes/ and rounds/)",
+    )
+    loc.add_argument(
+        "--query",
+        default=None,
+        help="Query image file or directory of images to localize (optional with --non-round-keyframes)",
+    )
+    loc.add_argument(
+        "--round",
+        type=int,
+        default=None,
+        help="Rebuild round to localize against (default: last successful round from live/state.json)",
+    )
+    loc.add_argument(
+        "--output",
+        default=None,
+        help="Write JSON summary to this path (default: print to stdout)",
+    )
+    loc.add_argument(
+        "--non-round-keyframes",
+        action="store_true",
+        help="Localize every session keyframe that is absent from the round's images.txt",
+    )
+    loc.add_argument("--device", default="cuda", help="Torch device for gsplat refinement (default: cuda)")
+    loc.add_argument("--refine-iters", type=int, default=80, help="Adam steps per pyramid level (default: 80)")
+    loc.add_argument("--refine-lr", type=float, default=0.005, help="Adam learning rate for SE(3) delta (default: 0.005)")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -3586,6 +3620,47 @@ def cmd_splat_filter(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_localize(args: argparse.Namespace) -> None:
+    """Handle the localize subcommand."""
+    from gs_sim2real.robotics.localize import (
+        LocalizeConfig,
+        list_non_round_keyframes,
+        localize_queries,
+        resolve_live_map_session,
+        write_localize_summary,
+    )
+
+    session = resolve_live_map_session(Path(args.map), round_index=args.round)
+    if args.non_round_keyframes:
+        query_paths = list_non_round_keyframes(session)
+        if not query_paths:
+            raise SystemExit("no non-round keyframes found to localize")
+    elif args.query is None:
+        raise SystemExit("--query is required unless --non-round-keyframes is set")
+    else:
+        query_path = Path(args.query)
+        if query_path.is_dir():
+            query_paths = sorted(
+                p for p in list(query_path.glob("*.jpg")) + list(query_path.glob("*.png")) if p.is_file()
+            )
+            if not query_paths:
+                raise SystemExit(f"no JPG/PNG images found under {query_path}")
+        else:
+            query_paths = [query_path]
+
+    config = LocalizeConfig(
+        device=args.device,
+        refine_iters=args.refine_iters,
+        refine_lr=args.refine_lr,
+    )
+    summary = localize_queries(session.session_dir, query_paths, round_index=args.round, config=config)
+    if args.output:
+        write_localize_summary(summary, Path(args.output))
+        print(f"Wrote localization summary: {args.output}")
+    else:
+        print(json.dumps(summary.to_json(), indent=2))
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4331,6 +4406,7 @@ def main(argv: list[str] | None = None) -> None:
         "video-to-splat": cmd_video_to_splat,
         "map": cmd_video_to_splat,
         "splat-filter": cmd_splat_filter,
+        "localize": cmd_localize,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

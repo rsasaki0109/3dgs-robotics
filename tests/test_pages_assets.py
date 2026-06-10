@@ -425,6 +425,20 @@ def test_live_mapping_grow_gif_is_real_and_linked() -> None:
         assert image.n_frames >= 4, "growth needs several rebuild rounds"
 
 
+def test_localization_gif_is_real_and_linked() -> None:
+    """The localization GIF must be linked from live-mapping docs."""
+    loc_gif = REPO_ROOT / "docs" / "images" / "live-mapping" / "localization-kitti0056.gif"
+    live_doc = (REPO_ROOT / "docs" / "live-mapping.md").read_text(encoding="utf-8")
+    sidecar = loc_gif.with_suffix(".json")
+    assert "images/live-mapping/localization-kitti0056.gif" in live_doc
+    assert "build_localization_gif.py" in live_doc
+    assert loc_gif.stat().st_size > 50_000
+    assert sidecar.is_file()
+    with Image.open(loc_gif) as image:
+        assert image.size == (960, 420)
+        assert image.n_frames >= 4
+
+
 def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
     """The share image should be a real 1200x630 card, not an arbitrary scene thumbnail."""
     card = REPO_ROOT / "docs" / "images" / "social-card.png"

@@ -758,6 +758,24 @@ class TestCLIHelp:
         assert args.open_viewer is False
         assert args.quality == "balanced"
 
+    def test_cli_localize_defaults(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "localize",
+                "--map",
+                "outputs/live_mapping/session",
+                "--query",
+                "query.jpg",
+            ]
+        )
+        assert args.command == "localize"
+        assert args.map == "outputs/live_mapping/session"
+        assert args.query == "query.jpg"
+        assert args.round is None
+        assert args.non_round_keyframes is False
+        assert args.refine_iters == 80
+        assert args.device == "cuda"
+
     def test_video_to_splat_extracts_frames_and_delegates(self, tmp_path: Path, monkeypatch) -> None:
         """video-to-splat should extract frames then reuse the photos-to-splat pipeline."""
         pytest.importorskip("cv2")
