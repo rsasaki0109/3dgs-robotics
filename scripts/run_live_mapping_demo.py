@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fps", type=float, default=2.0, help="Replay rate (frames per second)")
     parser.add_argument("--no-realtime", action="store_true", help="Feed frames without sleeping between them")
     parser.add_argument("--port", type=int, default=8765, help="HTTP port for the live viewer (0 disables)")
-    parser.add_argument("--method", default="dust3r", choices=["dust3r", "mast3r", "simple"])
+    parser.add_argument("--method", default="dust3r", choices=["dust3r", "mast3r", "vggt", "simple"])
     parser.add_argument("--iterations", type=int, default=1500, help="gsplat iterations per rebuild round")
     parser.add_argument("--align-iters", type=int, default=150, help="DUSt3R alignment iterations per round")
     parser.add_argument("--scene-graph", default="swin-3", help="DUSt3R pair graph for sequential frames")
@@ -52,6 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-keyframe-motion", type=float, default=0.02, help="Min thumbnail diff (0..1)")
     parser.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint path or HF hub id")
     parser.add_argument("--dust3r-root", default=None, help="Local clone of naver/dust3r")
+    parser.add_argument(
+        "--vggt-checkpoint",
+        default=None,
+        help="VGGT checkpoint .pt path or Hugging Face hub id (default: facebook/VGGT-1B)",
+    )
+    parser.add_argument("--vggt-root", default=None, help="Local clone of facebookresearch/vggt")
     parser.add_argument("--hold", action="store_true", help="Keep serving after the replay until Ctrl+C")
     return parser
 
@@ -79,8 +85,13 @@ def main() -> None:
         iterations=args.iterations,
         align_iters=args.align_iters,
         scene_graph=args.scene_graph,
-        checkpoint=Path(args.dust3r_checkpoint) if args.dust3r_checkpoint else None,
+        checkpoint=(
+            args.vggt_checkpoint
+            if args.method == "vggt" and args.vggt_checkpoint
+            else (Path(args.dust3r_checkpoint) if args.dust3r_checkpoint else None)
+        ),
         dust3r_root=Path(args.dust3r_root) if args.dust3r_root else None,
+        vggt_root=Path(args.vggt_root) if args.vggt_root else None,
         viewer_html=viewer_html if viewer_html.is_file() else None,
     )
     session = LiveMappingSession(config)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -692,6 +693,38 @@ class TestCLIHelp:
         assert args.splat_max_scale == 2.0
         assert args.splat_max_scale_percentile == 98.0
 
+    def test_cli_preprocess_vggt_method(self) -> None:
+        """preprocess accepts vggt as a pose-free backend."""
+        args = build_parser().parse_args(
+            [
+                "preprocess",
+                "--images",
+                "frames/",
+                "--method",
+                "vggt",
+                "--vggt-root",
+                "/tmp/vggt",
+            ]
+        )
+        assert args.method == "vggt"
+        assert args.vggt_root == "/tmp/vggt"
+
+    def test_cli_photos_to_splat_vggt_preprocess(self) -> None:
+        """photos-to-splat accepts vggt as a pose-estimation backend."""
+        args = build_parser().parse_args(
+            [
+                "photos-to-splat",
+                "--images",
+                "photos/",
+                "--preprocess",
+                "vggt",
+                "--vggt-checkpoint",
+                "facebook/VGGT-1B",
+            ]
+        )
+        assert args.preprocess == "vggt"
+        assert args.vggt_checkpoint == "facebook/VGGT-1B"
+
     def test_cli_photos_to_splat_defaults(self) -> None:
         """photos-to-splat parser accepts the minimal form and has sane defaults."""
         args = build_parser().parse_args(["photos-to-splat", "--images", "photos/"])
@@ -706,6 +739,61 @@ class TestCLIHelp:
         assert args.splat_min_opacity == 0.02
         assert args.splat_max_scale == 2.0
         assert args.splat_max_scale_percentile is None
+
+    def test_cli_video_to_splat_defaults(self) -> None:
+        """video-to-splat parser accepts a video path and uses video-oriented defaults."""
+        args = build_parser().parse_args(["video-to-splat", "walk.mp4"])
+        assert args.command == "video-to-splat"
+        assert args.video == "walk.mp4"
+        assert args.output is None
+        assert args.num_frames == 32
+        assert args.open_viewer is True
+        assert args.viewer_port == 8000
+
+    def test_cli_map_alias_matches_video_to_splat(self) -> None:
+        """map is a short alias for video-to-splat."""
+        args = build_parser().parse_args(["map", "drive.mov", "--no-open-viewer", "--quality", "balanced"])
+        assert args.command == "map"
+        assert args.video == "drive.mov"
+        assert args.open_viewer is False
+        assert args.quality == "balanced"
+
+    def test_video_to_splat_extracts_frames_and_delegates(self, tmp_path: Path, monkeypatch) -> None:
+        """video-to-splat should extract frames then reuse the photos-to-splat pipeline."""
+        pytest.importorskip("cv2")
+        from tests.test_preprocess import _create_test_video
+
+        video_path = _create_test_video(tmp_path / "clip.mp4", num_frames=10)
+        output_dir = tmp_path / "out"
+        delegated: list[argparse.Namespace] = []
+
+        def fake_photos_to_splat(args) -> None:
+            delegated.append(args)
+
+        monkeypatch.setattr("gs_sim2real.cli.cmd_photos_to_splat", fake_photos_to_splat)
+
+        main(
+            [
+                "video-to-splat",
+                str(video_path),
+                "--output",
+                str(output_dir),
+                "--preprocess",
+                "simple",
+                "--num-frames",
+                "4",
+                "--no-open-viewer",
+            ]
+        )
+
+        frames_dir = output_dir / "clip"
+        assert frames_dir.is_dir()
+        assert len(list(frames_dir.glob("frame_*.png"))) == 4
+        assert len(delegated) == 1
+        assert delegated[0].images == str(frames_dir)
+        assert delegated[0].output == str(output_dir)
+        assert delegated[0].num_frames == 4
+        assert delegated[0].preprocess == "simple"
 
     def test_cli_photos_to_splat_clean_quality_resolves_heavier_defaults(self) -> None:
         """clean preset should spend more compute and filter browser-blurring gaussians."""

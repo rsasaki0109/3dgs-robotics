@@ -42,7 +42,7 @@ class LiveMapperConfig:
     """Tuning knobs for keyframe selection and incremental rebuilds."""
 
     workdir: Path
-    method: str = "dust3r"  # dust3r | mast3r | simple
+    method: str = "dust3r"  # dust3r | mast3r | vggt | simple
     # keyframe gating
     min_keyframe_gap_s: float = 1.0
     min_keyframe_motion: float = 0.04  # mean abs diff (0..1) on a gray thumbnail
@@ -60,9 +60,10 @@ class LiveMapperConfig:
     jpeg_quality: int = 92
     device: str = "cuda"
     # backend overrides (None -> pose_free defaults / env vars)
-    checkpoint: Path | None = None
+    checkpoint: Path | str | None = None
     dust3r_root: Path | None = None
     mast3r_root: Path | None = None
+    vggt_root: Path | None = None
     # optional page copied to live/index.html so one HTTP server serves the demo
     viewer_html: Path | None = None
 
@@ -162,6 +163,8 @@ class SplatRebuilder:
             processor_kwargs["dust3r_root"] = cfg.dust3r_root
         if cfg.mast3r_root:
             processor_kwargs["mast3r_root"] = cfg.mast3r_root
+        if cfg.vggt_root:
+            processor_kwargs["vggt_root"] = cfg.vggt_root
 
         sparse_dir = round_dir / "sparse_input"
         PoseFreeProcessor(**processor_kwargs).estimate_poses(images_dir, sparse_dir)

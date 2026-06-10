@@ -16,7 +16,7 @@ so far, so the published map grows over time. `live/latest.splat` and
 swaps the map in place without resetting the camera.
 
 ```
-camera topic ──> keyframe gate ──> rebuild rounds (DUSt3R + gsplat) ──> live/latest.splat
+camera topic ──> keyframe gate ──> rebuild rounds (DUSt3R / VGGT + gsplat) ──> live/latest.splat
 (odom topic)     (time + motion)   whole-run, evenly strided             live/state.json
                                                                             │ HTTP (no-cache)
                                                   browser viewer  <─ poll ──┘
@@ -51,6 +51,12 @@ DUSt3R backend setup matches `photos-to-splat`: clone
 the HF hub id `naver/DUSt3R_ViTLarge_BaseDecoder_512_dpt`
 (`--dust3r-checkpoint`). `--method simple` exercises the plumbing without a
 checkpoint (non-metric output, smoke tests only).
+
+**VGGT feedforward backend** (`--method vggt`) uses
+[facebookresearch/vggt](https://github.com/facebookresearch/vggt). Clone the
+repo, set `VGGT_PATH` or pass `--vggt-root`, and optionally `--vggt-checkpoint`
+(default hub id `facebook/VGGT-1B`). This is the in-repo one-pass backend — not
+the VGGT-SLAM 2.0 external artifact importer.
 
 ## Quickstart (no ROS)
 
@@ -87,15 +93,18 @@ orthographic camera so the strip visibly extends.
 | `--rebuild-min-new` | 4 | New keyframes required to trigger a rebuild round |
 | `--num-frames` | 24 | Frame cap per round (evenly strided over the whole run) |
 | `--iterations` | 1500 | gsplat iterations per round (draft latency over fidelity) |
-| `--align-iters` | 150 | DUSt3R global alignment iterations per round |
-| `--scene-graph` | `swin-3` | Pair graph; sequential streams want `swin-N` |
+| `--align-iters` | 150 | DUSt3R global alignment iterations per round (ignored for `--method vggt`) |
+| `--scene-graph` | `swin-3` | Pair graph; sequential streams want `swin-N` (DUSt3R/MAST3R only) |
+| `--method` | `dust3r` | Pose-free backend: `dust3r`, `mast3r`, `vggt`, or `simple` |
 | `--max-keyframes` | 512 | Hard cap on stored keyframes |
 
 Each round is a full draft rebuild over a strided snapshot of the run — an
 intentionally simple contract (no warm-start state to corrupt, bounded round
 time via `--num-frames`). On a 16 GB RTX 4070 Ti SUPER a 24-frame round takes
-roughly 2–4 minutes with DUSt3R; lower `--num-frames` / `--iterations` for
-faster rounds, raise them for cleaner maps.
+roughly 2–4 minutes with DUSt3R preprocess + 1500 gsplat iterations; the same
+round with `--method vggt` is typically **~30–90 seconds for preprocess**
+(feedforward, no global alignment) plus training time. Lower `--num-frames` /
+`--iterations` for faster rounds, raise them for cleaner maps.
 
 ## Outputs
 

@@ -2,8 +2,9 @@
 
 Two real backends ship here: DUSt3R (pairwise pointmap prediction + global
 alignment) and MAST3R (metric-aware descendant of DUSt3R; sparse global
-alignment). Both write a COLMAP-text sparse model compatible with the gsplat
-trainer. The "simple" fallback remains for unit tests / sanity checks when
+alignment). VGGT (feedforward Visual Geometry Grounded Transformer) adds a
+one-pass backend that exports COLMAP binaries via pycolmap. Both write models
+compatible with the gsplat trainer. The "simple" fallback remains for unit tests / sanity checks when
 neither clone is available — it arranges cameras in a circle so the trainer
 has something to chew on, but the result is not meaningful.
 
@@ -52,6 +53,8 @@ _DEFAULT_DUST3R_ROOT = Path(os.environ.get("DUST3R_PATH", "/tmp/dust3r"))
 _DEFAULT_CHECKPOINT_NAME = "DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
 _DEFAULT_MAST3R_ROOT = Path(os.environ.get("MAST3R_PATH", "/tmp/mast3r"))
 _DEFAULT_MAST3R_CHECKPOINT_NAME = "MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+_DEFAULT_VGGT_ROOT = Path(os.environ.get("VGGT_PATH", "/tmp/vggt"))
+_DEFAULT_VGGT_HUB_ID = "facebook/VGGT-1B"
 
 
 def _add_dust3r_to_path(dust3r_root: Path) -> None:
@@ -382,6 +385,9 @@ class PoseFreeProcessor:
         dust3r_root: Path | None = None,
         mast3r_root: Path | None = None,
         mast3r_cache: Path | None = None,
+        vggt_root: Path | None = None,
+        vggt_hub_id: str | None = None,
+        vggt_conf_threshold: float = 1.0,
         num_frames: int = 30,
         image_size: int = 512,
         device: str = "cuda",
@@ -396,10 +402,15 @@ class PoseFreeProcessor:
         self.dust3r_root = Path(dust3r_root) if dust3r_root else _DEFAULT_DUST3R_ROOT
         self.mast3r_root = Path(mast3r_root) if mast3r_root else _DEFAULT_MAST3R_ROOT
         self.mast3r_cache = Path(mast3r_cache) if mast3r_cache else None
+        self.vggt_root = Path(vggt_root) if vggt_root else _DEFAULT_VGGT_ROOT
+        self.vggt_hub_id = vggt_hub_id or _DEFAULT_VGGT_HUB_ID
+        self.vggt_conf_threshold = vggt_conf_threshold
         if checkpoint:
-            self.checkpoint = Path(checkpoint)
+            self.checkpoint = checkpoint if isinstance(checkpoint, str) and not str(checkpoint).endswith(".pt") else Path(checkpoint)
         elif method == "mast3r":
             self.checkpoint = self.mast3r_root / "checkpoints" / _DEFAULT_MAST3R_CHECKPOINT_NAME
+        elif method == "vggt":
+            self.checkpoint = None
         else:
             self.checkpoint = self.dust3r_root / "checkpoints" / _DEFAULT_CHECKPOINT_NAME
         self.num_frames = num_frames
@@ -428,9 +439,29 @@ class PoseFreeProcessor:
             return self._run_dust3r(images, output_dir)
         if self.method == "mast3r":
             return self._run_mast3r(images, output_dir)
+        if self.method == "vggt":
+            return self._run_vggt(images, output_dir)
         if self.method == "simple":
             return self._run_simple_init(images, output_dir)
         raise ValueError(f"Unknown pose-free method: {self.method}")
+
+    def _run_vggt(self, images: list[Path], output_dir: Path) -> str:
+        from gs_sim2real.preprocess.vggt_backend import run_vggt_inference
+
+        selected = _select_frames(images, self.num_frames)
+        logger.info("VGGT using %d / %d images", len(selected), len(images))
+        sparse_dir = run_vggt_inference(
+            selected,
+            output_dir,
+            checkpoint=self.checkpoint,
+            hub_id=self.vggt_hub_id,
+            vggt_root=self.vggt_root,
+            device=self.device,
+            conf_thres_value=self.vggt_conf_threshold,
+            max_points=self.max_points,
+        )
+        np.save(output_dir / "vggt_frame_count.npy", np.array([len(selected)], dtype=np.int32))
+        return str(sparse_dir)
 
     def _run_mast3r(self, images: list[Path], output_dir: Path) -> str:
         try:

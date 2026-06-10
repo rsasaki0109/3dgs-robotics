@@ -92,3 +92,40 @@ class TestExtractFrames:
             img = cv2.imread(str(frame_path))
             assert img is not None
             assert img.shape == (48, 64, 3)
+
+
+class TestPlanVideoFrameSampling:
+    """Tests for automatic video frame sampling plans."""
+
+    @pytest.fixture(autouse=True)
+    def _check_cv2(self) -> None:
+        pytest.importorskip("cv2")
+
+    def test_short_video_uses_every_frame(self, tmp_path: Path) -> None:
+        from gs_sim2real.preprocess.extract_frames import plan_video_frame_sampling
+
+        video_path = _create_test_video(tmp_path / "short.mp4", num_frames=8)
+        plan = plan_video_frame_sampling(video_path, target_frames=32)
+
+        assert plan.every_n == 1
+        assert plan.max_frames == 8
+        assert plan.total_frames == 8
+
+    def test_long_video_subsamples_to_target(self, tmp_path: Path) -> None:
+        from gs_sim2real.preprocess.extract_frames import plan_video_frame_sampling
+
+        video_path = _create_test_video(tmp_path / "long.mp4", num_frames=120)
+        plan = plan_video_frame_sampling(video_path, target_frames=32)
+
+        assert plan.every_n >= 3
+        assert plan.max_frames == 32
+        assert plan.total_frames == 120
+
+    def test_target_zero_means_all_frames(self, tmp_path: Path) -> None:
+        from gs_sim2real.preprocess.extract_frames import plan_video_frame_sampling
+
+        video_path = _create_test_video(tmp_path / "all.mp4", num_frames=12)
+        plan = plan_video_frame_sampling(video_path, target_frames=0)
+
+        assert plan.every_n == 1
+        assert plan.max_frames is None

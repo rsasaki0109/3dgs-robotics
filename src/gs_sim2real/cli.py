@@ -21,6 +21,8 @@ _PREPROCESS_METHOD_CHOICES = [
     "frames",
     "pose-free",
     "dust3r",
+    "mast3r",
+    "vggt",
     "simple",
     "waymo",
     "mcd",
@@ -31,6 +33,8 @@ _PIPELINE_PREPROCESS_METHOD_CHOICES = [
     "colmap",
     "pose-free",
     "dust3r",
+    "mast3r",
+    "vggt",
     "simple",
     "waymo",
     "mcd",
@@ -80,6 +84,109 @@ _PHOTOS_TO_SPLAT_QUALITY_PRESETS = {
         "splat_max_scale_percentile": 96.0,
     },
 }
+
+
+def _add_photos_to_splat_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    num_frames_default: int = 20,
+    output_default: str | None = "outputs/photos_splat",
+) -> None:
+    """Register shared photos/video-to-splat pipeline flags."""
+    if output_default is None:
+        output_help = "Root output directory (default: outputs/<video-stem>_splat)"
+    else:
+        output_help = f"Root output directory (default: {output_default})"
+    parser.add_argument("--output", default=output_default, help=output_help)
+    parser.add_argument(
+        "--preprocess",
+        choices=["dust3r", "mast3r", "vggt", "simple"],
+        default="dust3r",
+        help="Pose-estimation backend. 'mast3r' uses naver/mast3r (newer, metric-aware). "
+        "'vggt' uses facebook/VGGT-1B feedforward reconstruction (requires VGGT clone). "
+        "'simple' is a non-metric circular fallback for smoke tests.",
+    )
+    parser.add_argument(
+        "--quality",
+        choices=list(_PHOTOS_TO_SPLAT_QUALITY_PRESETS),
+        default="draft",
+        help=(
+            "Quality preset. draft preserves the fast legacy defaults; clean/hero use more frames, "
+            "more alignment/training iterations, and stricter export filtering for cleaner maps."
+        ),
+    )
+    parser.add_argument(
+        "--num-frames",
+        type=int,
+        default=num_frames_default,
+        help=f"Frame cap for pose-free reconstruction (0 = all). Default {num_frames_default}.",
+    )
+    parser.add_argument(
+        "--scene-graph", default="complete", help="DUSt3R/MAST3R pair graph (complete / swin-N / oneref-K)"
+    )
+    parser.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint .pth path")
+    parser.add_argument(
+        "--dust3r-root", default=None, help="Local clone of naver/dust3r (default: DUST3R_PATH env or /tmp/dust3r)"
+    )
+    parser.add_argument("--mast3r-checkpoint", default=None, help="MAST3R checkpoint .pth path")
+    parser.add_argument(
+        "--mast3r-root", default=None, help="Local clone of naver/mast3r (default: MAST3R_PATH env or /tmp/mast3r)"
+    )
+    parser.add_argument(
+        "--vggt-checkpoint",
+        default=None,
+        help="VGGT checkpoint .pt path or Hugging Face hub id (default: facebook/VGGT-1B)",
+    )
+    parser.add_argument(
+        "--vggt-root",
+        default=None,
+        help="Local clone of facebookresearch/vggt (default: VGGT_PATH env or /tmp/vggt)",
+    )
+    parser.add_argument("--mast3r-subsample", type=int, default=8, help="MAST3R pointcloud subsample stride")
+    parser.add_argument("--align-iters", type=int, default=300, help="DUSt3R global alignment iterations")
+    parser.add_argument("--iterations", type=int, default=3000, help="gsplat training iterations")
+    parser.add_argument("--config", default=None, help="Training config YAML override")
+    parser.add_argument(
+        "--splat-max-points", type=int, default=400000, help="Max gaussians in .splat output (default: 400k)"
+    )
+    parser.add_argument(
+        "--splat-normalize-extent",
+        type=float,
+        default=17.0,
+        help="Rescale so the scene max-axis extent matches this (matches docs/splat.html defaults).",
+    )
+    parser.add_argument("--splat-min-opacity", type=float, default=0.02, help="Drop gaussians below this opacity")
+    parser.add_argument("--splat-max-scale", type=float, default=2.0, help="Drop gaussians above this scale (meters)")
+    parser.add_argument(
+        "--splat-max-scale-percentile",
+        type=float,
+        default=None,
+        help="Drop gaussians above this adaptive max-scale percentile during .splat export.",
+    )
+    parser.add_argument("--skip-data-check", action="store_true", help="Skip COLMAP sparse preflight before training")
+
+
+def _register_video_to_splat_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register ``video-to-splat`` and the shorter ``map`` alias."""
+    for name, help_text in (
+        ("video-to-splat", "One-shot: mp4/mov -> frame extract -> pose-free -> gsplat train -> .splat file"),
+        ("map", "Alias for video-to-splat: one video file -> browser-ready .splat"),
+    ):
+        parser = subparsers.add_parser(name, help=help_text)
+        parser.add_argument("video", help="Input video file (.mp4, .mov, .mkv, ...)")
+        _add_photos_to_splat_arguments(parser, num_frames_default=32, output_default=None)
+        parser.add_argument(
+            "--open-viewer",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Start a local HTTP server and open docs/splat.html when training finishes (default: on)",
+        )
+        parser.add_argument(
+            "--viewer-port",
+            type=int,
+            default=8000,
+            help="Port for the local docs HTTP server used by --open-viewer (default: 8000)",
+        )
 
 
 def _add_external_slam_args(parser: argparse.ArgumentParser, *, context: str) -> None:
@@ -169,6 +276,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="colmap",
         help="Preprocessing method (default: colmap). "
         "'pose-free' and 'dust3r' use DUSt3R for pose estimation; "
+        "'mast3r' uses MAST3R sparse global alignment; "
+        "'vggt' uses facebook/VGGT-1B feedforward reconstruction; "
         "'simple' uses circular camera initialization; "
         "'waymo' extracts frames from Waymo tfrecord files; "
         "'mcd' extracts images and optional sensors from MCD rosbags; "
@@ -346,6 +455,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pp.add_argument("--pointcloud", default=None, help="Point cloud file for lidar-slam (.ply/.npy/.pcd)")
     _add_external_slam_args(pp, context="preprocess")
+    pp.add_argument(
+        "--vggt-checkpoint",
+        default=None,
+        help="For --method vggt, checkpoint .pt path or Hugging Face hub id (default: facebook/VGGT-1B)",
+    )
+    pp.add_argument(
+        "--vggt-root",
+        default=None,
+        help="For --method vggt, local clone of facebookresearch/vggt (default: VGGT_PATH env or /tmp/vggt)",
+    )
 
     # train
     tr = subparsers.add_parser("train", help="Train a 3DGS model")
@@ -974,61 +1093,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="One-shot: a folder of JPG/PNG -> DUSt3R pose-free -> gsplat train -> .splat file",
     )
     p2s.add_argument("--images", required=True, help="Directory of input images (jpg/png)")
-    p2s.add_argument(
-        "--output", default="outputs/photos_splat", help="Root output directory (default: outputs/photos_splat)"
-    )
-    p2s.add_argument(
-        "--preprocess",
-        choices=["dust3r", "mast3r", "simple"],
-        default="dust3r",
-        help="Pose-estimation backend. 'mast3r' uses naver/mast3r (newer, metric-aware). "
-        "'simple' is a non-metric circular fallback for smoke tests.",
-    )
-    p2s.add_argument(
-        "--quality",
-        choices=list(_PHOTOS_TO_SPLAT_QUALITY_PRESETS),
-        default="draft",
-        help=(
-            "Quality preset. draft preserves the fast legacy defaults; clean/hero use more frames, "
-            "more alignment/training iterations, and stricter export filtering for cleaner maps."
-        ),
-    )
-    p2s.add_argument(
-        "--num-frames", type=int, default=20, help="DUSt3R/MAST3R frame cap (0 = all). Default 20 fits a 16 GB GPU."
-    )
-    p2s.add_argument(
-        "--scene-graph", default="complete", help="DUSt3R/MAST3R pair graph (complete / swin-N / oneref-K)"
-    )
-    p2s.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint .pth path")
-    p2s.add_argument(
-        "--dust3r-root", default=None, help="Local clone of naver/dust3r (default: DUST3R_PATH env or /tmp/dust3r)"
-    )
-    p2s.add_argument("--mast3r-checkpoint", default=None, help="MAST3R checkpoint .pth path")
-    p2s.add_argument(
-        "--mast3r-root", default=None, help="Local clone of naver/mast3r (default: MAST3R_PATH env or /tmp/mast3r)"
-    )
-    p2s.add_argument("--mast3r-subsample", type=int, default=8, help="MAST3R pointcloud subsample stride")
-    p2s.add_argument("--align-iters", type=int, default=300, help="DUSt3R global alignment iterations")
-    p2s.add_argument("--iterations", type=int, default=3000, help="gsplat training iterations")
-    p2s.add_argument("--config", default=None, help="Training config YAML override")
-    p2s.add_argument(
-        "--splat-max-points", type=int, default=400000, help="Max gaussians in .splat output (default: 400k)"
-    )
-    p2s.add_argument(
-        "--splat-normalize-extent",
-        type=float,
-        default=17.0,
-        help="Rescale so the scene max-axis extent matches this (matches docs/splat.html defaults).",
-    )
-    p2s.add_argument("--splat-min-opacity", type=float, default=0.02, help="Drop gaussians below this opacity")
-    p2s.add_argument("--splat-max-scale", type=float, default=2.0, help="Drop gaussians above this scale (meters)")
-    p2s.add_argument(
-        "--splat-max-scale-percentile",
-        type=float,
-        default=None,
-        help="Drop gaussians above this adaptive max-scale percentile during .splat export.",
-    )
-    p2s.add_argument("--skip-data-check", action="store_true", help="Skip COLMAP sparse preflight before training")
+    _add_photos_to_splat_arguments(p2s)
+
+    _register_video_to_splat_parser(subparsers)
 
     # splat-filter
     sf = subparsers.add_parser(
@@ -2783,15 +2850,13 @@ def cmd_preprocess(args: argparse.Namespace) -> None:
                 print("External SLAM dry run complete.")
         else:
             print(f"External SLAM import complete: {sparse_dir}")
-    elif args.method in ("pose-free", "dust3r", "simple"):
+    elif args.method in _POSE_FREE_METHOD_MAP:
         from gs_sim2real.preprocess.pose_free import run_pose_free
 
-        # Map CLI method names to PoseFreeProcessor methods
-        method_map = {"pose-free": "dust3r", "dust3r": "dust3r", "simple": "simple"}
         run_pose_free(
             image_dir=images_path,
             output_dir=output_dir,
-            method=method_map[args.method],
+            **_pose_free_kwargs_from_args(args),
         )
     else:
         from gs_sim2real.preprocess.colmap import run_colmap
@@ -2823,6 +2888,137 @@ def _resolve_photos_to_splat_quality(args: argparse.Namespace) -> argparse.Names
         if values.get(key) == _PHOTOS_TO_SPLAT_DEFAULTS[key]:
             values[key] = value
     return argparse.Namespace(**values)
+
+
+_POSE_FREE_METHOD_MAP = {
+    "pose-free": "dust3r",
+    "dust3r": "dust3r",
+    "mast3r": "mast3r",
+    "vggt": "vggt",
+    "simple": "simple",
+}
+
+
+def _pose_free_kwargs_from_args(args: argparse.Namespace, *, method: str | None = None) -> dict:
+    """Build PoseFreeProcessor kwargs from CLI flags."""
+    cli_method = method or getattr(args, "method", None) or getattr(args, "preprocess", "dust3r")
+    resolved = _POSE_FREE_METHOD_MAP.get(cli_method, cli_method)
+    kwargs: dict = {
+        "method": resolved,
+        "num_frames": getattr(args, "num_frames", 30),
+        "scene_graph": getattr(args, "scene_graph", "complete"),
+        "align_iters": getattr(args, "align_iters", 300),
+        "mast3r_subsample": getattr(args, "mast3r_subsample", 8),
+    }
+    if resolved == "mast3r":
+        if getattr(args, "mast3r_checkpoint", None):
+            kwargs["checkpoint"] = Path(args.mast3r_checkpoint)
+        if getattr(args, "mast3r_root", None):
+            kwargs["mast3r_root"] = Path(args.mast3r_root)
+    elif resolved == "vggt":
+        if getattr(args, "vggt_checkpoint", None):
+            kwargs["checkpoint"] = args.vggt_checkpoint
+        if getattr(args, "vggt_root", None):
+            kwargs["vggt_root"] = Path(args.vggt_root)
+    else:
+        if getattr(args, "dust3r_checkpoint", None):
+            kwargs["checkpoint"] = Path(args.dust3r_checkpoint)
+        if getattr(args, "dust3r_root", None):
+            kwargs["dust3r_root"] = Path(args.dust3r_root)
+    return kwargs
+
+
+def _find_repo_root(start: Path | None = None) -> Path:
+    """Return the repository root that contains ``docs/splat.html``."""
+    candidate = (start or Path.cwd()).resolve()
+    for path in [candidate, *candidate.parents]:
+        if (path / "docs" / "splat.html").is_file():
+            return path
+    return candidate
+
+
+def _open_local_splat_viewer(splat_path: Path, *, port: int = 8000) -> None:
+    """Serve the repo over HTTP and open ``docs/splat.html`` for a local ``.splat`` file."""
+    import os
+    import threading
+    import webbrowser
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import quote
+
+    repo_root = _find_repo_root()
+    splat_path = splat_path.resolve()
+    docs_dir = repo_root / "docs"
+    rel_splat = os.path.relpath(splat_path, docs_dir).replace(os.sep, "/")
+
+    class RepoHTTPRequestHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(repo_root), **kwargs)
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), RepoHTTPRequestHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    viewer_url = f"http://127.0.0.1:{port}/docs/splat.html?url={quote(rel_splat, safe='/')}"
+    print(f"\nLocal viewer: {viewer_url}")
+    print("Leave this process running while you inspect the map in the browser.")
+    webbrowser.open(viewer_url)
+
+
+def cmd_video_to_splat(args: argparse.Namespace) -> None:
+    """Handle the video-to-splat / map subcommands.
+
+    One-shot pipeline: video file -> frame extraction -> pose-free sparse -> gsplat training
+    -> antimatter15 ``.splat`` binary, optionally opened in the local docs viewer.
+    """
+    from gs_sim2real.preprocess.extract_frames import VIDEO_EXTENSIONS, extract_frames, plan_video_frame_sampling
+
+    video_path = Path(args.video)
+    if not video_path.is_file():
+        print(f"Error: video file not found: {video_path}")
+        sys.exit(2)
+
+    suffix = video_path.suffix.lower()
+    if suffix and suffix not in VIDEO_EXTENSIONS:
+        print(f"Warning: {suffix} is not a known video extension; trying OpenCV anyway.")
+
+    output_dir = Path(args.output) if args.output else Path("outputs") / f"{video_path.stem}_splat"
+    frames_dir = output_dir / video_path.stem
+    sampling_target = args.num_frames if args.num_frames > 0 else 32
+    plan = plan_video_frame_sampling(video_path, target_frames=sampling_target)
+
+    print("=" * 60)
+    print(f"Step 1/4: Extract frames from {video_path.name}")
+    print("=" * 60)
+    print(
+        f"Sampling plan: every_n={plan.every_n}, max_frames={plan.max_frames}, "
+        f"video_frames={plan.total_frames}, fps={plan.video_fps:.1f}"
+    )
+    extracted = extract_frames(
+        video_path,
+        frames_dir,
+        every_n=plan.every_n,
+        max_frames=plan.max_frames,
+    )
+    if not extracted:
+        print("Error: no frames were extracted from the video.")
+        sys.exit(2)
+
+    photos_args = argparse.Namespace(**vars(args))
+    photos_args.images = str(frames_dir)
+    photos_args.output = str(output_dir)
+    if photos_args.num_frames <= 0:
+        photos_args.num_frames = len(extracted)
+    else:
+        photos_args.num_frames = min(photos_args.num_frames, len(extracted))
+
+    cmd_photos_to_splat(photos_args)
+
+    splat_path = output_dir / f"{video_path.stem}.splat"
+    if getattr(args, "open_viewer", False):
+        if splat_path.is_file():
+            _open_local_splat_viewer(splat_path, port=args.viewer_port)
+        else:
+            print(f"Warning: expected splat at {splat_path} but file is missing; skipping viewer open.")
 
 
 def cmd_train(args: argparse.Namespace) -> None:
@@ -3333,23 +3529,7 @@ def cmd_photos_to_splat(args: argparse.Namespace) -> None:
             "Tip: --preprocess mast3r usually produces cleaner pose-free outdoor maps "
             "than DUSt3R when the checkpoint is available."
         )
-    processor_kwargs: dict = {
-        "method": quality_args.preprocess,
-        "num_frames": quality_args.num_frames,
-        "scene_graph": quality_args.scene_graph,
-        "align_iters": quality_args.align_iters,
-        "mast3r_subsample": quality_args.mast3r_subsample,
-    }
-    if quality_args.preprocess == "mast3r":
-        if quality_args.mast3r_checkpoint:
-            processor_kwargs["checkpoint"] = Path(quality_args.mast3r_checkpoint)
-        if quality_args.mast3r_root:
-            processor_kwargs["mast3r_root"] = Path(quality_args.mast3r_root)
-    else:
-        if quality_args.dust3r_checkpoint:
-            processor_kwargs["checkpoint"] = Path(quality_args.dust3r_checkpoint)
-        if quality_args.dust3r_root:
-            processor_kwargs["dust3r_root"] = Path(quality_args.dust3r_root)
+    processor_kwargs = _pose_free_kwargs_from_args(quality_args, method=quality_args.preprocess)
     processor = PoseFreeProcessor(**processor_kwargs)
     processor.estimate_poses(images_dir, sparse_dir)
 
@@ -3671,14 +3851,13 @@ def cmd_run(args: argparse.Namespace) -> None:
             _run_waymo_preprocess(images_dir, colmap_dir, args)
         elif preprocess_method == "mcd":
             _run_mcd_preprocess_to_colmap(images_dir, colmap_dir, args)
-        elif preprocess_method in ("pose-free", "dust3r", "simple"):
+        elif preprocess_method in _POSE_FREE_METHOD_MAP:
             from gs_sim2real.preprocess.pose_free import run_pose_free
 
-            method_map = {"pose-free": "dust3r", "dust3r": "dust3r", "simple": "simple"}
             run_pose_free(
                 image_dir=images_dir,
                 output_dir=colmap_dir,
-                method=method_map[preprocess_method],
+                **_pose_free_kwargs_from_args(args, method=preprocess_method),
             )
         else:
             from gs_sim2real.preprocess.colmap import run_colmap
@@ -3768,14 +3947,13 @@ def cmd_demo(args: argparse.Namespace) -> None:
             _run_waymo_preprocess(images_dir, colmap_dir, args)
         elif preprocess_method == "mcd":
             _run_mcd_preprocess_to_colmap(images_dir, colmap_dir, args)
-        elif preprocess_method in ("pose-free", "dust3r", "simple"):
+        elif preprocess_method in _POSE_FREE_METHOD_MAP:
             from gs_sim2real.preprocess.pose_free import run_pose_free
 
-            method_map = {"pose-free": "dust3r", "dust3r": "dust3r", "simple": "simple"}
             run_pose_free(
                 image_dir=images_dir,
                 output_dir=colmap_dir,
-                method=method_map[preprocess_method],
+                **_pose_free_kwargs_from_args(args, method=preprocess_method),
             )
         else:
             from gs_sim2real.preprocess.colmap import run_colmap as _run_colmap
@@ -4150,6 +4328,8 @@ def main(argv: list[str] | None = None) -> None:
         "view": cmd_view,
         "export": cmd_export,
         "photos-to-splat": cmd_photos_to_splat,
+        "video-to-splat": cmd_video_to_splat,
+        "map": cmd_video_to_splat,
         "splat-filter": cmd_splat_filter,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,

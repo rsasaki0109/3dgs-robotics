@@ -10,11 +10,79 @@ Supported video formats: mp4, avi, mkv, mov (via OpenCV VideoCapture).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm"}
+
+
+@dataclass(frozen=True)
+class VideoFrameSamplingPlan:
+    """Frame interval settings for evenly sampling a video."""
+
+    every_n: int
+    max_frames: int | None
+    total_frames: int
+    video_fps: float
+
+
+def probe_video_metadata(video_path: Path | str) -> tuple[int, float]:
+    """Return ``(total_frames, video_fps)`` for a readable video file."""
+    try:
+        import cv2
+    except ImportError:
+        raise ImportError("OpenCV is required for frame extraction. Install it with: pip install opencv-python")
+
+    video_path = Path(video_path)
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open video file: {video_path}")
+
+    video_fps = float(cap.get(cv2.CAP_PROP_FPS))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    if video_fps <= 0:
+        logger.warning("Could not determine video FPS for %s, assuming 30.", video_path.name)
+        video_fps = 30.0
+
+    return max(total_frames, 0), video_fps
+
+
+def plan_video_frame_sampling(
+    video_path: Path | str,
+    target_frames: int = 32,
+) -> VideoFrameSamplingPlan:
+    """Choose ``every_n`` / ``max_frames`` to sample a video into roughly ``target_frames`` frames."""
+    if target_frames < 0:
+        raise ValueError("target_frames must be >= 0")
+
+    total_frames, video_fps = probe_video_metadata(video_path)
+
+    if target_frames == 0:
+        every_n = 1
+        max_frames = None
+    elif total_frames <= 0:
+        every_n = 1
+        max_frames = target_frames
+    elif total_frames <= target_frames:
+        every_n = 1
+        max_frames = total_frames
+    else:
+        every_n = max(1, total_frames // target_frames)
+        max_frames = target_frames
+
+    return VideoFrameSamplingPlan(
+        every_n=every_n,
+        max_frames=max_frames,
+        total_frames=total_frames,
+        video_fps=video_fps,
+    )
 
 
 def extract_frames(

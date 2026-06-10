@@ -24,6 +24,9 @@ git clone https://github.com/rsasaki0109/gs-mapper.git
 cd gs-mapper
 pip install -e ".[dev]"
 
+# Video -> .splat -> browser viewer
+gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat
+
 # Photos -> .splat -> browser viewer
 gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
 
@@ -40,6 +43,8 @@ What ships:
   and 87 browser-ready route tiles.
 - `photos-to-splat` for image-folder to browser `.splat` runs — also zero-install
   via the HF Spaces and Colab badges above.
+- `video-to-splat` (alias: `map`) for a single mp4/mov walkaround video to a
+  browser `.splat` in one command.
 - `gs-mapper-live-mapper`: ROS 2 live mapping node — the splat map grows in the
   browser while the robot drives.
 - `splat-inspect` and `splat-filter` for cleaning cloudy browser splats.
@@ -49,6 +54,7 @@ What ships:
 
 | What you start with | Minimum command | Deep-dive section |
 | --- | --- | --- |
+| **A walkaround video** | `gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat` | [Video to splat (one-shot)](#video-to-splat-one-shot-pose-free) |
 | **A folder of photos** | `gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
 | **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `gs-mapper preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `gs-mapper route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
@@ -150,6 +156,7 @@ viewers, README previews, and GIF scripts.
 |-------|---------|----------|
 | Autoware 6-bag fused (supervised default) | [![](docs/images/demo-sweep/01_outdoor-demo.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo.splat) | GNSS + `/tf_static` + LiDAR-seeded COLMAP, image-projected RGB init, gsplat 30-50k iter |
 | bag6 cam0 — DUSt3R pose-free | [![](docs/images/demo-sweep/02_outdoor-demo-dust3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat) | 20 frames -> DUSt3R pointmap + global align -> gsplat 3k iter |
+| bag6 cam0 — VGGT feedforward (CLI backend) | same comparison family as DUSt3R | `preprocess --method vggt` / `photos-to-splat --preprocess vggt`; faster one-pass pose+depth, not VGGT-SLAM 2.0 import |
 | MCD tuhh_day_04 — DUSt3R pose-free | [![](docs/images/demo-sweep/03_mcd-tuhh-day04.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat) | 20 MCD handheld frames -> DUSt3R -> gsplat 3k iter |
 | bag6 cam0 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/04_bag6-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat) | 20 frames -> MAST3R sparse global alignment -> gsplat 15k iter |
 | bag6 cam0 — VGGT-SLAM 2.0 (15k) | [![](docs/images/demo-sweep/07_bag6-vggt-slam.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat) | VGGT-SLAM 2.0 artifact import -> gsplat 15k iter |
@@ -166,6 +173,24 @@ Regenerate preview images after changing a production `.splat`:
 DISPLAY=:0 python3 scripts/capture_readme_splat_previews.py
 python3 scripts/build_map_quality_gif.py
 ```
+
+## Video to splat (one-shot, pose-free)
+
+Turn a phone or dashcam walkaround clip into a browser `.splat`:
+
+```bash
+# Optional: clone DUSt3R if you use the DUSt3R backend.
+git clone --recursive https://github.com/naver/dust3r /tmp/dust3r
+
+# Quick draft from a single mp4/mov (extracts ~32 frames by default).
+gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat
+
+# Shorter alias with the same flags.
+gs-mapper map my_drive.mp4 --quality balanced --no-open-viewer
+```
+
+By default the command finishes by starting a local HTTP server and opening
+`docs/splat.html` in your browser. Pass `--no-open-viewer` when running headless.
 
 ## Bring Your Own Photos (one-shot, pose-free)
 
@@ -187,6 +212,9 @@ gs-mapper photos-to-splat \
   --output outputs/my_photos_splat_clean \
   --quality clean \
   --preprocess mast3r
+
+# Faster feedforward reconstruction with VGGT (requires a local VGGT clone).
+gs-mapper preprocess --images ./my_photos --output outputs/my_vggt_sparse --method vggt
 ```
 
 Inspect or clean an existing browser `.splat`:
@@ -266,6 +294,10 @@ gs-mapper preprocess \
 ```
 
 Supported profiles include MASt3R-SLAM, VGGT-SLAM 2.0, Pi3/Pi3X, and LoGeR.
+For **in-repo** feedforward reconstruction (no external SLAM run), use
+`gs-mapper preprocess --method vggt` or `photos-to-splat --preprocess vggt`
+with a local [facebookresearch/vggt](https://github.com/facebookresearch/vggt)
+clone — distinct from the VGGT-SLAM 2.0 artifact importer above.
 The current external-SLAM matrix is in `docs/plan_outdoor_gs.md`.
 
 ## Physical AI benchmark path

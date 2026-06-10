@@ -49,6 +49,7 @@ Repository = "https://github.com/rsasaki0109/gs-mapper"
 [project.optional-dependencies]
 nerfstudio = ["nerfstudio"]
 gsplat = ["gsplat"]
+vggt = []
 app = ["streamlit>=1.30", "plotly>=5.0"]
 metrics = ["lpips"]
 dev = ["pytest", "ruff", "mypy"]
