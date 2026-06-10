@@ -27,9 +27,10 @@ pip install -e ".[dev]"
 
 What ships: nine public outdoor `.splat` scenes; a large-scale Dynamic Map Viewer
 fixture (87 tiles); `video-to-splat` / `photos-to-splat`; VGGT feedforward
-preprocess; ROS 2 live mapping; 3DGS localization against live sessions;
-`splat-inspect` / `splat-filter`; Physical AI benchmark + scenario CI tooling.
-Details: `docs/plan_outdoor_gs.md`, `docs/live-mapping.md`, `docs/physical-ai-sim.md`.
+preprocess; ROS 2 live mapping + localizer node; 3DGS localization against live
+sessions; Isaac Sim export (NuRec USDZ); `splat-inspect` / `splat-filter`;
+Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
+`docs/live-mapping.md`, `docs/isaac-sim.md`, `docs/physical-ai-sim.md`.
 
 ## Quickstart — pick your entry point
 
@@ -41,6 +42,7 @@ Details: `docs/plan_outdoor_gs.md`, `docs/live-mapping.md`, `docs/physical-ai-si
 | **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `3dgs-robotics preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 | **A live ROS 2 camera topic** | `3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
+| **Isaac Sim as the target** | `3dgs-robotics export-isaac --map outputs/live_mapping --output scene.usdz` | [docs/isaac-sim.md](docs/isaac-sim.md) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).

@@ -1172,6 +1172,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--refine-lr", type=float, default=0.005, help="Adam learning rate for SE(3) delta (default: 0.005)"
     )
 
+    exi = subparsers.add_parser(
+        "export-isaac",
+        help="Export a trained 3DGS map to Isaac Sim (NuRec USDZ via NVIDIA 3dgrut)",
+    )
+    exi.add_argument("--map", default=None, help="Live-mapping session directory (exports a trained round)")
+    exi.add_argument("--round", type=int, default=None, help="Rebuild round to export (default: last successful)")
+    exi.add_argument("--ply", default=None, help="Standard 3DGS PLY to export directly (alternative to --map)")
+    exi.add_argument("--output", default=None, help="Output .usdz path (default: input PLY with .usdz suffix)")
+    exi.add_argument(
+        "--format",
+        choices=["nurec", "lightfield"],
+        default="nurec",
+        help="USD flavour: nurec (Isaac Sim / Omniverse volume) or lightfield (ParticleField schema)",
+    )
+    exi.add_argument(
+        "--threedgrut-root",
+        default=None,
+        help="Local clone of github.com/nv-tlabs/3dgrut (or set $THREEDGRUT_ROOT)",
+    )
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -3695,6 +3715,35 @@ def cmd_localize(args: argparse.Namespace) -> None:
         print(json.dumps(summary.to_json(), indent=2))
 
 
+def cmd_export_isaac(args: argparse.Namespace) -> None:
+    """Handle the export-isaac subcommand."""
+    from gs_sim2real.robotics.isaac_export import export_usdz
+
+    if bool(args.map) == bool(args.ply):
+        raise SystemExit("provide exactly one of --map or --ply")
+    if args.ply:
+        ply_path = Path(args.ply)
+    else:
+        from gs_sim2real.robotics.localize import resolve_live_map_session
+
+        session = resolve_live_map_session(Path(args.map), round_index=args.round)
+        ply_path = session.round.ply_path
+        print(f"Exporting round {session.round.round_index}: {ply_path}")
+
+    output_path = Path(args.output) if args.output else ply_path.with_suffix(".usdz")
+    try:
+        result = export_usdz(
+            ply_path,
+            output_path,
+            threedgrut_root=Path(args.threedgrut_root) if args.threedgrut_root else None,
+            export_format=args.format,
+        )
+    except (RuntimeError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    print(f"Wrote {result} ({result.stat().st_size / 1e6:.1f} MB)")
+    print("Isaac Sim 5.0+: File > Import (or drag-and-drop) the USDZ, then add a ground plane for physics.")
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4441,6 +4490,7 @@ def main(argv: list[str] | None = None) -> None:
         "map": cmd_video_to_splat,
         "splat-filter": cmd_splat_filter,
         "localize": cmd_localize,
+        "export-isaac": cmd_export_isaac,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,
