@@ -106,11 +106,7 @@ def main() -> None:
 
 
 def _load_tiles(catalog_path: Path, catalog: dict[str, object]) -> list[TileCloud]:
-    raw_tiles = [
-        tile
-        for tile in catalog.get("tiles", [])
-        if isinstance(tile, dict) and tile.get("status") == "ready"
-    ]
+    raw_tiles = [tile for tile in catalog.get("tiles", []) if isinstance(tile, dict) and tile.get("status") == "ready"]
     if not raw_tiles:
         raise ValueError(f"{catalog_path} has no ready tiles")
 
@@ -184,10 +180,18 @@ def _read_viewer_ply(path: Path, *, max_points: int) -> tuple[np.ndarray, np.nda
 
 
 def _combined_bounds(tiles: list[TileCloud], points: np.ndarray) -> dict[str, float]:
-    min_x = min((tile.bounds.get("minX") for tile in tiles if "minX" in tile.bounds), default=float(np.min(points[:, 0])))
-    max_x = max((tile.bounds.get("maxX") for tile in tiles if "maxX" in tile.bounds), default=float(np.max(points[:, 0])))
-    min_z = min((tile.bounds.get("minZ") for tile in tiles if "minZ" in tile.bounds), default=float(np.min(points[:, 2])))
-    max_z = max((tile.bounds.get("maxZ") for tile in tiles if "maxZ" in tile.bounds), default=float(np.max(points[:, 2])))
+    min_x = min(
+        (tile.bounds.get("minX") for tile in tiles if "minX" in tile.bounds), default=float(np.min(points[:, 0]))
+    )
+    max_x = max(
+        (tile.bounds.get("maxX") for tile in tiles if "maxX" in tile.bounds), default=float(np.max(points[:, 0]))
+    )
+    min_z = min(
+        (tile.bounds.get("minZ") for tile in tiles if "minZ" in tile.bounds), default=float(np.min(points[:, 2]))
+    )
+    max_z = max(
+        (tile.bounds.get("maxZ") for tile in tiles if "maxZ" in tile.bounds), default=float(np.max(points[:, 2]))
+    )
     span_x = max(1.0, max_x - min_x)
     span_z = max(1.0, max_z - min_z)
     pad = max(span_x, span_z) * 0.08
@@ -224,7 +228,15 @@ def _render_frame(
     image = _render_cloud(tiles, bounds=bounds, size=size)
     draw = ImageDraw.Draw(image, "RGBA")
     _draw_vignette(draw, size)
-    _draw_tiles(draw, tiles, bounds=bounds, size=size, active_tile=active_tile, resident_tiles=resident_tiles, preload_tiles=preload_tiles)
+    _draw_tiles(
+        draw,
+        tiles,
+        bounds=bounds,
+        size=size,
+        active_tile=active_tile,
+        resident_tiles=resident_tiles,
+        preload_tiles=preload_tiles,
+    )
     _draw_route(draw, route_points, bounds=bounds, size=size, progress=progress)
     _draw_header(draw, size=size, title=title, subtitle=subtitle, rich_labels=rich_labels)
     return image
@@ -361,12 +373,20 @@ def _draw_header(
     draw.text((47, 82), subtitle, font=label_font, fill=(0, 0, 0, 190))
     draw.text((45, 80), subtitle, font=label_font, fill=(181, 209, 208, 235))
     legend_x = width - 318
-    draw.rounded_rectangle((legend_x, height - 104, width - 28, height - 28), radius=8, fill=(5, 16, 18, 172), outline=(194, 218, 207, 90), width=1)
-    for idx, (name, color) in enumerate((
-        ("active", (94, 224, 226, 255)),
-        ("resident", (101, 205, 158, 255)),
-        ("preload", (247, 190, 88, 255)),
-    )):
+    draw.rounded_rectangle(
+        (legend_x, height - 104, width - 28, height - 28),
+        radius=8,
+        fill=(5, 16, 18, 172),
+        outline=(194, 218, 207, 90),
+        width=1,
+    )
+    for idx, (name, color) in enumerate(
+        (
+            ("active", (94, 224, 226, 255)),
+            ("resident", (101, 205, 158, 255)),
+            ("preload", (247, 190, 88, 255)),
+        )
+    ):
         x = legend_x + 22 + idx * 90
         y = height - 76
         draw.rounded_rectangle((x, y, x + 18, y + 18), radius=4, fill=color)
@@ -386,8 +406,12 @@ def _draw_vignette(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
 
 def _font(size: int, *, bold: bool) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     ]
     for candidate in candidates:
         if Path(candidate).exists():

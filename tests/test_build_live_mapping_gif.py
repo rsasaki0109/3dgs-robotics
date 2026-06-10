@@ -91,9 +91,7 @@ def test_align_to_anchor_chains_through_intermediate_round(gif_module) -> None:
         rotations = np.einsum("ij,njk->nik", rotation.T, world_rot[ids])
         return gif_module.RoundData(index, Path("unused.ply"), [names[i] for i in ids], centers, rotations)
 
-    gauges = [
-        (float(rng.uniform(0.5, 2.0)), _random_rotation(rng), rng.normal(size=3)) for _ in range(3)
-    ]
+    gauges = [(float(rng.uniform(0.5, 2.0)), _random_rotation(rng), rng.normal(size=3)) for _ in range(3)]
     rounds = [
         make_round(1, [0, 1], gauges[0]),
         make_round(2, [0, 1, 2, 3], gauges[1]),

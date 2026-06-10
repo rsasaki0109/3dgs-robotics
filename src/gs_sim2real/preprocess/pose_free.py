@@ -406,7 +406,9 @@ class PoseFreeProcessor:
         self.vggt_hub_id = vggt_hub_id or _DEFAULT_VGGT_HUB_ID
         self.vggt_conf_threshold = vggt_conf_threshold
         if checkpoint:
-            self.checkpoint = checkpoint if isinstance(checkpoint, str) and not str(checkpoint).endswith(".pt") else Path(checkpoint)
+            self.checkpoint = (
+                checkpoint if isinstance(checkpoint, str) and not str(checkpoint).endswith(".pt") else Path(checkpoint)
+            )
         elif method == "mast3r":
             self.checkpoint = self.mast3r_root / "checkpoints" / _DEFAULT_MAST3R_CHECKPOINT_NAME
         elif method == "vggt":

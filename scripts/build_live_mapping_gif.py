@@ -159,9 +159,7 @@ def align_to_anchor(rounds: list[RoundData]) -> list[tuple[float, np.ndarray, np
         nxt_index = {name: i for i, name in enumerate(nxt.names)}
         shared = [(i, nxt_index[name]) for i, name in enumerate(rnd.names) if name in nxt_index]
         if len(shared) < MIN_SHARED_CAMERAS:
-            raise SystemExit(
-                f"rounds {rnd.index}->{nxt.index}: only {len(shared)} shared cameras; cannot align"
-            )
+            raise SystemExit(f"rounds {rnd.index}->{nxt.index}: only {len(shared)} shared cameras; cannot align")
         src_ids = [i for i, _ in shared]
         dst_ids = [j for _, j in shared]
         step = similarity_from_poses(

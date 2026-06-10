@@ -317,7 +317,8 @@ def test_sample_review_bundle_generator_writes_self_contained_pages_bundle(tmp_p
     assert payload["passed"] is True
     assert payload["metadata"]["sampleBundle"] is True
     assert (
-        payload["metadata"]["pagesBaseUrl"] == "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/"
+        payload["metadata"]["pagesBaseUrl"]
+        == "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/"
     )
     assert payload["adoption"]["triggerMode"] == "pull-request"
     assert payload["adoption"]["adopted"] is True

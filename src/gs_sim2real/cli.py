@@ -1160,7 +1160,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     loc.add_argument("--device", default="cuda", help="Torch device for gsplat refinement (default: cuda)")
     loc.add_argument("--refine-iters", type=int, default=80, help="Adam steps per pyramid level (default: 80)")
-    loc.add_argument("--refine-lr", type=float, default=0.005, help="Adam learning rate for SE(3) delta (default: 0.005)")
+    loc.add_argument(
+        "--refine-lr", type=float, default=0.005, help="Adam learning rate for SE(3) delta (default: 0.005)"
+    )
 
     stc = subparsers.add_parser(
         "splat-tile-catalog",

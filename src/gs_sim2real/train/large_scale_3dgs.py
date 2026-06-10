@@ -2358,8 +2358,7 @@ def _write_viewer_splat_ply(source_path: Path, output_path: Path, axes: tuple[st
     for vertex_index in range(vertex_count):
         row_offset = header_size + vertex_index * row_size
         values = {
-            axis: struct.unpack_from("<f", data, row_offset + source_offsets[axis])[0]
-            for axis in ("x", "y", "z")
+            axis: struct.unpack_from("<f", data, row_offset + source_offsets[axis])[0] for axis in ("x", "y", "z")
         }
         for axis, value in values.items():
             struct.pack_into("<f", data, row_offset + target_offsets[axis], value)
@@ -2403,10 +2402,7 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
             public_url = _join_public_url(options.public_url_prefix, scene_id, source_splat.name)
             if has_viewer_splat and source_viewer_splat is not None:
                 viewer_public_path = (
-                    Path(options.public_root)
-                    / options.public_url_prefix.strip("/")
-                    / scene_id
-                    / f"{chunk['id']}.ply"
+                    Path(options.public_root) / options.public_url_prefix.strip("/") / scene_id / f"{chunk['id']}.ply"
                 )
                 _write_viewer_splat_ply(
                     source_viewer_splat,
@@ -2420,9 +2416,7 @@ def build_large_scale_3dgs_catalog(options: LargeScale3DGSCatalogOptions) -> dic
                     f"{chunk['id']}.ply",
                 )
         public_splat_path = public_path if public_path is not None else source_splat
-        public_viewer_splat_path = (
-            viewer_public_path if viewer_public_path is not None else source_viewer_splat
-        )
+        public_viewer_splat_path = viewer_public_path if viewer_public_path is not None else source_viewer_splat
         splat_bytes = _file_size(public_splat_path) if has_splat else 0
         viewer_splat_bytes = _file_size(public_viewer_splat_path) if has_viewer_splat else 0
         viewer_gaussian_count = _ply_vertex_count(public_viewer_splat_path) if has_viewer_splat else 0
@@ -3026,9 +3020,7 @@ def build_large_scale_3dgs_promotion(options: LargeScale3DGSPromoteOptions) -> d
             "missingSplatTileCount": summary["missingSplatTileCount"],
             "routePointCount": len(route.get("route", [])) if route is not None else 0,
             "publicSplatCount": sum(1 for tile in catalog["tiles"] if tile.get("publicPath")),
-            "publicViewerSplatCount": sum(
-                1 for tile in catalog["tiles"] if tile.get("viewerPublicPath")
-            ),
+            "publicViewerSplatCount": sum(1 for tile in catalog["tiles"] if tile.get("viewerPublicPath")),
             "publicSplatBytes": summary.get("splatBytes", 0),
             "publicViewerSplatBytes": summary.get("viewerSplatBytes", 0),
             "publicViewerGaussianCount": summary.get("viewerGaussianCount", 0),

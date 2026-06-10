@@ -149,7 +149,9 @@ def run_vggt_inference(
             "Pass device='cpu' for a slow smoke run, or reduce --num-frames."
         )
 
-    dtype = torch.bfloat16 if device.startswith("cuda") and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    dtype = (
+        torch.bfloat16 if device.startswith("cuda") and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    )
     resolved_checkpoint = _resolve_vggt_checkpoint(checkpoint, hub_id=hub_id)
 
     try:

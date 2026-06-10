@@ -220,9 +220,7 @@ def retrieve_seed_keyframe(
     return best_name, best_distance
 
 
-def _slerp_quat(
-    q0: Sequence[float], q1: Sequence[float], t: float
-) -> tuple[float, float, float, float]:
+def _slerp_quat(q0: Sequence[float], q1: Sequence[float], t: float) -> tuple[float, float, float, float]:
     a = np.asarray(q0, dtype=np.float64)
     b = np.asarray(q1, dtype=np.float64)
     dot = float(np.dot(a, b))
@@ -316,7 +314,6 @@ def _load_query_rgb(image_path: Path) -> np.ndarray:
 
 
 def _scale_intrinsics(k: Any, scale: float) -> Any:
-    import torch
 
     scaled = k.clone()
     scaled[0, 0] *= scale
@@ -405,7 +402,9 @@ def refine_pose_photometric(
     return viewmat_final, final_loss, total_iters
 
 
-def viewmat_to_colmap(viewmat: np.ndarray) -> tuple[tuple[float, float, float, float], tuple[float, float, float], np.ndarray]:
+def viewmat_to_colmap(
+    viewmat: np.ndarray,
+) -> tuple[tuple[float, float, float, float], tuple[float, float, float], np.ndarray]:
     """Convert a 4x4 world-to-camera matrix to COLMAP qvec/tvec + center."""
     rotation = viewmat[:3, :3]
     tvec = viewmat[:3, 3]
@@ -506,8 +505,10 @@ def localize_query(
     relative_translation_error = None
     if gt_center is not None:
         translation_error = float(np.linalg.norm(center - gt_center))
-        spacing = neighbor_spacing if neighbor_spacing is not None else median_neighbor_spacing(
-            np.asarray([record.center for record in mapped_records], dtype=np.float64)
+        spacing = (
+            neighbor_spacing
+            if neighbor_spacing is not None
+            else median_neighbor_spacing(np.asarray([record.center for record in mapped_records], dtype=np.float64))
         )
         relative_translation_error = translation_error / max(spacing, 1e-8)
 

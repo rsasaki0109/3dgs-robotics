@@ -59,7 +59,9 @@ def _load_font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _draw_trajectory(draw: ImageDraw.ImageDraw, camera, centers: np.ndarray, color: tuple[int, int, int], width: int) -> None:
+def _draw_trajectory(
+    draw: ImageDraw.ImageDraw, camera, centers: np.ndarray, color: tuple[int, int, int], width: int
+) -> None:
     projected = camera.project(centers)
     visible = projected[:, 2] > 0
     points = [(float(p[0]), float(p[1])) for p, v in zip(projected, visible) if v]
@@ -117,9 +119,7 @@ def build_localization_gif(
         _draw_trajectory(draw, camera, np.asarray(est_centers), EST_TRAIL, 4)
 
         rel_errors = [
-            r.relative_translation_error
-            for r in summary.results[:index]
-            if r.relative_translation_error is not None
+            r.relative_translation_error for r in summary.results[:index] if r.relative_translation_error is not None
         ]
         median_rel = float(np.median(rel_errors)) if rel_errors else float("nan")
         banner_h = 58
