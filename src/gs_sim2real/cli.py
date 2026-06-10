@@ -1313,6 +1313,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mgm.add_argument("--device", default="cuda", help="torch device for --align localize")
 
+    qmp = subparsers.add_parser(
+        "query-map",
+        help='Open-vocabulary 3D query against a trained map ("car" -> 3D hits + a navigation goal)',
+    )
+    qmp.add_argument("prompt", help="Free-text prompt, e.g. 'car' or 'traffic sign'")
+    qmp.add_argument("--map", required=True, help="Live-mapping session directory")
+    qmp.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    qmp.add_argument("--output", required=True, help="Output query.json path (a .png preview lands next to it)")
+    qmp.add_argument("--threshold", type=float, default=0.4, help="CLIPSeg relevance threshold in [0, 1]")
+    qmp.add_argument("--max-keyframes", type=int, default=12, help="Keyframes scored with CLIPSeg")
+    qmp.add_argument(
+        "--min-cluster-gaussians", type=int, default=20, help="Smallest gaussian cluster reported as a hit"
+    )
+    qmp.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -4169,6 +4184,49 @@ def cmd_merge_maps(args: argparse.Namespace) -> None:
     print("Inspect it: 3dgs-robotics splat-inspect after converting, or load the PLY in your viewer.")
 
 
+def cmd_query_map(args: argparse.Namespace) -> None:
+    """Handle the query-map subcommand."""
+    from gs_sim2real.robotics.language_query import QueryParams, query_map, write_query_preview
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    params = QueryParams(
+        score_threshold=args.threshold,
+        max_keyframes=args.max_keyframes,
+        min_cluster_gaussians=args.min_cluster_gaussians,
+    )
+    try:
+        result, points = query_map(
+            Path(args.map), args.prompt, round_index=args.round, params=params, device=args.device
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(f"query-map needs the optional `transformers` package: {error}") from error
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result.to_json(), indent=2) + "\n", encoding="utf-8")
+    preview = write_query_preview(result, points, output_path.with_suffix(".png"))
+
+    print(f"Wrote {output_path} + {preview.name}")
+    if not result.hits:
+        print(f'No hits for "{args.prompt}" at threshold {args.threshold} - try lowering --threshold.')
+        return
+    print(f'"{args.prompt}": {len(result.hits)} hit(s)')
+    for rank, hit in enumerate(result.hits[:5], start=1):
+        cx, cy, cz = hit.centroid
+        print(
+            f"  #{rank}: {hit.gaussians} gaussians, mean score {hit.mean_score:.2f} at ({cx:.3f}, {cy:.3f}, {cz:.3f})"
+        )
+    best = result.hits[0]
+    print(
+        "Drive there: 3dgs-robotics navigate "
+        f"--map {args.map} --goal {best.goal_xy[0]:.3f},{best.goal_xy[1]:.3f} --output nav/nav_result.json"
+    )
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4920,6 +4978,7 @@ def main(argv: list[str] | None = None) -> None:
         "detect-changes": cmd_detect_changes,
         "navigate": cmd_navigate,
         "merge-maps": cmd_merge_maps,
+        "query-map": cmd_query_map,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

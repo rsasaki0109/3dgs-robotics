@@ -379,6 +379,33 @@ even where draft-round floaters mark obstacles — the robot drove there.
 The virtual camera follows the local road level (nearest keyframe height),
 so sloping streets render correctly.
 
+### Open-vocabulary queries ("where is the car?")
+
+`3dgs-robotics query-map` answers free-text questions about the map:
+[CLIPSeg](https://huggingface.co/CIDAS/clipseg-rd64-refined) scores the
+mapped keyframe images against the prompt, the per-pixel relevance is lifted
+onto the gaussians through the COLMAP poses (occlusion ignored), and
+high-scoring gaussians are clustered into ranked 3D hits:
+
+```bash
+pip install transformers   # one-time optional dependency
+3dgs-robotics query-map "car" --map outputs/live_mapping/session --output query/car.json
+```
+
+Outputs `query.json` (hit centroids/extents in the map gauge) and a top-down
+preview PNG with the relevance painted red. Each hit carries `goal_xy` in
+grid-plane coordinates, and the CLI prints a ready-to-run command — language
+in, autonomous driving out:
+
+```bash
+3dgs-robotics navigate --map outputs/live_mapping/session --goal <from query-map> \
+  --output nav/nav_result.json
+```
+
+Dynamic objects smear along their motion (a car driving ahead appears as a
+chain of hits down the street); lower `--threshold` for fainter concepts and
+raise `--min-cluster-gaussians` to suppress speckle.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |
