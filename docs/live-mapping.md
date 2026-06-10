@@ -119,6 +119,19 @@ If a round shares fewer than 2 keyframes with its predecessor (shouldn't
 happen with strided rounds), the chain rebases and the map jumps once instead
 of receiving a garbage alignment.
 
+From the third round on, the chain is additionally refined by a **round-level
+Sim3 pose graph**: because every rebuild re-strides the whole keyframe
+history, temporally distant rounds share keyframes too (including across
+revisited places), and every such round pair contributes a direct relative
+Sim3 edge weighted by its shared-camera count. A small damped Gauss-Newton
+(pure numpy — rounds number in the tens) refines all session-gauge transforms
+against those edges, rewrites every round's `gauge_transform.json`
+(`"optimized": true`), and the chain continues from the refined latest
+transform. This bounds the compounding chain error over long sessions;
+drift *inside* one round's pose-free reconstruction is a per-round-backend
+matter and is not corrected here. Disable with
+`LiveMapperConfig.pose_graph_refinement = False`.
+
 ## Loop candidates (revisit detection, v1)
 
 While frames stream in, each accepted keyframe is also matched against older
@@ -126,9 +139,10 @@ keyframes (same 64x64 gray-thumbnail metric as motion gating, computed on the
 original images so draft map quality doesn't matter). Pairs that are
 temporally distant (default ≥ 30 s and ≥ 20 keyframes apart) yet visually
 near (default thumbnail diff ≤ 0.04) are recorded as **loop candidates** in
-`live/loop_candidates.json` and counted in `state.json` — detection only for
-now; the map is not corrected yet. Judge detection quality on a trajectory
-plot before trusting the candidates:
+`live/loop_candidates.json` and counted in `state.json`. Map correction
+happens at the round level via the pose graph above (shared-keyframe edges);
+the candidates themselves are recorded for diagnosis and for future per-pair
+re-estimation edges. Judge detection quality on a trajectory plot:
 
 ```bash
 python3 scripts/plot_loop_candidates.py --session outputs/live_mapping_demo
@@ -212,7 +226,7 @@ round with `--method vggt` is typically **~30–90 seconds for preprocess**
   rounds/round_003/gauge_transform.json  round gauge -> session gauge (Sim3)
   live/latest.splat           atomically replaced after each round (session gauge)
   live/state.json             keyframe/round/loop counters for viewers
-  live/loop_candidates.json   revisit detections (v1: record only)
+  live/loop_candidates.json   revisit detections (diagnosis; correction = round pose graph)
   live/index.html             status page (copy of docs/splat_live.html)
 ```
 

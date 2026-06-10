@@ -56,6 +56,8 @@ class LiveMapperConfig:
     revisit_min_time_separation_s: float = 30.0
     revisit_min_index_separation: int = 20
     revisit_max_distance: float = 0.04
+    # round-level Sim3 pose graph over shared-keyframe edges (loop correction)
+    pose_graph_refinement: bool = True
     # reconstruction quality (draft-leaning: latency beats fidelity here)
     iterations: int = 1500
     align_iters: int = 150
@@ -210,11 +212,25 @@ class RevisitDetector:
 
 
 def select_round_frames(keyframes: list[Keyframe], num_frames: int) -> list[Keyframe]:
-    """Evenly strided subset covering the whole run (keeps first and latest)."""
-    if num_frames <= 0 or len(keyframes) <= num_frames:
+    """Strided subset covering the whole run (keeps first and latest).
+
+    The stride is a fixed integer (``ceil(n / num_frames)``) anchored at
+    index 0 — not an even linspace — so consecutive rounds keep picking the
+    same multiples while the run grows and therefore share many keyframes.
+    The session gauge chain and the round-level pose graph both rely on that
+    overlap (an even linspace can leave consecutive rounds with a single
+    shared keyframe once the run far exceeds ``num_frames``).
+    """
+    n = len(keyframes)
+    if num_frames <= 0 or n <= num_frames:
         return list(keyframes)
-    idx = np.linspace(0, len(keyframes) - 1, num_frames).round().astype(int)
-    return [keyframes[i] for i in sorted(set(idx.tolist()))]
+    stride = -(-n // num_frames)  # ceil
+    indices = set(range(0, n, stride))
+    indices.add(n - 1)
+    selected = sorted(indices)
+    if len(selected) > num_frames:
+        selected.pop(-2)  # drop the stride pick next to the latest keyframe
+    return [keyframes[i] for i in selected]
 
 
 class SplatRebuilder:
@@ -236,6 +252,8 @@ class SplatRebuilder:
 
         self._gauge_chain = SessionGaugeChain()
         self._normalize_params: tuple[np.ndarray, float] | None = None
+        # (round_dir, poses, transform, shared, rebased) per round of the current gauge segment
+        self._round_history: list[tuple[Path, object, object, int, bool]] = []
 
     def __call__(self, images_dir: Path, round_dir: Path) -> Path:
         from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
@@ -299,12 +317,16 @@ class SplatRebuilder:
         if not images_txt.is_file():
             logger.warning("gauge chain: %s missing; rebasing the session gauge", images_txt)
             self._gauge_chain = SessionGaugeChain()  # next round becomes the new anchor
+            self._round_history.clear()
             transform = identity_sim3()
             write_gauge_transform(round_dir, transform, rebased=True, shared_cameras=0)
             return transform, True
 
         poses = RoundPoses.from_images_txt(images_txt)
         transform, rebased, shared = self._gauge_chain.update(poses)
+        if rebased:
+            self._round_history.clear()
+        self._round_history.append((round_dir, poses, transform, shared, rebased))
         write_gauge_transform(round_dir, transform, rebased=rebased, shared_cameras=shared)
         if not rebased and shared:
             logger.info(
@@ -312,7 +334,39 @@ class SplatRebuilder:
                 shared,
                 transform[0],
             )
+        if self.config.pose_graph_refinement:
+            transform = self._refine_gauge_pose_graph(default=transform)
         return transform, rebased
+
+    def _refine_gauge_pose_graph(self, default):
+        """Globally refine the current segment's gauge transforms (loop correction).
+
+        Edges come from every round pair sharing keyframes — rounds stride the
+        whole history, so distant rounds (including across revisits) stay
+        connected. Refined transforms are rewritten to every round's
+        ``gauge_transform.json``; the chain continues from the refined latest.
+        """
+        if len(self._round_history) < 3:
+            return default
+        from gs_sim2real.robotics.gauge_pose_graph import build_round_edges, optimize_session_transforms
+
+        poses_list = [poses for _, poses, _, _, _ in self._round_history]
+        edges = build_round_edges(poses_list)
+        if len(edges) <= len(self._round_history) - 1:
+            return default  # only the sequential chain: nothing to refine
+        initial = [transform for _, _, transform, _, _ in self._round_history]
+        refined = optimize_session_transforms(initial, edges)
+
+        from gs_sim2real.robotics.gauge_alignment import write_gauge_transform
+
+        self._round_history = [
+            (round_dir, poses, new_transform, shared, was_rebased)
+            for (round_dir, poses, _, shared, was_rebased), new_transform in zip(self._round_history, refined)
+        ]
+        for round_dir, _, new_transform, shared, was_rebased in self._round_history:
+            write_gauge_transform(round_dir, new_transform, rebased=was_rebased, shared_cameras=shared, optimized=True)
+        self._gauge_chain.set_cumulative(refined[-1])
+        return refined[-1]
 
     def _session_normalize_params(self, ply_path: Path, transform, rebased: bool):
         """Freeze the viewer normalization on the session's first (or rebased) round."""

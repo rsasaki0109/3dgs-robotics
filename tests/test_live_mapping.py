@@ -66,6 +66,13 @@ class TestSelectRoundFrames:
         assert selected[-1].index == 99
         assert [k.index for k in selected] == sorted(k.index for k in selected)
 
+    def test_consecutive_rounds_share_many_keyframes(self):
+        """Gauge chaining needs overlap: a growing run must keep re-picking the same indices."""
+        cap = 12
+        previous = {k.index for k in select_round_frames(self._keyframes(53), cap)}
+        current = {k.index for k in select_round_frames(self._keyframes(59), cap)}
+        assert len(previous & current) >= cap // 2
+
 
 class _FakeBuilder:
     def __init__(self, fail_rounds: set[int] | None = None):

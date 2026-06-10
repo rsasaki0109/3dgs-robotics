@@ -169,7 +169,7 @@ class RoundPoses:
         return cls(names=names, centers=centers, rotations=rotations)
 
 
-def transform_to_json(transform: Sim3, *, rebased: bool, shared_cameras: int) -> dict:
+def transform_to_json(transform: Sim3, *, rebased: bool, shared_cameras: int, optimized: bool = False) -> dict:
     scale, rotation, translation = transform
     return {
         "scale": float(scale),
@@ -177,6 +177,7 @@ def transform_to_json(transform: Sim3, *, rebased: bool, shared_cameras: int) ->
         "translation": np.asarray(translation, dtype=np.float64).tolist(),
         "rebased": bool(rebased),
         "sharedCameras": int(shared_cameras),
+        "optimized": bool(optimized),
     }
 
 
@@ -188,13 +189,13 @@ def transform_from_json(data: dict) -> Sim3:
     )
 
 
-def write_gauge_transform(round_dir: Path, transform: Sim3, *, rebased: bool, shared_cameras: int) -> Path:
+def write_gauge_transform(
+    round_dir: Path, transform: Sim3, *, rebased: bool, shared_cameras: int, optimized: bool = False
+) -> Path:
     """Persist a round's cumulative round-gauge -> session-gauge transform."""
     path = Path(round_dir) / GAUGE_TRANSFORM_FILENAME
-    path.write_text(
-        json.dumps(transform_to_json(transform, rebased=rebased, shared_cameras=shared_cameras), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    payload = transform_to_json(transform, rebased=rebased, shared_cameras=shared_cameras, optimized=optimized)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path
 
 
@@ -248,3 +249,7 @@ class SessionGaugeChain:
         self._cumulative = compose(self._cumulative, step)
         self._prev_poses = poses
         return self._cumulative, False, shared
+
+    def set_cumulative(self, transform: Sim3) -> None:
+        """Replace the latest cumulative transform (e.g. after pose-graph refinement)."""
+        self._cumulative = transform
