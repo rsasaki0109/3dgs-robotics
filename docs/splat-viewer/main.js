@@ -752,6 +752,96 @@ async function main() {
     // splat (and its sibling state.json, when present) and swaps the buffer
     // in place without resetting the camera. Used by the live mapping node.
     const refreshSeconds = parseFloat(params.get("refresh") || "0") || 0;
+    // ?overlay=<json-url> draws robot results exported by
+    // `3dgs-robotics export-overlay` (mapped trajectory, planned navigation
+    // path, open-vocabulary query hits) on a 2D canvas over the splat. The
+    // JSON holds splat-frame polylines/markers; see robotics/viewer_overlay.py.
+    let overlayData = null;
+    let overlayCtx = null;
+    const overlayUrl = params.get("overlay");
+    if (overlayUrl) {
+        fetch(new URL(overlayUrl, location.href), { credentials: "omit" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (!data) return;
+                overlayData = data;
+                const overlayCanvas = document.createElement("canvas");
+                overlayCanvas.id = "overlay";
+                overlayCanvas.style.cssText =
+                    "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50";
+                document.body.appendChild(overlayCanvas);
+                overlayCtx = overlayCanvas.getContext("2d");
+            })
+            .catch((err) => console.warn("overlay load failed", err));
+    }
+    const projectOverlayPoint = (viewProj, p, w, h) => {
+        const clipW =
+            viewProj[3] * p[0] + viewProj[7] * p[1] + viewProj[11] * p[2] + viewProj[15];
+        if (clipW <= 0.02) return null; // behind the camera
+        const clipX =
+            viewProj[0] * p[0] + viewProj[4] * p[1] + viewProj[8] * p[2] + viewProj[12];
+        const clipY =
+            viewProj[1] * p[0] + viewProj[5] * p[1] + viewProj[9] * p[2] + viewProj[13];
+        return [((clipX / clipW) * 0.5 + 0.5) * w, (0.5 - (clipY / clipW) * 0.5) * h, clipW];
+    };
+    const drawOverlay = (viewProj) => {
+        if (!overlayCtx || !overlayData) return;
+        const canvas2d = overlayCtx.canvas;
+        const w = innerWidth;
+        const h = innerHeight;
+        if (canvas2d.width !== w || canvas2d.height !== h) {
+            canvas2d.width = w;
+            canvas2d.height = h;
+        }
+        const ctx = overlayCtx;
+        ctx.clearRect(0, 0, w, h);
+        ctx.lineWidth = 2.5;
+        ctx.font = "12px sans-serif";
+        for (const polyline of overlayData.polylines || []) {
+            ctx.strokeStyle = polyline.color || "#4da3ff";
+            ctx.beginPath();
+            let pen = false;
+            let labelAt = null;
+            for (const point of polyline.points || []) {
+                const s = projectOverlayPoint(viewProj, point, w, h);
+                if (!s) {
+                    pen = false;
+                    continue;
+                }
+                if (pen) ctx.lineTo(s[0], s[1]);
+                else ctx.moveTo(s[0], s[1]);
+                pen = true;
+                if (!labelAt) labelAt = s;
+            }
+            ctx.stroke();
+            if (labelAt && polyline.label) {
+                ctx.fillStyle = polyline.color || "#4da3ff";
+                ctx.fillText(polyline.label, labelAt[0] + 6, labelAt[1] - 6);
+            }
+        }
+        for (const marker of overlayData.markers || []) {
+            const p = marker.position;
+            const s = projectOverlayPoint(viewProj, p, w, h);
+            if (!s) continue;
+            // screen-space radius: probe one world-radius along each axis
+            let radius = 4;
+            for (const axis of [0, 1, 2]) {
+                const q = [...p];
+                q[axis] += marker.radius || 0;
+                const sq = projectOverlayPoint(viewProj, q, w, h);
+                if (sq) radius = Math.max(radius, Math.hypot(sq[0] - s[0], sq[1] - s[1]));
+            }
+            ctx.strokeStyle = marker.color || "#ff5050";
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], Math.min(radius, w), 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], 2.5, 0, 2 * Math.PI);
+            ctx.fillStyle = marker.color || "#ff5050";
+            ctx.fill();
+            if (marker.label) ctx.fillText(marker.label, s[0] + radius + 4, s[1] + 4);
+        }
+    };
     let req = await fetch(url, {
         mode: "cors", // no-cors, *cors, same-origin
         credentials: "omit", // include, *same-origin, omit
@@ -1387,6 +1477,7 @@ async function main() {
             gl.uniformMatrix4fv(u_view, false, actualViewMatrix);
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, vertexCount);
+            drawOverlay(viewProj);
         } else {
             gl.clear(gl.COLOR_BUFFER_BIT);
             document.getElementById("spinner").style.display = "";

@@ -1355,6 +1355,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     spc.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
 
+    exo = subparsers.add_parser(
+        "export-overlay",
+        help="Export nav paths / query hits as a splat.html?overlay= JSON drawn over the browser splat",
+    )
+    exo.add_argument("--map", required=True, help="Live-mapping session directory")
+    exo.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    exo.add_argument("--output", required=True, help="Output overlay .json path")
+    exo.add_argument("--nav", default=None, help="nav_result.json from `navigate` (draws the planned path + goal)")
+    exo.add_argument("--query", default=None, help="query.json from `query-map` (draws the 3D hits)")
+    exo.add_argument(
+        "--extent",
+        type=float,
+        default=17.0,
+        help="Viewer normalization extent the session was exported with (live mapping default: 17)",
+    )
+    exo.add_argument("--no-trajectory", action="store_true", help="Skip the mapped-trajectory polyline")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -4307,6 +4324,32 @@ def cmd_splat_clean(args: argparse.Namespace) -> None:
     print("The cleaned map keeps the original gauge - navigate/export-grid/merge-maps work unchanged.")
 
 
+def cmd_export_overlay(args: argparse.Namespace) -> None:
+    """Handle the export-overlay subcommand."""
+    from gs_sim2real.robotics.viewer_overlay import build_overlay
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    try:
+        stats = build_overlay(
+            Path(args.map),
+            output_path,
+            round_index=args.round,
+            nav_json=Path(args.nav) if args.nav else None,
+            query_json=Path(args.query) if args.query else None,
+            target_extent=args.extent,
+            include_trajectory=not args.no_trajectory,
+        )
+    except (ValueError, FileNotFoundError, KeyError) as error:
+        raise SystemExit(str(error)) from error
+
+    print(f"Wrote {stats['output']} ({stats['polylines']} polyline(s), {stats['markers']} marker(s))")
+    print(f"View it: splat.html?url=<url of {Path(stats['splat']).name}>&overlay=<url of {output_path.name}>")
+    print("(serve both files next to docs/, e.g. python3 -m http.server in the repo root)")
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -5059,6 +5102,7 @@ def main(argv: list[str] | None = None) -> None:
         "navigate": cmd_navigate,
         "merge-maps": cmd_merge_maps,
         "query-map": cmd_query_map,
+        "export-overlay": cmd_export_overlay,
         "splat-clean": cmd_splat_clean,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,

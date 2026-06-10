@@ -435,6 +435,28 @@ gaussians in red. The cleaned map keeps the original gauge, so `navigate`,
 (CLIPSeg relevance, default 0.5), `--min-cluster-gaussians` (speckle
 suppression), `--dilate` (smear shell in camera-height units, default 0.125).
 
+### Overlaying robot results in the browser viewer
+
+![browser viewer with the mapped trajectory, planned path and query hits overlaid](images/robotics/viewer-overlay.png)
+
+`export-overlay` projects robot results into the frame of the session's
+`scene.splat` (the sim3 gauge chain plus the frozen viewer normalization)
+and writes one JSON that the WebGL viewer draws over the gaussians — the
+mapped trajectory, the planned navigation path and goal, and the
+open-vocabulary query hits, labels included:
+
+```bash
+3dgs-robotics export-overlay --map outputs/live_mapping/session \
+  --nav nav/nav_result.json --query query/car.json --output overlay/overlay.json
+# serve the repo (python3 -m http.server) and open:
+#   docs/splat.html?url=<scene.splat url>&overlay=<overlay.json url>
+```
+
+`?overlay=` works on the default viewer (`splat.html`) and composes with
+`?refresh=` live polling. Rounds rewritten later by pose-graph refinement
+can drift slightly against their older splats; the latest round (what the
+live viewer shows) always matches.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |
