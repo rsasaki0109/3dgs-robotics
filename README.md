@@ -123,6 +123,24 @@ python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --po
 python3 scripts/run_live_mapping_demo.py --bag ./my_drive_bag --port 8765               # rosbag replay, no ROS needed
 ```
 
+## Robotics applications — one map, four pillars
+
+![3DGS robotics closed loop: the camera simulator flies the mapped trajectory while the localizer re-estimates its pose over the nav2 grid](docs/images/robotics/robotics-loop.gif)
+
+Everything in this GIF comes from one live-mapping session and closes the
+loop inside this repo: the **GS camera simulator** replays the mapped
+trajectory (top), the **3DGS localizer** re-estimates each view's pose from
+the rendered pixels alone (orange dots vs the green ground-truth trail), and
+the backdrop is the **nav2 occupancy grid** exported from the same map.
+Reproduce it with `python3 scripts/build_robotics_demo_gif.py --session <session>`.
+
+| Pillar | Command | Docs |
+| --- | --- | --- |
+| Localization | `3dgs-robotics-localizer --map <session>` (PoseStamped + TF) | [live-mapping.md](docs/live-mapping.md#ros-2-localizer-node) |
+| Simulation | `3dgs-robotics-camera-sim --map <session> --replay` / `3dgs-robotics export-isaac` | [live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node), [isaac-sim.md](docs/isaac-sim.md) |
+| Navigation | `3dgs-robotics export-grid --map <session> --output map.yaml` | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
+| Inspection | `3dgs-robotics detect-changes --map-a <run1> --map-b <run2>` | [live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
+
 ## Import External SLAM Results
 
 ```bash
