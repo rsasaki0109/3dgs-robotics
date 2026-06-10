@@ -305,14 +305,6 @@ def _load_cameras_txt(path: Path) -> dict[int, dict[str, Any]]:
     return trainer._load_cameras_txt(path)
 
 
-def _load_query_rgb(image_path: Path) -> np.ndarray:
-    bgr = cv2.imread(str(image_path))
-    if bgr is None:
-        raise FileNotFoundError(f"could not read query image: {image_path}")
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    return rgb.astype(np.float32) / 255.0
-
-
 def _scale_intrinsics(k: Any, scale: float) -> Any:
 
     scaled = k.clone()
@@ -441,10 +433,11 @@ def viewmat_to_colmap(
     return qvec, tvec_tuple, center.astype(np.float64)
 
 
-def localize_query(
+def localize_image(
     session: LiveMapSession,
-    query_path: Path,
+    query_bgr: np.ndarray,
     *,
+    query_name: str = "query",
     gaussians: GaussianModel | None = None,
     mapped_records: Sequence[ColmapImageRecord] | None = None,
     cameras: dict[int, dict[str, Any]] | None = None,
@@ -452,16 +445,12 @@ def localize_query(
     gt_name: str | None = None,
     neighbor_spacing: float | None = None,
 ) -> LocalizeResult:
-    """Localize one query image against the session's final round map."""
+    """Localize one in-memory BGR image against the session's round map."""
     config = config or LocalizeConfig()
     mapped_records = list(mapped_records if mapped_records is not None else load_mapped_records(session))
     mapped_by_name = mapped_records_by_name(mapped_records)
     mapped_by_idx = mapped_records_by_index(mapped_records)
     cameras = cameras if cameras is not None else _load_cameras_txt(session.round.cameras_txt)
-
-    query_bgr = cv2.imread(str(query_path))
-    if query_bgr is None:
-        raise FileNotFoundError(f"could not read query image: {query_path}")
 
     seed_name, seed_distance = retrieve_seed_keyframe(
         query_bgr,
@@ -482,7 +471,7 @@ def localize_query(
     k = trainer._make_intrinsic_matrix(cam, device)
     intrinsic = k.detach().cpu().numpy() if hasattr(k, "detach") else np.asarray(k, dtype=np.float64)
 
-    gt_rgb = _load_query_rgb(query_path)
+    gt_rgb = cv2.cvtColor(query_bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     if gt_rgb.shape[0] != cam["height"] or gt_rgb.shape[1] != cam["width"]:
         gt_rgb = cv2.resize(gt_rgb, (cam["width"], cam["height"]), interpolation=cv2.INTER_AREA)
 
@@ -498,8 +487,8 @@ def localize_query(
     )
     qvec, tvec, center = viewmat_to_colmap(viewmat_final)
 
-    eval_name = gt_name or query_path.name
-    gt_pose = interpolate_gt_pose(eval_name, mapped_by_idx)
+    eval_name = gt_name or query_name
+    gt_pose = interpolate_gt_pose(eval_name, mapped_by_idx) if _KEYFRAME_RE.search(eval_name) else None
     gt_center = gt_pose[2] if gt_pose is not None else None
     translation_error = None
     relative_translation_error = None
@@ -513,7 +502,7 @@ def localize_query(
         relative_translation_error = translation_error / max(spacing, 1e-8)
 
     return LocalizeResult(
-        query_path=Path(query_path),
+        query_path=Path(query_name),
         seed_keyframe=seed_name,
         seed_distance=seed_distance,
         qvec=qvec,
@@ -525,6 +514,106 @@ def localize_query(
         translation_error=translation_error,
         relative_translation_error=relative_translation_error,
     )
+
+
+def localize_query(
+    session: LiveMapSession,
+    query_path: Path,
+    *,
+    gaussians: GaussianModel | None = None,
+    mapped_records: Sequence[ColmapImageRecord] | None = None,
+    cameras: dict[int, dict[str, Any]] | None = None,
+    config: LocalizeConfig | None = None,
+    gt_name: str | None = None,
+    neighbor_spacing: float | None = None,
+) -> LocalizeResult:
+    """Localize one query image file against the session's round map."""
+    query_bgr = cv2.imread(str(query_path))
+    if query_bgr is None:
+        raise FileNotFoundError(f"could not read query image: {query_path}")
+    return localize_image(
+        session,
+        query_bgr,
+        query_name=str(query_path),
+        gaussians=gaussians,
+        mapped_records=mapped_records,
+        cameras=cameras,
+        config=config,
+        gt_name=gt_name or Path(query_path).name,
+        neighbor_spacing=neighbor_spacing,
+    )
+
+
+class SessionLocalizer:
+    """Stateful localizer: load a session's map once, localize many images.
+
+    ``maybe_reload_latest`` re-resolves the session so a long-running consumer
+    (e.g. the ROS 2 localizer node) can follow a live-mapping session whose
+    rounds keep rebuilding. Each round has its own gauge; after a reload the
+    published poses jump to the new round's frame.
+    """
+
+    def __init__(
+        self,
+        session_dir: Path,
+        *,
+        round_index: int | None = None,
+        config: LocalizeConfig | None = None,
+    ) -> None:
+        self.session_dir = Path(session_dir)
+        self.config = config or LocalizeConfig()
+        self._pinned_round = round_index
+        self.session: LiveMapSession | None = None
+        self.gaussians: GaussianModel | None = None
+        self.mapped_records: list[ColmapImageRecord] = []
+        self.cameras: dict[int, dict[str, Any]] = {}
+        self.neighbor_spacing: float | None = None
+        self.reload()
+
+    @property
+    def round_index(self) -> int:
+        if self.session is None:
+            raise RuntimeError("localizer has no resolved session")
+        return self.session.round.round_index
+
+    def reload(self) -> None:
+        """(Re)load map artifacts for the pinned or latest successful round."""
+        session = resolve_live_map_session(self.session_dir, round_index=self._pinned_round)
+        mapped_records = load_mapped_records(session)
+        centers = np.asarray([record.center for record in mapped_records], dtype=np.float64)
+        self.neighbor_spacing = median_neighbor_spacing(centers)
+        self.cameras = _load_cameras_txt(session.round.cameras_txt)
+        self.gaussians = load_gaussian_model_from_ply(session.round.ply_path, self.config.device)
+        self.mapped_records = list(mapped_records)
+        self.session = session
+
+    def maybe_reload_latest(self) -> bool:
+        """Reload when a newer successful round exists. Returns True on reload."""
+        if self._pinned_round is not None:
+            return False
+        try:
+            latest = resolve_live_map_session(self.session_dir)
+        except FileNotFoundError:
+            return False
+        if self.session is not None and latest.round.round_index <= self.session.round.round_index:
+            return False
+        self.reload()
+        return True
+
+    def localize(self, image_bgr: np.ndarray, *, query_name: str = "query") -> LocalizeResult:
+        """Localize one BGR image against the currently loaded round."""
+        if self.session is None:
+            raise RuntimeError("localizer has no resolved session")
+        return localize_image(
+            self.session,
+            image_bgr,
+            query_name=query_name,
+            gaussians=self.gaussians,
+            mapped_records=self.mapped_records,
+            cameras=self.cameras,
+            config=self.config,
+            neighbor_spacing=self.neighbor_spacing,
+        )
 
 
 def localize_queries(

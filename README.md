@@ -110,6 +110,7 @@ Localize query frames against a finished session: `3dgs-robotics localize --map 
 
 ```bash
 3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765       # live ROS 2 topic
+3dgs-robotics-localizer --map outputs/live_mapping --follow-latest                       # PoseStamped + TF in the map
 python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765 # image-folder replay
 python3 scripts/run_live_mapping_demo.py --bag ./my_drive_bag --port 8765               # rosbag replay, no ROS needed
 ```

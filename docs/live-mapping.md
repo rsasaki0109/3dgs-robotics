@@ -194,6 +194,38 @@ Evaluation is **gauge-relative** (median spacing between mapped keyframe
 centers). Pose-free monocular maps are not metric — do not report meter-level
 accuracy.
 
+### ROS 2 localizer node
+
+`3dgs-robotics-localizer` runs the same retrieval + photometric refinement as
+a streaming node: camera topic in, `geometry_msgs/PoseStamped` +
+`nav_msgs/Path` (and a `map -> camera` TF) out. Localization runs in a
+background worker that always takes the newest frame, so a fast camera never
+queues up behind the GPU.
+
+```bash
+# against a finished session
+3dgs-robotics-localizer --map outputs/live_mapping/session \
+  --image-topic /camera/image_raw/compressed
+
+# against a session that is still being built by 3dgs-robotics-live-mapper
+3dgs-robotics-localizer --map outputs/live_mapping/session --follow-latest
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--map` | (required) | Live-mapping session directory (the mapper's `--workdir`) |
+| `--round` | last successful | Pin one rebuild round |
+| `--follow-latest` | off | Reload the map whenever a newer round finishes |
+| `--pose-topic` / `--path-topic` | `/gs_localizer/pose` / `/gs_localizer/path` | Outputs (Path for RViz/Foxglove) |
+| `--map-frame` / `--camera-frame` | `map` / `camera` | TF frames (`--no-tf` disables the broadcast) |
+| `--max-seed-distance` | 0.5 | Reject estimates whose retrieval seed is this far (lost / off-map) |
+| `--pyramid-scales` | `0.25,0.5` | Streaming default trades the full-resolution pass for latency |
+
+Poses are in the loaded round's reconstruction gauge (not metric); the camera
+frame uses the optical convention (x right, y down, z forward). With
+`--follow-latest`, published poses jump to the new round's gauge after each
+reload — consumers that need continuity should pin `--round`.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |
