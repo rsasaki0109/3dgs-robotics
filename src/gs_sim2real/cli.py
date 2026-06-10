@@ -1221,6 +1221,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Percentile of below-camera gaussian heights taken as the ground level",
     )
 
+    dtc = subparsers.add_parser(
+        "detect-changes",
+        help="Diff two 3DGS maps of the same place (inspection: appeared / disappeared objects)",
+    )
+    dtc.add_argument("--map-a", required=True, help="Reference live-mapping session directory")
+    dtc.add_argument("--round-a", type=int, default=None, help="Round of map A (default: last successful)")
+    dtc.add_argument("--map-b", default=None, help="Comparison session directory (default: same as --map-a)")
+    dtc.add_argument("--round-b", type=int, default=None, help="Round of map B (default: last successful)")
+    dtc.add_argument(
+        "--align",
+        choices=["auto", "shared", "localize", "none"],
+        default="auto",
+        help="Gauge alignment: shared keyframes, 3DGS localization (GPU, independent sessions), or none",
+    )
+    dtc.add_argument("--output", required=True, help="Output changes.json path (a .png preview lands next to it)")
+    dtc.add_argument(
+        "--voxel-size",
+        type=float,
+        default=None,
+        help="Voxel size in map gauge units (default: camera height above ground / 4)",
+    )
+    dtc.add_argument("--min-opacity", type=float, default=0.3, help="Ignore gaussians more transparent than this")
+    dtc.add_argument("--min-count", type=int, default=3, help="Gaussians per voxel to call it solid")
+    dtc.add_argument(
+        "--min-cluster-voxels", type=int, default=4, help="Smallest connected voxel blob reported as a change"
+    )
+    dtc.add_argument("--device", default="cuda", help="torch device for --align localize")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -3813,6 +3841,65 @@ def cmd_export_grid(args: argparse.Namespace) -> None:
     print(f"Serve it: ros2 run nav2_map_server map_server --ros-args -p yaml_filename:={yaml_path}")
 
 
+def cmd_detect_changes(args: argparse.Namespace) -> None:
+    """Handle the detect-changes subcommand."""
+    from gs_sim2real.robotics.change_detection import (
+        ChangeParams,
+        detect_session_changes,
+        write_change_preview,
+    )
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    map_b = args.map_b or args.map_a
+    if map_b == args.map_a and args.round_a is None and args.round_b is None:
+        raise SystemExit("comparing a session with itself needs --round-a/--round-b (or a different --map-b)")
+
+    localize_config = None
+    if args.align in ("auto", "localize"):
+        from gs_sim2real.robotics.localize import LocalizeConfig
+
+        localize_config = LocalizeConfig(device=args.device, refine_iters=40, pyramid_scales=(0.25, 0.5))
+
+    params = ChangeParams(
+        voxel_size=args.voxel_size,
+        min_opacity=args.min_opacity,
+        min_count=args.min_count,
+        min_cluster_voxels=args.min_cluster_voxels,
+    )
+    try:
+        report, points_a, aligned_b = detect_session_changes(
+            Path(args.map_a),
+            Path(map_b),
+            round_a=args.round_a,
+            round_b=args.round_b,
+            align=args.align,
+            params=params,
+            localize_config=localize_config,
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report.to_json(), indent=2) + "\n", encoding="utf-8")
+    preview = write_change_preview(report, points_a, aligned_b, output_path.with_suffix(".png"))
+
+    print(f"Wrote {output_path} + {preview.name}")
+    print(
+        f"Alignment: {report.alignment['mode']} ({report.alignment['matched_keyframes']} keyframes, "
+        f"scale {report.alignment['scale']:.3f}) | voxel {report.voxel_size:.4f} gauge units "
+        f"(camera height = {report.camera_height:.4f})"
+    )
+    print(f"Appeared: {len(report.appeared)} cluster(s), disappeared: {len(report.disappeared)} cluster(s)")
+    for cluster in report.clusters[:5]:
+        cx, cy, cz = cluster.centroid
+        print(
+            f"  {cluster.kind}: {cluster.voxels} voxels / {cluster.points} gaussians at ({cx:.3f}, {cy:.3f}, {cz:.3f})"
+        )
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4561,6 +4648,7 @@ def main(argv: list[str] | None = None) -> None:
         "localize": cmd_localize,
         "export-isaac": cmd_export_isaac,
         "export-grid": cmd_export_grid,
+        "detect-changes": cmd_detect_changes,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

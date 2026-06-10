@@ -29,7 +29,8 @@ What ships: nine public outdoor `.splat` scenes; a large-scale Dynamic Map Viewe
 fixture (87 tiles); `video-to-splat` / `photos-to-splat`; VGGT feedforward
 preprocess; ROS 2 live mapping + localizer + GS camera simulator nodes; 3DGS
 localization against live sessions; Isaac Sim export (NuRec USDZ); nav2
-occupancy grid export; `splat-inspect` / `splat-filter`;
+occupancy grid export; map-to-map change detection;
+`splat-inspect` / `splat-filter`;
 Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 `docs/live-mapping.md`, `docs/isaac-sim.md`, `docs/physical-ai-sim.md`.
 
@@ -46,6 +47,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **Isaac Sim as the target** | `3dgs-robotics export-isaac --map outputs/live_mapping --output scene.usdz` | [docs/isaac-sim.md](docs/isaac-sim.md) |
 | **A simulated camera in your map** | `3dgs-robotics-camera-sim --map outputs/live_mapping --replay --loop` | [docs/live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node) |
 | **nav2 needs a map** | `3dgs-robotics export-grid --map outputs/live_mapping --output nav2_map/map.yaml` | [docs/live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
+| **Two patrols, what changed?** | `3dgs-robotics detect-changes --map-a run1 --map-b run2 --output changes/changes.json` | [docs/live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).

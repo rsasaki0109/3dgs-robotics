@@ -293,6 +293,32 @@ draft round speckle the map, or retrain the round at higher quality first.
 If the map was built with metric poses, the units are metres and the yaml
 drops straight into a nav2 bringup.
 
+### Change detection (inspection)
+
+`3dgs-robotics detect-changes` diffs two maps of the same place and reports
+what **appeared** and what **disappeared** — two patrols of a route, or two
+rebuild rounds of one session:
+
+```bash
+# two rounds of one session
+3dgs-robotics detect-changes --map-a outputs/session --round-a 5 --round-b 4 \
+  --align shared --output changes/changes.json
+
+# two independent sessions of the same place (GPU: aligns by localizing
+# map B's keyframes inside map A)
+3dgs-robotics detect-changes --map-a outputs/patrol_monday --map-b outputs/patrol_friday \
+  --align localize --output changes/changes.json
+```
+
+The two gauges are aligned with a Sim3 (shared keyframes when the rounds
+overlap, the 3DGS localizer across independent sessions), both gaussian
+clouds are voxelized in camera-height units, and solid voxels present in
+only one map are clustered into change reports (`changes.json` with
+centroids/extents in map A's gauge, plus a top-down `changes.png` preview).
+Draft 1500-iteration rounds re-place splats noisily — raise
+`--min-cluster-voxels` / `--min-count` (e.g. 25 / 5) to suppress the
+speckle, or retrain both rounds at higher quality for fine-grained diffs.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |
