@@ -93,7 +93,7 @@ def _draw_copy(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
         draw.text((104, y), bullet, font=meta_font, fill=muted)
         y += 48
     draw.line((64, height - 54, width - 74, height - 54), fill=(255, 255, 255, 54), width=2)
-    draw.text((64, height - 38), "github.com/rsasaki0109/gs-mapper", font=chip_font, fill=(235, 245, 255, 230))
+    draw.text((64, height - 38), "github.com/rsasaki0109/3dgs-robotics", font=chip_font, fill=(235, 245, 255, 230))
 
 
 def _load_font(size: int) -> ImageFont.ImageFont:

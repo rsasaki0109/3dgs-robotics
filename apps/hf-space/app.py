@@ -24,8 +24,8 @@ GPU_DURATION = int(os.environ.get("GS_MAPPER_GPU_DURATION", "240"))
 DEFAULT_METHOD = os.environ.get("GS_MAPPER_DEMO_METHOD", "dust3r")
 MAX_FRAMES = 16
 
-REPO_URL = "https://github.com/rsasaki0109/gs-mapper"
-VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat.html"
+REPO_URL = "https://github.com/rsasaki0109/3dgs-robotics"
+VIEWER_URL = "https://rsasaki0109.github.io/3dgs-robotics/splat.html"
 
 try:  # ZeroGPU decorator; falls back to identity off-Spaces.
     import spaces

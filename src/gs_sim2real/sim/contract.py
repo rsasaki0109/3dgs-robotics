@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_SITE_URL = "https://rsasaki0109.github.io/gs-mapper/"
+DEFAULT_SITE_URL = "https://rsasaki0109.github.io/3dgs-robotics/"
 CATALOG_VERSION = "gs-mapper-physical-ai-sim/v1"
 
 

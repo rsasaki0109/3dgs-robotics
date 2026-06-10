@@ -30,7 +30,7 @@ DEFAULT_SAMPLE_NOTICE = (
     "Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; "
     "it proves the scenario-CI review bundle contract but is not a production benchmark run."
 )
-DEFAULT_PAGES_BASE_URL = "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/"
+DEFAULT_PAGES_BASE_URL = "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))

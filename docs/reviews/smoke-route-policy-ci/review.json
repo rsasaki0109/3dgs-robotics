@@ -44,7 +44,7 @@
     "activationFailedChecks": [],
     "historyMarkdownPath": "sample-artifacts/shard-history.md",
     "historyPath": "sample-artifacts/shard-history.json",
-    "pagesBaseUrl": "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/",
+    "pagesBaseUrl": "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/",
     "sampleBundle": true,
     "sampleNotice": "Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; it proves the scenario-CI review bundle contract but is not a production benchmark run.",
     "sampleSource": "scripts/smoke_route_policy_scenario_ci.py",

@@ -39,7 +39,7 @@ Then open `http://localhost:8765/` (status page, links to the polling 3D
 viewer) — or the viewer directly:
 
 ```
-https://rsasaki0109.github.io/gs-mapper/splat.html?url=http://localhost:8765/latest.splat&refresh=2
+https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=http://localhost:8765/latest.splat&refresh=2
 ```
 
 Replaying a rosbag works the same way: `ros2 bag play my_drive` in another

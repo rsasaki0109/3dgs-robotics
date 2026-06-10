@@ -44,7 +44,7 @@
     "activationFailedChecks": [],
     "historyMarkdownPath": "sample-artifacts/shard-history.md",
     "historyPath": "sample-artifacts/shard-history.json",
-    "pagesBaseUrl": "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/",
+    "pagesBaseUrl": "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/",
     "validationFailedChecks": []
   },
   "multiAgent": true,

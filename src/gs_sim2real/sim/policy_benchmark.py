@@ -447,7 +447,7 @@ def run_cli(args: Any) -> None:
 
     catalog = load_simulation_catalog_from_scene_picker(
         getattr(args, "scene_catalog"),
-        site_url=getattr(args, "site_url", "https://rsasaki0109.github.io/gs-mapper/"),
+        site_url=getattr(args, "site_url", "https://rsasaki0109.github.io/3dgs-robotics/"),
     )
     goal_suite_path = getattr(args, "goal_suite", None)
     goal_suite = load_route_policy_goal_suite_json(goal_suite_path) if goal_suite_path else None

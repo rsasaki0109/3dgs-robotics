@@ -22,25 +22,25 @@ test('collectDynamicMapTargetFragmentIds includes active fragment and known gate
 test('resolvePublicUrl maps root public assets under a Pages base path', () => {
   assert.equal(
     resolvePublicUrl('/manifests/outdoor-production-grid-large-tile-catalog.json', {
-      basePath: '/gs-mapper/dreamwalker/'
+      basePath: '/3dgs-robotics/dreamwalker/'
     }),
-    '/gs-mapper/dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json'
+    '/3dgs-robotics/dreamwalker/manifests/outdoor-production-grid-large-tile-catalog.json'
   );
   assert.equal(
-    resolvePublicUrl('/gs-mapper/dreamwalker/splats/tile.splat', {
-      basePath: '/gs-mapper/dreamwalker/'
+    resolvePublicUrl('/3dgs-robotics/dreamwalker/splats/tile.splat', {
+      basePath: '/3dgs-robotics/dreamwalker/'
     }),
-    '/gs-mapper/dreamwalker/splats/tile.splat'
+    '/3dgs-robotics/dreamwalker/splats/tile.splat'
   );
   assert.equal(
     resolvePublicUrl('https://cdn.example.test/tile.splat', {
-      basePath: '/gs-mapper/dreamwalker/'
+      basePath: '/3dgs-robotics/dreamwalker/'
     }),
     'https://cdn.example.test/tile.splat'
   );
   assert.equal(
     resolvePublicUrl('robot-routes/local.json', {
-      basePath: '/gs-mapper/dreamwalker/'
+      basePath: '/3dgs-robotics/dreamwalker/'
     }),
     'robot-routes/local.json'
   );

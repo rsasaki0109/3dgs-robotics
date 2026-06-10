@@ -6,7 +6,7 @@ notes so your first PR isn't blocked on nit-picks.
 ## Local setup
 
 ```bash
-git clone https://github.com/rsasaki0109/gs-mapper.git
+git clone https://github.com/rsasaki0109/3dgs-robotics.git
 cd gs-mapper
 pip install -e ".[dev]"
 ```

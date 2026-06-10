@@ -42,9 +42,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rsasaki0109/gs-mapper"
-Documentation = "https://rsasaki0109.github.io/gs-mapper/"
-Repository = "https://github.com/rsasaki0109/gs-mapper"
+Homepage = "https://github.com/rsasaki0109/3dgs-robotics"
+Documentation = "https://rsasaki0109.github.io/3dgs-robotics/"
+Repository = "https://github.com/rsasaki0109/3dgs-robotics"
 
 [project.optional-dependencies]
 nerfstudio = ["nerfstudio"]

@@ -1831,7 +1831,7 @@ def build_parser() -> argparse.ArgumentParser:
     rpb.add_argument("--markdown-output", default=None, help="Optional Markdown summary output path")
     rpb.add_argument("--scene-catalog", default="docs/scenes-list.json", help="Scene picker catalog JSON")
     rpb.add_argument(
-        "--site-url", default="https://rsasaki0109.github.io/gs-mapper/", help="Base site URL for scene assets"
+        "--site-url", default="https://rsasaki0109.github.io/3dgs-robotics/", help="Base site URL for scene assets"
     )
     rpb.add_argument(
         "--scene-id", default=None, help="Scene id to evaluate (default: outdoor-demo or first catalog scene)"

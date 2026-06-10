@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Live demo (GitHub Pages)
-    url: https://rsasaki0109.github.io/gs-mapper/
+    url: https://rsasaki0109.github.io/3dgs-robotics/
     about: Before filing a viewer bug, sanity-check against the hosted demo to rule out local setup issues.
   - name: Contributing guide
-    url: https://github.com/rsasaki0109/gs-mapper/blob/main/CONTRIBUTING.md
+    url: https://github.com/rsasaki0109/3dgs-robotics/blob/main/CONTRIBUTING.md
     about: Local setup, lint/test commands, and PR conventions live here.

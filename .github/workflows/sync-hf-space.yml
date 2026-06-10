@@ -36,7 +36,7 @@ jobs:
               folder_path="apps/hf-space",
               repo_id=space_id,
               repo_type="space",
-              commit_message=f"Sync from gs-mapper@{os.environ.get('GITHUB_SHA', 'manual')[:12]}",
+              commit_message=f"Sync from 3dgs-robotics@{os.environ.get('GITHUB_SHA', 'manual')[:12]}",
           )
           print(f"Synced to https://huggingface.co/spaces/{space_id}")
           EOF

@@ -1,9 +1,9 @@
 # GS Mapper
 
-[![CI](https://github.com/rsasaki0109/gs-mapper/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsasaki0109/gs-mapper/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/rsasaki0109/gs-mapper)](LICENSE)
+[![CI](https://github.com/rsasaki0109/3dgs-robotics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsasaki0109/3dgs-robotics/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/rsasaki0109/3dgs-robotics)](LICENSE)
 [![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rsasaki0109/3dgs-robotics/blob/main/notebooks/photos_to_splat_colab.ipynb)
 
 **Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI.**
 
@@ -12,10 +12,10 @@ GS Mapper turns photos, videos, rosbags, and external SLAM outputs into browser
 scenario CI.
 
 **Try it first:** [build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/gs-mapper) |
-[live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html) |
-[large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/gs-mapper/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1)
+[live 3DGS demo](https://rsasaki0109.github.io/3dgs-robotics/splat.html) |
+[large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/3dgs-robotics/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1)
 
-[![Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/gs-mapper/)
+[![Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)](docs/images/demo-sweep/map-quality.gif)](https://rsasaki0109.github.io/3dgs-robotics/)
 
 Lead GIF: dynamic map loading on real robot data — the base layer is a true top-down (orthographic gsplat) render of the Istanbul Bag6 rosbag2 pilot scene, and the resident (green) / preload (amber) tile window moves along the camera trajectory recovered from the mapped street, so 30 m map tiles light up as the camera drives. Standalone still: `docs/images/demo-sweep/dynamic-map-material.png`.
 
@@ -48,25 +48,25 @@ Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart
 
 | URL | Renderer |
 | --- | --- |
-| [`/splat.html`](https://rsasaki0109.github.io/gs-mapper/splat.html) | Default WebGL2 splat viewer |
-| [`/splat_spark.html`](https://rsasaki0109.github.io/gs-mapper/splat_spark.html) | Spark 2.0 (mobile / WebXR) |
-| [`/splat_webgpu.html`](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) | WebGPU splat viewer |
-| [`/`](https://rsasaki0109.github.io/gs-mapper/) | Landing page + Physical AI proof |
-| [`/dreamwalker/`](https://rsasaki0109.github.io/gs-mapper/dreamwalker/) | Dynamic Map Viewer (regional mosaic + Istanbul pilot) |
+| [`/splat.html`](https://rsasaki0109.github.io/3dgs-robotics/splat.html) | Default WebGL2 splat viewer |
+| [`/splat_spark.html`](https://rsasaki0109.github.io/3dgs-robotics/splat_spark.html) | Spark 2.0 (mobile / WebXR) |
+| [`/splat_webgpu.html`](https://rsasaki0109.github.io/3dgs-robotics/splat_webgpu.html) | WebGPU splat viewer |
+| [`/`](https://rsasaki0109.github.io/3dgs-robotics/) | Landing page + Physical AI proof |
+| [`/dreamwalker/`](https://rsasaki0109.github.io/3dgs-robotics/dreamwalker/) | Dynamic Map Viewer (regional mosaic + Istanbul pilot) |
 
 Production scenes come from `docs/scenes-list.json` (README table, viewers, GIF scripts).
 
 | Scene | Preview | Pipeline |
 |-------|---------|----------|
-| Autoware 6-bag fused (supervised default) | [![](docs/images/demo-sweep/01_outdoor-demo.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo.splat) | GNSS + LiDAR-seeded COLMAP, gsplat 30–50k |
-| bag6 cam0 — DUSt3R pose-free | [![](docs/images/demo-sweep/02_outdoor-demo-dust3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat) | 20 frames, DUSt3R, gsplat 3k |
-| MCD tuhh_day_04 — DUSt3R pose-free | [![](docs/images/demo-sweep/03_mcd-tuhh-day04.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat) | MCD handheld, DUSt3R, gsplat 3k |
-| bag6 cam0 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/04_bag6-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat) | 20 frames, MAST3R, gsplat 15k |
-| bag6 cam0 — VGGT-SLAM 2.0 (15k) | [![](docs/images/demo-sweep/07_bag6-vggt-slam.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat) | VGGT-SLAM 2.0 artifact import, gsplat 15k |
-| bag6 cam0 — MASt3R-SLAM (15k) | [![](docs/images/demo-sweep/08_bag6-mast3r-slam.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat) | MASt3R-SLAM artifact import, gsplat 15k |
-| bag6 cam0 — Pi3X (15k) | [![](docs/images/demo-sweep/09_bag6-pi3x.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-pi3x-20-15k.splat) | Pi3X VO tensor import, gsplat 15k |
-| MCD tuhh_day_04 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/05_mcd-tuhh-day04-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat) | MCD handheld, MAST3R, gsplat 15k |
-| MCD ntu_day_02 — supervised | [![](docs/images/demo-sweep/06_mcd-ntu-day02-supervised.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat) | Valid GNSS + LiDAR depth-supervised gsplat |
+| Autoware 6-bag fused (supervised default) | [![](docs/images/demo-sweep/01_outdoor-demo.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/outdoor-demo.splat) | GNSS + LiDAR-seeded COLMAP, gsplat 30–50k |
+| bag6 cam0 — DUSt3R pose-free | [![](docs/images/demo-sweep/02_outdoor-demo-dust3r.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat) | 20 frames, DUSt3R, gsplat 3k |
+| MCD tuhh_day_04 — DUSt3R pose-free | [![](docs/images/demo-sweep/03_mcd-tuhh-day04.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat) | MCD handheld, DUSt3R, gsplat 3k |
+| bag6 cam0 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/04_bag6-mast3r.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat) | 20 frames, MAST3R, gsplat 15k |
+| bag6 cam0 — VGGT-SLAM 2.0 (15k) | [![](docs/images/demo-sweep/07_bag6-vggt-slam.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat) | VGGT-SLAM 2.0 artifact import, gsplat 15k |
+| bag6 cam0 — MASt3R-SLAM (15k) | [![](docs/images/demo-sweep/08_bag6-mast3r-slam.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat) | MASt3R-SLAM artifact import, gsplat 15k |
+| bag6 cam0 — Pi3X (15k) | [![](docs/images/demo-sweep/09_bag6-pi3x.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-pi3x-20-15k.splat) | Pi3X VO tensor import, gsplat 15k |
+| MCD tuhh_day_04 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/05_mcd-tuhh-day04-mast3r.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat) | MCD handheld, MAST3R, gsplat 15k |
+| MCD ntu_day_02 — supervised | [![](docs/images/demo-sweep/06_mcd-ntu-day02-supervised.png)](https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat) | Valid GNSS + LiDAR depth-supervised gsplat |
 
 The Autoware supervised default uses the full multi-bag pose-import stack. The MCD supervised row uses `ntu_day_02` because `tuhh_day_04` publishes all-zero GNSS; that rejected zero-GNSS artifact remains documented in `docs/plan_outdoor_gs.md`.
 
@@ -93,7 +93,7 @@ gs-mapper splat-filter --input outputs/my_scene.splat --output outputs/my_scene.
 ## Zero-install demos (HF Spaces / Colab)
 
 - **[Hugging Face Space](https://huggingface.co/spaces/rsasaki0109/gs-mapper)** — upload photos or a short video in the browser (`apps/hf-space/`).
-- **[Colab notebook](https://colab.research.google.com/github/rsasaki0109/gs-mapper/blob/main/notebooks/photos_to_splat_colab.ipynb)** — full `photos-to-splat` on a free T4.
+- **[Colab notebook](https://colab.research.google.com/github/rsasaki0109/3dgs-robotics/blob/main/notebooks/photos_to_splat_colab.ipynb)** — full `photos-to-splat` on a free T4.
 
 ## Live Mapping (ROS 2) — watch the map grow
 

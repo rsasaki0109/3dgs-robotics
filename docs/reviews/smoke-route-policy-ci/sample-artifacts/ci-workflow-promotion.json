@@ -139,7 +139,7 @@
   "pushBranches": [],
   "recordType": "route-policy-scenario-ci-workflow-promotion",
   "reviewId": "smoke-route-policy-ci-review",
-  "reviewUrl": "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/",
+  "reviewUrl": "https://rsasaki0109.github.io/3dgs-robotics/reviews/smoke-route-policy-ci/",
   "triggerBranchCount": 1,
   "triggerMode": "pull-request",
   "version": "gs-mapper-route-policy-scenario-ci-workflow-promotion/v1",

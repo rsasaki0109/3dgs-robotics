@@ -23,8 +23,8 @@ def test_default_launch_kit_has_core_links_and_bounded_social_post() -> None:
     kit = build_default_launch_kit()
 
     link_urls = {link.url for link in kit.links}
-    assert "https://rsasaki0109.github.io/gs-mapper/splat.html" in link_urls
-    assert "https://github.com/rsasaki0109/gs-mapper" in link_urls
+    assert "https://rsasaki0109.github.io/3dgs-robotics/splat.html" in link_urls
+    assert "https://github.com/rsasaki0109/3dgs-robotics" in link_urls
     assert "vggt-slam" in kit.topics
 
     snippet_keys = {snippet.key for snippet in kit.snippets}
@@ -79,7 +79,7 @@ def test_generate_launch_kit_script_writes_all_formats(tmp_path: Path) -> None:
     assert (tmp_path / "launch-kit.html").is_file()
     assert (tmp_path / "launch-kit.md").is_file()
     payload = json.loads((tmp_path / "launch-kit.json").read_text(encoding="utf-8"))
-    assert payload["siteUrl"] == "https://rsasaki0109.github.io/gs-mapper/"
+    assert payload["siteUrl"] == "https://rsasaki0109.github.io/3dgs-robotics/"
 
 
 def test_checked_in_launch_kit_files_match_generator(tmp_path: Path) -> None:

@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from typing import Any
 
 
-DEFAULT_SITE_URL = "https://rsasaki0109.github.io/gs-mapper/"
-DEFAULT_REPO_URL = "https://github.com/rsasaki0109/gs-mapper"
-DEFAULT_LIVE_VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat.html"
-DEFAULT_SPARK_VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat_spark.html"
-DEFAULT_WEBGPU_VIEWER_URL = "https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html"
-DEFAULT_PHYSICAL_AI_DOC_URL = "https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md"
+DEFAULT_SITE_URL = "https://rsasaki0109.github.io/3dgs-robotics/"
+DEFAULT_REPO_URL = "https://github.com/rsasaki0109/3dgs-robotics"
+DEFAULT_LIVE_VIEWER_URL = "https://rsasaki0109.github.io/3dgs-robotics/splat.html"
+DEFAULT_SPARK_VIEWER_URL = "https://rsasaki0109.github.io/3dgs-robotics/splat_spark.html"
+DEFAULT_WEBGPU_VIEWER_URL = "https://rsasaki0109.github.io/3dgs-robotics/splat_webgpu.html"
+DEFAULT_PHYSICAL_AI_DOC_URL = "https://github.com/rsasaki0109/3dgs-robotics/blob/main/docs/physical-ai-sim.md"
 DEFAULT_HERO_IMAGE = "images/demo-sweep/hero.gif"
-DEFAULT_SOCIAL_IMAGE_URL = "https://rsasaki0109.github.io/gs-mapper/images/social-card.png"
+DEFAULT_SOCIAL_IMAGE_URL = "https://rsasaki0109.github.io/3dgs-robotics/images/social-card.png"
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +193,7 @@ def build_default_launch_kit() -> LaunchKit:
             key="awesome-list",
             label="Awesome-list entry",
             text=(
-                "- [GS Mapper](https://github.com/rsasaki0109/gs-mapper) - Converts photos, robotics logs, "
+                "- [GS Mapper](https://github.com/rsasaki0109/3dgs-robotics) - Converts photos, robotics logs, "
                 "and MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR artifacts into browser-viewable Gaussian splats, "
                 "Physical AI route-policy benchmarks, and CI review bundles."
             ),

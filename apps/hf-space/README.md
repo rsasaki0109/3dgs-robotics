@@ -20,7 +20,7 @@ tags:
 
 # GS Mapper — Photos to 3D Gaussian Splat
 
-Zero-install demo for [gs-mapper](https://github.com/rsasaki0109/gs-mapper):
+Zero-install demo for [3dgs-robotics](https://github.com/rsasaki0109/3dgs-robotics):
 upload 8–16 photos (or a short walkaround video) and get a browser-viewable
 3D Gaussian Splat. Pose-free via DUSt3R — no COLMAP, no GPU setup.
 

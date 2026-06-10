@@ -375,7 +375,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     """The README first screen should quickly answer what to click — few, strong links."""
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI." in readme
-    assert "[live 3DGS demo](https://rsasaki0109.github.io/gs-mapper/splat.html)" in readme
+    assert "[live 3DGS demo](https://rsasaki0109.github.io/3dgs-robotics/splat.html)" in readme
     assert "huggingface.co/spaces/rsasaki0109/gs-mapper" in readme
     assert "Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)" in readme
     assert "Lead GIF: dynamic map loading on real robot data" in readme
@@ -446,7 +446,7 @@ def test_social_card_exists_and_is_used_by_pages_metadata() -> None:
     assert card.stat().st_size > 100_000
     with Image.open(card) as image:
         assert image.size == (1200, 630)
-    assert "https://rsasaki0109.github.io/gs-mapper/images/social-card.png" in html
+    assert "https://rsasaki0109.github.io/3dgs-robotics/images/social-card.png" in html
 
 
 def test_splat_html_supports_embed_mode() -> None:

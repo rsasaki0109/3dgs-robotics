@@ -171,7 +171,7 @@
         }
       ],
       "trajectoryExtentMeters": null,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/outdoor-demo.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/outdoor-demo-dust3r.splat",
@@ -314,7 +314,7 @@
         }
       ],
       "trajectoryExtentMeters": 1.02,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/mcd-tuhh-day04.splat",
@@ -457,7 +457,7 @@
         }
       ],
       "trajectoryExtentMeters": 1.78,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/bag6-mast3r.splat",
@@ -629,7 +629,7 @@
         }
       ],
       "trajectoryExtentMeters": 28.1,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/bag6-vggt-slam-20-15k.splat",
@@ -800,7 +800,7 @@
         }
       ],
       "trajectoryExtentMeters": 3.23,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat",
@@ -971,7 +971,7 @@
         }
       ],
       "trajectoryExtentMeters": 2.16,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/bag6-pi3x-20-15k.splat",
@@ -1143,7 +1143,7 @@
         }
       ],
       "trajectoryExtentMeters": 74.4,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-pi3x-20-15k.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/bag6-pi3x-20-15k.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat",
@@ -1315,7 +1315,7 @@
         }
       ],
       "trajectoryExtentMeters": 59.0,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat"
     },
     {
       "assetUrl": "assets/outdoor-demo/mcd-ntu-day02-supervised.splat",
@@ -1487,7 +1487,7 @@
         }
       ],
       "trajectoryExtentMeters": 250.0,
-      "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat"
+      "viewerUrl": "https://rsasaki0109.github.io/3dgs-robotics/splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat"
     }
   ],
   "sourceCatalog": "docs/scenes-list.json",

@@ -1033,7 +1033,7 @@ review = build_route_policy_scenario_ci_review_artifact(
     validation,
     activation,
     review_id="outdoor-demo-policy-review",
-    pages_base_url="https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+    pages_base_url="https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/",
 )
 write_route_policy_scenario_ci_review_bundle(
     "docs/reviews/outdoor-demo-policy",
@@ -1048,7 +1048,7 @@ gs-mapper route-policy-scenario-ci-review \
   --validation-report runs/scenarios/ci-workflow-validation.json \
   --activation-report runs/scenarios/ci-workflow-activation.json \
   --review-id outdoor-demo-policy-review \
-  --pages-base-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --pages-base-url https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/ \
   --bundle-dir docs/reviews/outdoor-demo-policy \
   --fail-on-review
 ```
@@ -1060,7 +1060,7 @@ promotion = promote_route_policy_scenario_ci_workflow(
     review,
     trigger_mode="pull-request",
     pull_request_branches=("main",),
-    review_url="https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+    review_url="https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/",
 )
 write_route_policy_scenario_ci_workflow_promotion_json(
     "runs/scenarios/ci-workflow-promotion.json",
@@ -1072,7 +1072,7 @@ print(render_route_policy_scenario_ci_workflow_promotion_markdown(promotion))
 ```bash
 gs-mapper route-policy-scenario-ci-workflow-promote \
   --review runs/scenarios/ci-review.json \
-  --review-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --review-url https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/ \
   --trigger-mode pull-request \
   --pull-request-branch main \
   --output runs/scenarios/ci-workflow-promotion.json \
@@ -1136,7 +1136,7 @@ gs-mapper route-policy-scenario-ci-review \
   --activation-report runs/scenarios/ci-workflow-activation.json \
   --adoption-report runs/scenarios/ci-workflow-adoption.json \
   --review-id outdoor-demo-policy-review \
-  --pages-base-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --pages-base-url https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/ \
   --bundle-dir docs/reviews/outdoor-demo-policy \
   --fail-on-review
 ```

@@ -36,7 +36,7 @@ jobs:
         run: npm run build
         working-directory: apps/dreamwalker-web
         env:
-          DREAMWALKER_BASE: /gs-mapper/dreamwalker/
+          DREAMWALKER_BASE: /3dgs-robotics/dreamwalker/
           DREAMWALKER_OUT_DIR: ../../docs/dreamwalker
       - uses: actions/upload-pages-artifact@v5
         with:
