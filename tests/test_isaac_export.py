@@ -81,6 +81,25 @@ class TestExportUsdz:
         assert calls["env"]["PYTHONPATH"].startswith(str(root))
         assert str(ply) in calls["command"]
 
+    def test_relative_paths_are_resolved(self, tmp_path, monkeypatch):
+        """The converter runs with cwd=3dgrut, so relative inputs must become absolute."""
+        root = _fake_threedgrut(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        Path("scene.ply").write_bytes(b"ply\n")
+        calls = {}
+
+        def fake_run(command, env=None, cwd=None, capture_output=True, text=True):
+            calls["command"] = command
+            (tmp_path / "scene.usdz").write_bytes(b"usdz")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        monkeypatch.setattr("gs_sim2real.robotics.isaac_export.subprocess.run", fake_run)
+        export_usdz(Path("scene.ply"), Path("scene.usdz"), threedgrut_root=root)
+        ply_arg = calls["command"][3]
+        out_arg = calls["command"][calls["command"].index("-o") + 1]
+        assert Path(ply_arg).is_absolute()
+        assert Path(out_arg).is_absolute()
+
     def test_missing_ply_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             export_usdz(tmp_path / "missing.ply", tmp_path / "out.usdz", threedgrut_root=_fake_threedgrut(tmp_path))

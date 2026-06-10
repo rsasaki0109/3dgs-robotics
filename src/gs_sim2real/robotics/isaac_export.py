@@ -81,8 +81,9 @@ def export_usdz(
     python_executable: str | None = None,
 ) -> Path:
     """Convert a standard 3DGS PLY into an Isaac Sim-ready USDZ via 3dgrut."""
-    ply_path = Path(ply_path)
-    output_path = Path(output_path)
+    # resolve before building the command: the converter runs with cwd=3dgrut
+    ply_path = Path(ply_path).resolve()
+    output_path = Path(output_path).resolve()
     if not ply_path.is_file():
         raise FileNotFoundError(f"input PLY not found: {ply_path}")
 
