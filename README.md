@@ -27,8 +27,9 @@ pip install -e ".[dev]"
 
 What ships: nine public outdoor `.splat` scenes; a large-scale Dynamic Map Viewer
 fixture (87 tiles); `video-to-splat` / `photos-to-splat`; VGGT feedforward
-preprocess; ROS 2 live mapping + localizer node; 3DGS localization against live
-sessions; Isaac Sim export (NuRec USDZ); `splat-inspect` / `splat-filter`;
+preprocess; ROS 2 live mapping + localizer + GS camera simulator nodes; 3DGS
+localization against live sessions; Isaac Sim export (NuRec USDZ);
+`splat-inspect` / `splat-filter`;
 Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 `docs/live-mapping.md`, `docs/isaac-sim.md`, `docs/physical-ai-sim.md`.
 
@@ -43,6 +44,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 | **A live ROS 2 camera topic** | `3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
 | **Isaac Sim as the target** | `3dgs-robotics export-isaac --map outputs/live_mapping --output scene.usdz` | [docs/isaac-sim.md](docs/isaac-sim.md) |
+| **A simulated camera in your map** | `3dgs-robotics-camera-sim --map outputs/live_mapping --replay --loop` | [docs/live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
@@ -113,6 +115,7 @@ Localize query frames against a finished session: `3dgs-robotics localize --map 
 ```bash
 3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765       # live ROS 2 topic
 3dgs-robotics-localizer --map outputs/live_mapping --follow-latest                       # PoseStamped + TF in the map
+3dgs-robotics-camera-sim --map outputs/live_mapping --replay --loop                      # virtual camera in the map
 python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765 # image-folder replay
 python3 scripts/run_live_mapping_demo.py --bag ./my_drive_bag --port 8765               # rosbag replay, no ROS needed
 ```

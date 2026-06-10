@@ -226,6 +226,50 @@ frame uses the optical convention (x right, y down, z forward). With
 `--follow-latest`, published poses jump to the new round's gauge after each
 reload — consumers that need continuity should pin `--round`.
 
+### ROS 2 GS camera simulator node
+
+`3dgs-robotics-camera-sim` is the inverse of the localizer: pose in, rendered
+camera topic out. It loads a session round (or any standard 3DGS PLY) and
+publishes photorealistic frames with matching `CameraInfo` — a lightweight,
+ROS-2-only counterpart to the [Isaac Sim export](isaac-sim.md). Rendering uses
+gsplat's CUDA rasterizer when available and a deterministic point-splat
+fallback otherwise.
+
+```bash
+# virtual camera driven by a PoseStamped topic (e.g. from a planner)
+3dgs-robotics-camera-sim --map outputs/live_mapping/session \
+  --pose-topic /planner/camera_pose
+
+# self-contained: replay the mapped keyframe trajectory in a loop
+3dgs-robotics-camera-sim --map outputs/live_mapping/session --replay --loop
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--map` / `--ply` | (one required) | Session directory, or a raw 3DGS PLY |
+| `--pose-topic` | `/gs_camera_sim/pose` | `PoseStamped` input (map frame, optical-convention camera) |
+| `--replay` / `--loop` | off | Replay the session's mapped trajectory instead of subscribing |
+| `--image-topic` | `/gs_camera_sim/image_raw/compressed` | `/compressed` suffix selects `CompressedImage`, otherwise raw `rgb8` |
+| `--depth-topic` | (off) | Optional `32FC1` depth image output |
+| `--gt-pose-topic` | `/gs_camera_sim/gt_pose` | Ground-truth pose published while replaying |
+| `--width` / `--height` / `--fov-degrees` | session camera | Render resolution and optics (defaults read `cameras.txt`) |
+| `--fps` | 10 | Publish rate |
+
+Closing the loop entirely inside this repo — a virtual camera flies the mapped
+trajectory and the localizer re-estimates its poses from pixels alone:
+
+```bash
+# terminal 1
+3dgs-robotics-camera-sim --map outputs/live_mapping/session --replay --loop
+
+# terminal 2
+3dgs-robotics-localizer --map outputs/live_mapping/session \
+  --image-topic /gs_camera_sim/image_raw/compressed
+```
+
+Compare `/gs_localizer/pose` against `/gs_camera_sim/gt_pose` (both in the
+map frame) to measure the loop's accuracy.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |

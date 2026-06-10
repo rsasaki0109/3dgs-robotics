@@ -10,6 +10,10 @@ Sim as a photorealistic environment: real place in, simulated robot out.
 rosbag / video / photos ──> 3DGS map (PLY) ──> export-isaac ──> USDZ ──> Isaac Sim 5.0+
 ```
 
+No Isaac Sim at hand? `3dgs-robotics-camera-sim` simulates a camera in the
+same map with nothing but ROS 2 — see
+[live-mapping.md](live-mapping.md#ros-2-gs-camera-simulator-node).
+
 ## Setup (one time)
 
 The export wraps NVIDIA's official converter from

@@ -1079,8 +1079,13 @@ class HeadlessSplatRenderer:
         near_clip: float,
         far_clip: float,
         point_radius: int,
+        intrinsics: tuple[float, float, float, float] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Render an RGB image and float32 depth image from ``pose``."""
+        """Render an RGB image and float32 depth image from ``pose``.
+
+        ``intrinsics`` (fx, fy, cx, cy) overrides the pinhole parameters
+        derived from ``fov_degrees`` so renders can match a calibrated camera.
+        """
         if self.backend == "gsplat":
             return self._render_rgbd_gsplat(
                 pose,
@@ -1089,6 +1094,7 @@ class HeadlessSplatRenderer:
                 fov_degrees=fov_degrees,
                 near_clip=near_clip,
                 far_clip=far_clip,
+                intrinsics=intrinsics,
             )
         return self._render_rgbd_simple(
             pose,
@@ -1098,6 +1104,7 @@ class HeadlessSplatRenderer:
             near_clip=near_clip,
             far_clip=far_clip,
             point_radius=point_radius,
+            intrinsics=intrinsics,
         )
 
     def _render_rgbd_simple(
@@ -1110,9 +1117,10 @@ class HeadlessSplatRenderer:
         near_clip: float,
         far_clip: float,
         point_radius: int,
+        intrinsics: tuple[float, float, float, float] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Render RGBD with the deterministic numpy point-splat fallback."""
-        fx, fy, cx, cy = compute_camera_intrinsics(width, height, fov_degrees)
+        fx, fy, cx, cy = intrinsics if intrinsics is not None else compute_camera_intrinsics(width, height, fov_degrees)
         if near_clip <= 0.0 or far_clip <= near_clip:
             raise ValueError("clip planes must satisfy 0 < near_clip < far_clip")
 
@@ -1213,6 +1221,7 @@ class HeadlessSplatRenderer:
         fov_degrees: float,
         near_clip: float,
         far_clip: float,
+        intrinsics: tuple[float, float, float, float] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Render RGBD with gsplat's CUDA rasterizer."""
         if near_clip <= 0.0 or far_clip <= near_clip:
@@ -1227,7 +1236,7 @@ class HeadlessSplatRenderer:
         assert self._scales_torch is not None
         assert self._rotations_torch is not None
 
-        fx, fy, cx, cy = compute_camera_intrinsics(width, height, fov_degrees)
+        fx, fy, cx, cy = intrinsics if intrinsics is not None else compute_camera_intrinsics(width, height, fov_degrees)
         device = self._means_torch.device
         K = torch.tensor(
             [
