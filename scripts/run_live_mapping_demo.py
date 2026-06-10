@@ -58,6 +58,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rebuild-min-new", type=int, default=4, help="New keyframes per rebuild round")
     parser.add_argument("--min-keyframe-gap", type=float, default=0.4, help="Min seconds between keyframes")
     parser.add_argument("--min-keyframe-motion", type=float, default=0.02, help="Min thumbnail diff (0..1)")
+    parser.add_argument("--no-revisit", action="store_true", help="Disable loop-candidate (revisit) detection")
+    parser.add_argument(
+        "--revisit-min-time-separation",
+        type=float,
+        default=30.0,
+        help="Seconds a keyframe pair must span before it can count as a loop candidate",
+    )
+    parser.add_argument(
+        "--revisit-max-distance",
+        type=float,
+        default=0.04,
+        help="Max gray-thumbnail mean abs diff (0..1) for a loop candidate",
+    )
     parser.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint path or HF hub id")
     parser.add_argument("--dust3r-root", default=None, help="Local clone of naver/dust3r")
     parser.add_argument(
@@ -126,6 +139,9 @@ def main() -> None:
         method=args.method,
         min_keyframe_gap_s=args.min_keyframe_gap,
         min_keyframe_motion=args.min_keyframe_motion,
+        revisit_detection=not args.no_revisit,
+        revisit_min_time_separation_s=args.revisit_min_time_separation,
+        revisit_max_distance=args.revisit_max_distance,
         rebuild_min_new_keyframes=args.rebuild_min_new,
         num_frames=args.num_frames,
         iterations=args.iterations,
@@ -185,6 +201,11 @@ def main() -> None:
     if successful:
         print(f"Final map: {session.live_dir / 'latest.splat'}")
         print(f"Per-round timeline: {session.rounds_dir}/round_*/scene.splat")
+    if session.revisit_detector is not None and session.revisit_detector.candidates:
+        print(
+            f"Loop candidates: {len(session.revisit_detector.candidates)} "
+            f"({session.live_dir / 'loop_candidates.json'}; plot with scripts/plot_loop_candidates.py)"
+        )
     if failed:
         print(f"First failure: {failed[0].error}")
         sys.exit(1)

@@ -109,3 +109,54 @@ def test_align_to_anchor_chains_through_intermediate_round(gif_module) -> None:
     aligned = rounds[0].centers @ rotation.T * scale + translation
     expected = world_to_gauge(world[[0, 1]], gauges[2])
     np.testing.assert_allclose(aligned, expected, atol=1e-8)
+
+
+def _make_round_dir_with_transform(tmp_path: Path, index: int, transform, *, rebased: bool):
+    from gs_sim2real.robotics.gauge_alignment import write_gauge_transform
+
+    round_dir = tmp_path / f"round_{index:03d}"
+    (round_dir / "train").mkdir(parents=True)
+    write_gauge_transform(round_dir, transform, rebased=rebased, shared_cameras=4)
+    return round_dir
+
+
+def test_load_runtime_transforms_reanchors_onto_last_round(gif_module, tmp_path) -> None:
+    """Runtime transforms map rounds onto the session gauge; the GIF wants the last round's."""
+    rng = np.random.default_rng(13)
+    rotation = _random_rotation(rng)
+    session_from_round2 = (1.6, rotation, rng.normal(size=3))
+    dirs = [
+        _make_round_dir_with_transform(tmp_path, 1, (1.0, np.eye(3), np.zeros(3)), rebased=False),
+        _make_round_dir_with_transform(tmp_path, 2, session_from_round2, rebased=False),
+    ]
+    rounds = [
+        gif_module.RoundData(i + 1, d / "train" / "point_cloud.ply", [], np.empty((0, 3)), np.empty((0, 3, 3)))
+        for i, d in enumerate(dirs)
+    ]
+
+    transforms = gif_module.load_runtime_transforms(rounds)
+    assert transforms is not None
+    np.testing.assert_allclose(transforms[-1][0], 1.0)
+    np.testing.assert_allclose(transforms[-1][1], np.eye(3), atol=1e-12)
+    # round 1 (= session gauge) must be mapped by the inverse of round 2's transform
+    points = rng.normal(size=(5, 3))
+    scale, rot, t = transforms[0]
+    roundtrip = (points @ rot.T * scale + t) @ session_from_round2[1].T * session_from_round2[0] + session_from_round2[
+        2
+    ]
+    np.testing.assert_allclose(roundtrip, points, atol=1e-9)
+
+
+def test_load_runtime_transforms_falls_back_on_missing_or_rebased(gif_module, tmp_path) -> None:
+    dirs = [
+        _make_round_dir_with_transform(tmp_path, 1, (1.0, np.eye(3), np.zeros(3)), rebased=False),
+        _make_round_dir_with_transform(tmp_path, 2, (1.0, np.eye(3), np.zeros(3)), rebased=True),
+    ]
+    rounds = [
+        gif_module.RoundData(i + 1, d / "train" / "point_cloud.ply", [], np.empty((0, 3)), np.empty((0, 3, 3)))
+        for i, d in enumerate(dirs)
+    ]
+    assert gif_module.load_runtime_transforms(rounds) is None  # rebased mid-session
+
+    (dirs[1] / "gauge_transform.json").unlink()
+    assert gif_module.load_runtime_transforms(rounds) is None  # missing file

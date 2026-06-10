@@ -51,6 +51,11 @@ class LiveMapperConfig:
     rebuild_min_new_keyframes: int = 4
     max_keyframes: int = 512  # hard cap on stored keyframes
     num_frames: int = 24  # frame cap per rebuild (evenly strided over the run)
+    # revisit (loop candidate) detection — v1: record + visualize only
+    revisit_detection: bool = True
+    revisit_min_time_separation_s: float = 30.0
+    revisit_min_index_separation: int = 20
+    revisit_max_distance: float = 0.04
     # reconstruction quality (draft-leaning: latency beats fidelity here)
     iterations: int = 1500
     align_iters: int = 150
@@ -130,6 +135,80 @@ class KeyframeSelector:
         self._last_position = None if position is None else np.asarray(position, dtype=np.float64).copy()
 
 
+@dataclass(frozen=True)
+class LoopCandidate:
+    """A "temporally distant but visually near" keyframe pair (possible revisit).
+
+    v1 records and visualizes candidates only — no map correction yet. The
+    distance is the same gray-thumbnail mean-abs-diff used by keyframe motion
+    gating, so it is map-quality independent (original images, not splats).
+    """
+
+    query_index: int
+    query_timestamp: float
+    match_index: int
+    match_timestamp: float
+    distance: float
+
+    def to_json(self) -> dict:
+        return {
+            "queryIndex": self.query_index,
+            "queryTimestamp": round(self.query_timestamp, 3),
+            "matchIndex": self.match_index,
+            "matchTimestamp": round(self.match_timestamp, 3),
+            "distance": round(self.distance, 5),
+        }
+
+
+class RevisitDetector:
+    """Match each new keyframe against past keyframes outside a temporal window.
+
+    Candidates must be separated by both ``min_time_separation_s`` and
+    ``min_index_separation`` so adjacent keyframes (which are always similar)
+    never count as loops. The best match below ``max_distance`` is kept.
+    """
+
+    def __init__(
+        self,
+        *,
+        min_time_separation_s: float = 30.0,
+        min_index_separation: int = 20,
+        max_distance: float = 0.04,
+    ) -> None:
+        self.min_time_separation_s = min_time_separation_s
+        self.min_index_separation = min_index_separation
+        self.max_distance = max_distance
+        self._thumbs: list[np.ndarray] = []
+        self._timestamps: list[float] = []
+        self.candidates: list[LoopCandidate] = []
+
+    def add_keyframe(self, image_bgr: np.ndarray, timestamp: float) -> LoopCandidate | None:
+        """Register a keyframe; returns a loop candidate when a revisit is found."""
+        thumb = KeyframeSelector._thumbnail(image_bgr)
+        index = len(self._thumbs)
+        best: LoopCandidate | None = None
+        last_eligible = index - self.min_index_separation
+        for past_index in range(min(len(self._thumbs), max(last_eligible, 0))):
+            if timestamp - self._timestamps[past_index] < self.min_time_separation_s:
+                continue
+            distance = float(np.abs(thumb - self._thumbs[past_index]).mean())
+            if distance > self.max_distance:
+                continue
+            if best is None or distance < best.distance:
+                best = LoopCandidate(
+                    query_index=index,
+                    query_timestamp=timestamp,
+                    match_index=past_index,
+                    match_timestamp=self._timestamps[past_index],
+                    distance=distance,
+                )
+        self._thumbs.append(thumb)
+        self._timestamps.append(timestamp)
+        if best is not None:
+            self.candidates.append(best)
+        return best
+
+
 def select_round_frames(keyframes: list[Keyframe], num_frames: int) -> list[Keyframe]:
     """Evenly strided subset covering the whole run (keeps first and latest)."""
     if num_frames <= 0 or len(keyframes) <= num_frames:
@@ -139,10 +218,24 @@ def select_round_frames(keyframes: list[Keyframe], num_frames: int) -> list[Keyf
 
 
 class SplatRebuilder:
-    """Real backend: pose-free preprocess -> gsplat training -> .splat export."""
+    """Real backend: pose-free preprocess -> gsplat training -> .splat export.
+
+    Every round is an independent pose-free reconstruction with its own gauge.
+    The rebuilder chains each round onto the session gauge (= the first
+    round's) via the shared keyframes' COLMAP poses before exporting
+    ``scene.splat``, and freezes the viewer normalization on the first round —
+    so ``live/latest.splat`` grows cumulatively instead of jumping every
+    round. The cumulative transform is persisted as
+    ``rounds/round_NNN/gauge_transform.json`` for offline consumers (GIF
+    timeline, loop closure).
+    """
 
     def __init__(self, config: LiveMapperConfig) -> None:
         self.config = config
+        from gs_sim2real.robotics.gauge_alignment import SessionGaugeChain
+
+        self._gauge_chain = SessionGaugeChain()
+        self._normalize_params: tuple[np.ndarray, float] | None = None
 
     def __call__(self, images_dir: Path, round_dir: Path) -> Path:
         from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
@@ -173,16 +266,70 @@ class SplatRebuilder:
             output_dir=round_dir / "train",
             num_iterations=cfg.iterations,
         )
+        transform, rebased = self._align_round_gauge(round_dir)
+        normalize_params = self._session_normalize_params(Path(ply_path), transform, rebased)
         splat_path = round_dir / "scene.splat"
         ply_to_splat(
             ply_path,
             splat_path,
             max_points=cfg.splat_max_points,
-            normalize_target_extent=cfg.splat_normalize_extent,
+            normalize_params=normalize_params,
             min_opacity=0.02,
             max_scale=2.0,
+            similarity_transform=transform,
         )
         return splat_path
+
+    def _align_round_gauge(self, round_dir: Path):
+        """Chain this round onto the session gauge from its COLMAP poses.
+
+        Alignment uses ``train/point_cloud.ply``'s gauge via ``images.txt`` —
+        never the normalized ``scene.splat``. A missing/short pose file
+        rebases the chain (one visible jump) rather than exporting a garbage
+        alignment.
+        """
+        from gs_sim2real.robotics.gauge_alignment import (
+            RoundPoses,
+            SessionGaugeChain,
+            identity_sim3,
+            write_gauge_transform,
+        )
+
+        images_txt = round_dir / "sparse_input" / "sparse" / "0" / "images.txt"
+        if not images_txt.is_file():
+            logger.warning("gauge chain: %s missing; rebasing the session gauge", images_txt)
+            self._gauge_chain = SessionGaugeChain()  # next round becomes the new anchor
+            transform = identity_sim3()
+            write_gauge_transform(round_dir, transform, rebased=True, shared_cameras=0)
+            return transform, True
+
+        poses = RoundPoses.from_images_txt(images_txt)
+        transform, rebased, shared = self._gauge_chain.update(poses)
+        write_gauge_transform(round_dir, transform, rebased=rebased, shared_cameras=shared)
+        if not rebased and shared:
+            logger.info(
+                "gauge chain: aligned onto session gauge via %d shared cameras (scale %.4f)",
+                shared,
+                transform[0],
+            )
+        return transform, rebased
+
+    def _session_normalize_params(self, ply_path: Path, transform, rebased: bool):
+        """Freeze the viewer normalization on the session's first (or rebased) round."""
+        if self.config.splat_normalize_extent is None or self.config.splat_normalize_extent <= 0:
+            return None
+        if self._normalize_params is not None and not rebased:
+            return self._normalize_params
+        from gs_sim2real.robotics.gauge_alignment import apply_to_points
+        from gs_sim2real.viewer.web_export import compute_splat_normalization
+        from gs_sim2real.viewer.web_viewer import load_ply
+
+        positions = np.asarray(load_ply(str(ply_path)).positions, dtype=np.float64)
+        self._normalize_params = compute_splat_normalization(
+            apply_to_points(transform, positions),
+            float(self.config.splat_normalize_extent),
+        )
+        return self._normalize_params
 
 
 @dataclass
@@ -234,6 +381,15 @@ class LiveMappingSession:
             min_motion=config.min_keyframe_motion,
             min_translation_m=config.min_translation_m,
         )
+        self.revisit_detector: RevisitDetector | None = (
+            RevisitDetector(
+                min_time_separation_s=config.revisit_min_time_separation_s,
+                min_index_separation=config.revisit_min_index_separation,
+                max_distance=config.revisit_max_distance,
+            )
+            if config.revisit_detection
+            else None
+        )
         self.keyframes: list[Keyframe] = []
         self.rounds: list[_RoundRecord] = []
         self._built_keyframe_count = 0
@@ -255,6 +411,7 @@ class LiveMappingSession:
         position: np.ndarray | None = None,
     ) -> bool:
         """Feed a camera frame; returns True when it was kept as a keyframe."""
+        loop_candidate: LoopCandidate | None = None
         with self._lock:
             if len(self.keyframes) >= self.config.max_keyframes:
                 return False
@@ -264,6 +421,17 @@ class LiveMappingSession:
             path = self.keyframes_dir / f"kf_{index:06d}.jpg"
             cv2.imwrite(str(path), image_bgr, [cv2.IMWRITE_JPEG_QUALITY, self.config.jpeg_quality])
             self.keyframes.append(Keyframe(index=index, timestamp=timestamp, path=path, position=position))
+            if self.revisit_detector is not None:
+                loop_candidate = self.revisit_detector.add_keyframe(image_bgr, timestamp)
+        if loop_candidate is not None:
+            logger.info(
+                "loop candidate: kf_%06d revisits kf_%06d (dt=%.1fs, thumbnail dist %.4f)",
+                loop_candidate.query_index,
+                loop_candidate.match_index,
+                loop_candidate.query_timestamp - loop_candidate.match_timestamp,
+                loop_candidate.distance,
+            )
+            self._write_loop_candidates()
         self._wakeup.set()
         return True
 
@@ -357,9 +525,22 @@ class LiveMappingSession:
         shutil.copy2(splat_path, tmp)
         os.replace(tmp, target)
 
+    def _write_loop_candidates(self) -> None:
+        """Atomically persist loop candidates to ``live/loop_candidates.json``."""
+        if self.revisit_detector is None:
+            return
+        with self._lock:
+            candidates = [c.to_json() for c in self.revisit_detector.candidates]
+        payload = {"loopCandidates": candidates, "updatedUnix": round(time.time(), 3)}
+        target = self.live_dir / "loop_candidates.json"
+        tmp = target.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, indent=2))
+        os.replace(tmp, target)
+
     def _write_state(self, *, status: str, building_round: int | None = None) -> None:
         with self._lock:
             keyframes_total = len(self.keyframes)
+            loop_candidates = len(self.revisit_detector.candidates) if self.revisit_detector is not None else 0
         successful = [r for r in self.rounds if r.error is None]
         state = {
             "status": status,
@@ -368,6 +549,7 @@ class LiveMappingSession:
             "completedRounds": len(self.rounds),
             "lastSuccessfulRound": successful[-1].to_json() if successful else None,
             "rounds": [r.to_json() for r in self.rounds],
+            "loopCandidates": loop_candidates,
             "updatedUnix": round(time.time(), 3),
             "splatUrl": "latest.splat",
         }

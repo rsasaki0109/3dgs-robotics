@@ -96,11 +96,48 @@ python3 scripts/build_live_mapping_gif.py \
   --output docs/images/live-mapping/live-mapping-grow.gif
 ```
 
-Each round is a full pose-free rebuild and therefore lives in its own gauge;
-the builder chains per-round similarity transforms (rotation from the shared
-keyframes' camera orientations, scale/translation from their centers) onto the
-final round, then renders every aligned round from one fixed top-down
-orthographic camera so the strip visibly extends.
+Each round is a full pose-free rebuild and therefore lives in its own gauge.
+The session aligns every round onto the **session gauge** at runtime (see
+below), so the GIF builder simply reuses the persisted
+`rounds/round_*/gauge_transform.json` transforms; for legacy sessions without
+them it falls back to re-chaining the per-round similarity transforms from the
+COLMAP poses.
+
+## Session gauge: the map accumulates instead of jumping
+
+Every rebuild is an independent pose-free reconstruction, so consecutive
+rounds disagree in scale / rotation / translation. After each round trains,
+the session computes a similarity transform from the keyframes shared with the
+previous round (rotation via Kabsch over the shared cameras' orientations —
+two shared keyframes suffice — scale/translation from their centers), chains
+it onto the first round's gauge, and exports `scene.splat` /
+`live/latest.splat` in that fixed **session gauge** with a normalization
+frozen on round 1. The polling viewer therefore shows a map that grows
+cumulatively rather than re-centering every round. Per-round transforms are
+persisted as `rounds/round_NNN/gauge_transform.json` for offline consumers.
+If a round shares fewer than 2 keyframes with its predecessor (shouldn't
+happen with strided rounds), the chain rebases and the map jumps once instead
+of receiving a garbage alignment.
+
+## Loop candidates (revisit detection, v1)
+
+While frames stream in, each accepted keyframe is also matched against older
+keyframes (same 64x64 gray-thumbnail metric as motion gating, computed on the
+original images so draft map quality doesn't matter). Pairs that are
+temporally distant (default ≥ 30 s and ≥ 20 keyframes apart) yet visually
+near (default thumbnail diff ≤ 0.04) are recorded as **loop candidates** in
+`live/loop_candidates.json` and counted in `state.json` — detection only for
+now; the map is not corrected yet. Judge detection quality on a trajectory
+plot before trusting the candidates:
+
+```bash
+python3 scripts/plot_loop_candidates.py --session outputs/live_mapping_demo
+```
+
+Real loops appear as short edges connecting trajectory segments that pass the
+same place; long chords across the map are false positives — raise
+`--revisit-min-time-separation` or lower `--revisit-max-distance` (demo
+script flags; `LiveMapperConfig.revisit_*` in code).
 
 ## 3DGS localization
 
@@ -172,8 +209,10 @@ round with `--method vggt` is typically **~30–90 seconds for preprocess**
 <workdir>/
   keyframes/kf_000042.jpg     accepted keyframes
   rounds/round_003/           per-round sparse + train + scene.splat
-  live/latest.splat           atomically replaced after each round
-  live/state.json             keyframe/round counters for viewers
+  rounds/round_003/gauge_transform.json  round gauge -> session gauge (Sim3)
+  live/latest.splat           atomically replaced after each round (session gauge)
+  live/state.json             keyframe/round/loop counters for viewers
+  live/loop_candidates.json   revisit detections (v1: record only)
   live/index.html             status page (copy of docs/splat_live.html)
 ```
 
@@ -186,6 +225,7 @@ round with `--method vggt` is typically **~30–90 seconds for preprocess**
   "keyframesTotal": 42,
   "completedRounds": 5,
   "lastSuccessfulRound": {"round": 5, "keyframesUsed": 24, "buildSeconds": 131.2},
+  "loopCandidates": 3,
   "splatUrl": "latest.splat"
 }
 ```

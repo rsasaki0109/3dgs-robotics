@@ -645,6 +645,23 @@ def ply_to_scene_bundle(
 SH_C0 = 0.28209479177387814
 
 
+def compute_splat_normalization(positions: "np.ndarray", target_extent: float) -> tuple["np.ndarray", float]:
+    """Return (centroid, factor) so ``(pos - centroid) / factor`` spans ``target_extent``.
+
+    Precompute this once (e.g. from a live session's first round) and pass it
+    to :func:`ply_to_splat` as ``normalize_params`` so later exports share one
+    stable viewer frame instead of re-centering every time.
+    """
+    import numpy as np
+
+    pos = np.asarray(positions, dtype=np.float64)
+    centroid = pos.mean(axis=0)
+    centered = pos - centroid
+    extent = float(np.max(centered.max(axis=0) - centered.min(axis=0)))
+    factor = extent / float(target_extent) if extent > 0 and target_extent > 0 else 1.0
+    return centroid.astype(np.float32), float(factor)
+
+
 def ply_to_splat(
     ply_path: str | Path,
     output_path: str | Path,
@@ -653,6 +670,8 @@ def ply_to_splat(
     min_opacity: float = 0.0,
     max_scale: float | None = None,
     max_scale_percentile: float | None = None,
+    similarity_transform: tuple[float, "np.ndarray", "np.ndarray"] | None = None,
+    normalize_params: tuple["np.ndarray", float] | None = None,
 ) -> str:
     """Convert a gsplat PLY to the antimatter15/splat 32-byte-per-gaussian binary.
 
@@ -666,15 +685,27 @@ def ply_to_splat(
     Gaussians are sorted by ``exp(sum(scale_logs)) * sigmoid(opacity)`` descending
     before writing so the viewer renders larger, more opaque splats first.
 
+    ``similarity_transform`` ``(s, R, t)`` maps the gaussians into another
+    gauge before export: positions become ``s * R @ p + t``, scales are
+    multiplied by ``s`` (the ``min_opacity`` / ``max_scale`` filters then act
+    in the destination gauge), and rotations are premultiplied by ``R``. Live
+    mapping uses this to chain every round onto the session gauge.
+
     If ``normalize_target_extent`` is set, positions are centered at the
     scene centroid and rescaled so that the largest XYZ extent equals the
     target (gaussian scales are divided by the same factor to preserve
     visual shape). This lets world-metric scenes render inside viewers that
-    assume unit-ish scale.
+    assume unit-ish scale. ``normalize_params`` ``(centroid, factor)`` applies
+    a precomputed normalization instead (see
+    :func:`compute_splat_normalization`); use it when several exports must
+    share one stable frame.
     """
     import numpy as np
 
     from gs_sim2real.viewer.web_viewer import load_ply
+
+    if normalize_target_extent is not None and normalize_params is not None:
+        raise ValueError("Pass either normalize_target_extent or normalize_params, not both.")
 
     src = Path(ply_path)
     dst = Path(output_path)
@@ -691,9 +722,18 @@ def ply_to_splat(
             "PLY is missing gaussian parameters required for .splat (need scales, rotations, opacities, f_dc)"
         )
 
+    scale_shift = 0.0
+    if similarity_transform is not None:
+        sim_scale, sim_rot, sim_t = similarity_transform
+        sim_scale = float(sim_scale)
+        sim_rot = np.asarray(sim_rot, dtype=np.float64)
+        sim_t = np.asarray(sim_t, dtype=np.float64)
+        positions = (positions.astype(np.float64) @ sim_rot.T * sim_scale + sim_t).astype(np.float32)
+        scale_shift += float(np.log(sim_scale))
+
     n = len(positions)
     sigmoid_opacity = 1.0 / (1.0 + np.exp(-opacities))
-    scales_world = np.exp(scales_log)
+    scales_world = np.exp(scales_log + scale_shift)
     scale_max = scales_world.max(axis=1)
     keep = np.ones(n, dtype=bool)
     if min_opacity > 0.0:
@@ -730,6 +770,11 @@ def ply_to_splat(
     )
 
     rot_raw = rotations[order].astype(np.float64)
+    if similarity_transform is not None:
+        from gs_sim2real.robotics.gauge_alignment import quat_multiply, rotation_to_quat
+
+        rot_quat = rotation_to_quat(sim_rot)
+        rot_raw = quat_multiply(np.broadcast_to(rot_quat, rot_raw.shape), rot_raw)
     rot_norm = np.linalg.norm(rot_raw, axis=1, keepdims=True)
     rot_norm = np.where(rot_norm == 0.0, 1.0, rot_norm)
     rot_u8 = np.clip(rot_raw / rot_norm * 128.0 + 128.0, 0, 255).astype(np.uint8)
@@ -740,15 +785,19 @@ def ply_to_splat(
     rgba_u8 = np.clip(rgba * 255.0, 0, 255).astype(np.uint8)
 
     pos = positions[order].astype(np.float32)
-    scale_shift = 0.0
-    if normalize_target_extent is not None and normalize_target_extent > 0:
+    if normalize_params is not None:
+        centroid, factor = normalize_params
+        factor = float(factor) if float(factor) > 0 else 1.0
+        pos = ((pos - np.asarray(centroid, dtype=np.float32)) / factor).astype(np.float32)
+        scale_shift += float(-np.log(factor))
+    elif normalize_target_extent is not None and normalize_target_extent > 0:
         centroid = pos.mean(axis=0)
         centered = pos - centroid
         extent = float(np.max(centered.max(axis=0) - centered.min(axis=0)))
         if extent > 0:
             factor = extent / float(normalize_target_extent)
             pos = (centered / factor).astype(np.float32)
-            scale_shift = float(-np.log(factor))
+            scale_shift += float(-np.log(factor))
             logger.info(
                 "ply_to_splat: normalized scene extent %.2f -> %.2f (factor %.3f)",
                 extent,

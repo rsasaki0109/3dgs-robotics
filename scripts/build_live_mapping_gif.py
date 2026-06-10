@@ -30,13 +30,26 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 REPO = Path(__file__).resolve().parents[1]
+if str(REPO / "src") not in sys.path:
+    sys.path.insert(0, str(REPO / "src"))
+
+from gs_sim2real.robotics.gauge_alignment import (  # noqa: E402
+    MIN_SHARED_CAMERAS,
+    compose,
+    invert,
+    parse_images_txt,
+    quat_multiply,
+    quat_to_rotation,
+    read_gauge_transform,
+    rotation_to_quat,
+    similarity_from_poses,
+)
 
 FRAME_SIZE = (960, 420)
 FRAME_DURATION_MS = 900
 LAST_FRAME_HOLD_MS = 2600
 SCALE_PERCENTILE = 98.0
 MIN_OPACITY = 0.06
-MIN_SHARED_CAMERAS = 2
 
 INK = (236, 240, 246)
 ACCENT = (96, 205, 255)
@@ -57,37 +70,13 @@ class RoundData:
     rotations: np.ndarray  # (N, 3, 3) world-from-camera
 
 
-def _quat_to_rot(q: np.ndarray) -> np.ndarray:
-    w, x, y, z = q
-    return np.array(
-        [
-            [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
-            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
-            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
-        ]
-    )
-
-
-def _parse_images_txt(path: Path) -> tuple[list[str], np.ndarray, np.ndarray]:
-    """COLMAP image lines -> (names, camera centers, world-from-camera rotations)."""
-    names: list[str] = []
-    centers: list[np.ndarray] = []
-    rotations: list[np.ndarray] = []
-    lines = [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()]
-    for line in lines:
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split()
-        # image lines have 10 fields ending in a filename; POINTS2D lines are all-numeric
-        if len(parts) != 10 or parts[9].replace(".", "").isdigit():
-            continue
-        qw, qx, qy, qz, tx, ty, tz = (float(v) for v in parts[1:8])
-        r_cw = _quat_to_rot(np.array([qw, qx, qy, qz]))
-        t = np.array([tx, ty, tz])
-        rotations.append(r_cw.T)
-        centers.append(-r_cw.T @ t)
-        names.append(parts[9])
-    return names, np.asarray(centers), np.asarray(rotations)
+# Shared gauge-alignment math lives in gs_sim2real.robotics.gauge_alignment;
+# these aliases keep this script's historical local names working.
+_quat_to_rot = quat_to_rotation
+_parse_images_txt = parse_images_txt
+_rot_to_quat = rotation_to_quat
+_quat_multiply = quat_multiply
+_compose = compose
 
 
 def load_rounds(session: Path) -> list[RoundData]:
@@ -108,42 +97,24 @@ def load_rounds(session: Path) -> list[RoundData]:
 # ----------------------------------------------------------------- alignment
 
 
-def similarity_from_poses(
-    src_centers: np.ndarray,
-    src_rotations: np.ndarray,
-    dst_centers: np.ndarray,
-    dst_rotations: np.ndarray,
-) -> tuple[float, np.ndarray, np.ndarray]:
-    """Similarity (s, R, t) with dst ~= s * R @ src + t.
+def load_runtime_transforms(rounds: list[RoundData]) -> list[tuple[float, np.ndarray, np.ndarray]] | None:
+    """Fast path: reuse the per-round session-gauge transforms the live runtime persisted.
 
-    Rotation comes from the shared cameras' orientations (Kabsch over
-    R_dst @ R_src^T), so two shared cameras are enough — centers alone would
-    leave the rotation about their connecting axis unconstrained.
+    Returns transforms re-anchored onto the last round (matching
+    :func:`align_to_anchor`'s convention), or ``None`` when any round lacks
+    ``gauge_transform.json`` or the session gauge was rebased mid-run.
     """
-    acc = np.zeros((3, 3))
-    for r_src, r_dst in zip(src_rotations, dst_rotations):
-        acc += r_dst @ r_src.T
-    u, _d, vt = np.linalg.svd(acc)
-    sign = np.eye(3)
-    if np.linalg.det(u @ vt) < 0:
-        sign[2, 2] = -1.0
-    rotation = u @ sign @ vt
-
-    mu_src, mu_dst = src_centers.mean(axis=0), dst_centers.mean(axis=0)
-    var_src = ((src_centers - mu_src) ** 2).sum()
-    var_dst = ((dst_centers - mu_dst) ** 2).sum()
-    scale = float(np.sqrt(var_dst / max(var_src, 1e-12)))
-    translation = mu_dst - scale * rotation @ mu_src
-    return scale, rotation, translation
-
-
-def _compose(
-    second: tuple[float, np.ndarray, np.ndarray], first: tuple[float, np.ndarray, np.ndarray]
-) -> tuple[float, np.ndarray, np.ndarray]:
-    """Composition second∘first as a similarity transform."""
-    s1, r1, t1 = first
-    s2, r2, t2 = second
-    return s2 * s1, r2 @ r1, s2 * r2 @ t1 + t2
+    to_session: list[tuple[float, np.ndarray, np.ndarray]] = []
+    for position, rnd in enumerate(rounds):
+        entry = read_gauge_transform(rnd.ply_path.parent.parent)
+        if entry is None:
+            return None
+        transform, rebased = entry
+        if rebased and position > 0:
+            return None  # chain restarted mid-session; recompute from poses instead
+        to_session.append(transform)
+    session_from_last_inv = invert(to_session[-1])
+    return [_compose(session_from_last_inv, transform) for transform in to_session]
 
 
 def align_to_anchor(rounds: list[RoundData]) -> list[tuple[float, np.ndarray, np.ndarray]]:
@@ -170,30 +141,6 @@ def align_to_anchor(rounds: list[RoundData]) -> list[tuple[float, np.ndarray, np
 
 
 # ----------------------------------------------------------------- rendering
-
-
-def _rot_to_quat(rotation: np.ndarray) -> np.ndarray:
-    w = np.sqrt(max(0.0, 1.0 + rotation[0, 0] + rotation[1, 1] + rotation[2, 2])) / 2.0
-    if w < 1e-6:
-        return np.array([1.0, 0.0, 0.0, 0.0])
-    x = (rotation[2, 1] - rotation[1, 2]) / (4 * w)
-    y = (rotation[0, 2] - rotation[2, 0]) / (4 * w)
-    z = (rotation[1, 0] - rotation[0, 1]) / (4 * w)
-    return np.array([w, x, y, z])
-
-
-def _quat_multiply(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    w1, x1, y1, z1 = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-    w2, x2, y2, z2 = b[..., 0], b[..., 1], b[..., 2], b[..., 3]
-    return np.stack(
-        [
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        ],
-        axis=-1,
-    )
 
 
 def load_ply_aligned(path: Path, transform: tuple[float, np.ndarray, np.ndarray]) -> dict[str, np.ndarray]:
@@ -388,7 +335,9 @@ def build_gif(session: Path, output: Path, size: tuple[int, int]) -> dict:
     rounds = load_rounds(session)
     if len(rounds) < 2:
         raise SystemExit(f"need at least 2 successful rounds under {session}/rounds, found {len(rounds)}")
-    transforms = align_to_anchor(rounds)
+    transforms = load_runtime_transforms(rounds)
+    if transforms is None:
+        transforms = align_to_anchor(rounds)  # legacy sessions without runtime gauge transforms
     anchor = rounds[-1]
     anchor_splat = load_ply_aligned(anchor.ply_path, transforms[-1])
     camera = fit_view_camera(anchor, anchor_splat, size)
