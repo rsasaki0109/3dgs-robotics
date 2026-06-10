@@ -175,7 +175,7 @@ class EvaluationTask:
 
 @dataclass(frozen=True, slots=True)
 class SceneEnvironment:
-    """Physical AI contract for one bundled GS Mapper scene."""
+    """Physical AI contract for one bundled 3DGS Robotics scene."""
 
     scene_id: str
     label: str

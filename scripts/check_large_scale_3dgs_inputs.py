@@ -115,7 +115,7 @@ def _build_commands(
 ) -> dict[str, str]:
     bootstrap = _fmt_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "large-scale-3dgs-bootstrap",
             "--root",
             root_dir,
@@ -135,11 +135,11 @@ def _build_commands(
     pilot_plan = output_dir / "large_scale_3dgs_pilot_plan.json"
     full_plan = output_dir / "large_scale_3dgs_plan.json"
     run_report = output_dir / "large_scale_3dgs_run_report.json"
-    pilot_run = _fmt_command(["gs-mapper", "large-scale-3dgs-run", "--plan", pilot_plan])
-    full_run = _fmt_command(["gs-mapper", "large-scale-3dgs-run", "--plan", full_plan])
+    pilot_run = _fmt_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", pilot_plan])
+    full_run = _fmt_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", full_plan])
     promote = _fmt_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "large-scale-3dgs-promote",
             "--plan",
             full_plan,

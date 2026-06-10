@@ -1,4 +1,4 @@
-"""Public launch and outreach helpers for GS Mapper."""
+"""Public launch and outreach helpers for 3DGS Robotics."""
 
 from .launch_kit import (
     LaunchDestination,

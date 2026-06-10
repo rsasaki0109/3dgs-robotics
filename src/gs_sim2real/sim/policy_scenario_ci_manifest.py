@@ -492,7 +492,7 @@ def _scenario_set_command(
     fail_on_regression: bool,
 ) -> tuple[str, ...]:
     command = [
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         scenario_set_path,
@@ -522,7 +522,7 @@ def _shard_merge_command(
     history_markdown_output: str | None,
     fail_on_regression: bool,
 ) -> tuple[str, ...]:
-    command = ["gs-mapper", "route-policy-scenario-shard-merge"]
+    command = ["3dgs-robotics", "route-policy-scenario-shard-merge"]
     for run_input in run_inputs:
         command.extend(("--run", run_input))
     command.extend(("--merge-id", merge_id, "--history-output", history_output, "--output", output))

@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gs-mapper"
+name = "3dgs-robotics"
 version = "0.1.0"
-description = "Photos, robotics logs, and external SLAM outputs to browser-viewable 3D Gaussian Splats"
+description = "Map, localize, and simulate — 3D Gaussian Splatting for robotics"
 authors = [{ name = "rsasaki0109" }]
 readme = "README.md"
 license = "MIT"
@@ -55,6 +55,10 @@ metrics = ["lpips"]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.scripts]
+3dgs-robotics = "gs_sim2real.cli:main"
+3dgs-robotics-node = "gs_sim2real.robotics.ros2_bridge_node:main"
+3dgs-robotics-live-mapper = "gs_sim2real.robotics.live_mapper_node:main"
+# legacy aliases (pre-rename)
 gs-mapper = "gs_sim2real.cli:main"
 gs-sim2real = "gs_sim2real.cli:main"
 gs-mapper-robotics-node = "gs_sim2real.robotics.ros2_bridge_node:main"

@@ -13,7 +13,7 @@ body:
       label: What happened
       description: One or two sentences. What you did, what you expected, what you got.
       placeholder: |
-        Ran `gs-mapper photos-to-splat --images ./my_photos`. Expected a .splat,
+        Ran `3dgs-robotics photos-to-splat --images ./my_photos`. Expected a .splat,
         got a stack trace out of DUSt3R's `inference.py` on frame 7.
     validations:
       required: true
@@ -32,7 +32,7 @@ body:
     id: component
     attributes:
       label: Component
-      description: Which subcommand or viewer? (e.g. `gs-mapper photos-to-splat`, `docs/splat_spark.html`)
+      description: Which subcommand or viewer? (e.g. `3dgs-robotics photos-to-splat`, `docs/splat_spark.html`)
     validations:
       required: true
   - type: textarea

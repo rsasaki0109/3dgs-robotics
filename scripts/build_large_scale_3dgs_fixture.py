@@ -4,7 +4,7 @@
 The generated fixture is intentionally synthetic: it preserves the original
 Gaussian records from production outdoor splats, samples each source
 deterministically, and translates the records into a configurable X/Z mosaic.
-The output can then be passed to ``gs-mapper splat-tile-catalog`` to create a
+The output can then be passed to ``3dgs-robotics splat-tile-catalog`` to create a
 dynamic-map tile catalog with substantially more spatial coverage than a single
 scene.
 """

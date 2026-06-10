@@ -1,4 +1,4 @@
-"""Core photos/video -> .splat pipeline for the GS Mapper zero-install demo.
+"""Core photos/video -> .splat pipeline for the 3DGS Robotics zero-install demo.
 
 Kept free of gradio imports so it can be smoke-tested headless:
 

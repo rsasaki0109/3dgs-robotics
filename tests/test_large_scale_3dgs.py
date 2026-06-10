@@ -184,7 +184,7 @@ def test_write_large_scale_3dgs_smoke_data_feeds_multi_tile_planner(tmp_path: Pa
     assert {chunk["coreImageCount"] for chunk in plan["chunks"]} == {2}
     assert {chunk["pointCount"] for chunk in plan["chunks"]} == {5}
     assert (Path(plan["chunks"][0]["dataDir"]) / "images").exists()
-    assert "next plan: gs-mapper large-scale-3dgs-plan" in text
+    assert "next plan: 3dgs-robotics large-scale-3dgs-plan" in text
     assert "--axes xz" in text
 
 
@@ -225,12 +225,12 @@ def test_build_large_scale_3dgs_discovery_recommends_preflight_for_colmap_scene(
     assert report["colmapScenes"][0]["registeredImageCount"] == 5
     assert report["colmapScenes"][0]["points3DCount"] == 5
     assert report["bagInputs"][0]["source"] == str(log_dir)
-    assert "gs-mapper preprocess --method colmap" in report["bagInputs"][0]["preprocessCommand"]
+    assert "3dgs-robotics preprocess --method colmap" in report["bagInputs"][0]["preprocessCommand"]
     assert report["splatGroups"][0]["splatCount"] == 1
-    assert "gs-mapper splat-tile-catalog" in report["splatGroups"][0]["catalogCommand"]
+    assert "3dgs-robotics splat-tile-catalog" in report["splatGroups"][0]["catalogCommand"]
     assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["kind"] == "colmap-scene"
     assert "Large-scale 3DGS input discovery" in text
-    assert "next preflight: gs-mapper large-scale-3dgs-preflight" in text
+    assert "next preflight: 3dgs-robotics large-scale-3dgs-preflight" in text
 
 
 def test_build_large_scale_3dgs_bootstrap_writes_pilot_for_colmap_scene(tmp_path: Path) -> None:
@@ -269,7 +269,7 @@ def test_build_large_scale_3dgs_bootstrap_writes_pilot_for_colmap_scene(tmp_path
     assert preflight_path.exists()
     assert report_path == output_dir / "large_scale_3dgs_bootstrap.json"
     assert report["next"]["pilotPlanPath"] == str(pilot_plan_path)
-    assert "gs-mapper large-scale-3dgs-run --plan" in report["next"]["pilotRunCommand"]
+    assert "3dgs-robotics large-scale-3dgs-run --plan" in report["next"]["pilotRunCommand"]
     assert pilot_plan["summary"]["chunkCount"] == 2
     assert Path(pilot_plan["chunks"][0]["dataDir"], "images", "route_001.jpg").read_bytes() == b"jpg"
     assert "Large-scale 3DGS bootstrap" in text
@@ -293,7 +293,7 @@ def test_build_large_scale_3dgs_bootstrap_reports_preprocess_when_only_bag_exist
     assert report["status"] == "needs-preprocess"
     assert report["summary"]["pilotPlanWritten"] is False
     assert report["next"]["pilotRunCommand"] == ""
-    assert report["next"]["preprocessCommand"].startswith("gs-mapper preprocess --method colmap")
+    assert report["next"]["preprocessCommand"].startswith("3dgs-robotics preprocess --method colmap")
     assert str(bag_dir) in report["next"]["preprocessCommand"]
     assert "next preprocess:" in text
 
@@ -334,8 +334,8 @@ def test_build_large_scale_3dgs_preflight_recommends_tile_size_and_next_commands
     assert json.loads(report_path.read_text(encoding="utf-8"))["recommendation"]["tileSize"] == 20.0
     assert "Large-scale 3DGS preflight" in text
     assert "recommended: tile_size=20.0" in text
-    assert "next pilot: gs-mapper large-scale-3dgs-pilot" in text
-    assert "next plan: gs-mapper large-scale-3dgs-plan" in text
+    assert "next pilot: 3dgs-robotics large-scale-3dgs-pilot" in text
+    assert "next plan: 3dgs-robotics large-scale-3dgs-plan" in text
 
 
 def test_build_large_scale_3dgs_preflight_can_write_recommended_plan(tmp_path: Path) -> None:
@@ -445,7 +445,7 @@ def test_build_large_scale_3dgs_pilot_selects_route_contiguous_ready_chunks(tmp_
     assert not (output_dir / "chunks" / "tile_x001_y000").exists()
     assert json.loads(report_path.read_text(encoding="utf-8"))["selection"]["routeStartImage"] == 2
     assert "Real continuous 3DGS pilot" in text
-    assert "next run: gs-mapper large-scale-3dgs-run" in text
+    assert "next run: 3dgs-robotics large-scale-3dgs-run" in text
 
 
 def test_build_large_scale_3dgs_plan_materializes_chunk_sparse_and_images(tmp_path: Path) -> None:
@@ -492,7 +492,7 @@ def test_format_large_scale_3dgs_shell_skips_underfilled_chunks(tmp_path: Path) 
 
     shell = format_large_scale_3dgs_shell(plan)
 
-    assert "gs-mapper train" in shell
+    assert "3dgs-robotics train" in shell
     assert "# skip tile_x001_y000: too-few-images" in shell
 
 
@@ -596,16 +596,16 @@ def test_default_command_runner_falls_back_to_python_module_for_checkout(monkeyp
         del check
         command = list(args)
         calls.append(command)
-        if command[0] == "gs-mapper":
+        if command[0] == "3dgs-robotics":
             raise FileNotFoundError(command[0])
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
-    result = _default_command_runner(["gs-mapper", "train", "--help"])
+    result = _default_command_runner(["3dgs-robotics", "train", "--help"])
 
     assert result.returncode == 0
-    assert calls[0] == ["gs-mapper", "train", "--help"]
+    assert calls[0] == ["3dgs-robotics", "train", "--help"]
     assert calls[1][:3] == [module.sys.executable, "-m", "gs_sim2real.cli"]
     assert calls[1][3:] == ["train", "--help"]
 

@@ -47,7 +47,7 @@
   "mergeJob": {
     "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-merge",
     "command": [
-      "gs-mapper",
+      "3dgs-robotics",
       "route-policy-scenario-shard-merge",
       "--run",
       "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
@@ -100,7 +100,7 @@
     {
       "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-001",
       "command": [
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
@@ -148,7 +148,7 @@
     {
       "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-002",
       "command": [
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
@@ -196,7 +196,7 @@
     {
       "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-003",
       "command": [
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-003.json",
@@ -244,7 +244,7 @@
     {
       "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-004",
       "command": [
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-004.json",

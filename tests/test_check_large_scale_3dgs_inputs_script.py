@@ -97,7 +97,7 @@ def test_real_bag_input_requests_preprocess(tmp_path: Path, capsys) -> None:
     assert rc == 0
     assert report["status"] == "needs-preprocess"
     assert report["summary"]["acceptedBagInputCount"] == 1
-    assert report["commands"]["preprocess"].startswith("gs-mapper preprocess --method colmap")
+    assert report["commands"]["preprocess"].startswith("3dgs-robotics preprocess --method colmap")
     assert "large-scale-3dgs-bootstrap" in report["commands"]["bootstrap"]
 
 

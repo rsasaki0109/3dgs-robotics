@@ -141,7 +141,7 @@ class TrajectoryScore:
 
 @runtime_checkable
 class PhysicalAIEnvironment(Protocol):
-    """Interface expected from concrete GS Mapper simulation backends."""
+    """Interface expected from concrete 3DGS Robotics simulation backends."""
 
     def reset(self, scene_id: str, *, seed: int | None = None) -> Mapping[str, Any]:
         """Reset an episode for a scene and return initial state metadata."""

@@ -8,7 +8,7 @@ Watch the Gaussian-splat map grow in the browser while the robot drives.
 each rebuild round extends the mapped street (top-down orthographic gsplat
 render, camera trajectory in blue, onboard camera inset).*
 
-`gs-mapper-live-mapper` subscribes to a camera topic, gates incoming frames
+`3dgs-robotics-live-mapper` subscribes to a camera topic, gates incoming frames
 into keyframes, and rebuilds a draft-quality splat in a background thread
 whenever enough new keyframes arrive. Each round covers the whole trajectory
 so far, so the published map grows over time. `live/latest.splat` and
@@ -28,7 +28,7 @@ camera topic ──> keyframe gate ──> rebuild rounds (DUSt3R / VGGT + gspla
 source /opt/ros/<distro>/setup.bash
 pip install -e ".[gsplat]"   # plus a DUSt3R clone, see below
 
-gs-mapper-live-mapper \
+3dgs-robotics-live-mapper \
   --image-topic /camera/image_raw/compressed \
   --odom-topic /odom \
   --workdir outputs/live_mapping \
@@ -99,13 +99,13 @@ final round's sparse input at **7k–15k** iterations first:
 cp outputs/live_demo_kitti0056/session/rounds/round_006/train/point_cloud.ply \
    outputs/live_demo_kitti0056/session/rounds/round_006/train/point_cloud_iter_1500.ply
 
-PYTHONPATH=src gs-mapper train \
+PYTHONPATH=src 3dgs-robotics train \
   --data outputs/live_demo_kitti0056/session/rounds/round_006/sparse_input \
   --output outputs/live_demo_kitti0056/session/rounds/round_006/train \
   --iterations 10000
 
 # localize non-round keyframes + trajectory GIF
-PYTHONPATH=src gs-mapper localize \
+PYTHONPATH=src 3dgs-robotics localize \
   --map outputs/live_demo_kitti0056/session \
   --non-round-keyframes \
   --output /tmp/localization-kitti0056.json

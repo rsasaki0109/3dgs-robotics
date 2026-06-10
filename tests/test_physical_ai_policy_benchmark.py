@@ -3399,7 +3399,7 @@ def build_unit_ci_review_artifact(
 
 def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIManifest:
     shard_command = (
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-set",
         "--scenario-set",
         "shards/unit-shard.json",
@@ -3411,7 +3411,7 @@ def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIMa
         "ci/histories/unit-shard.json",
     )
     merge_command = (
-        "gs-mapper",
+        "3dgs-robotics",
         "route-policy-scenario-shard-merge",
         "--run",
         "ci/runs/unit-shard.json",

@@ -376,7 +376,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     assert "Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI." in readme
     assert "[live 3DGS demo](https://rsasaki0109.github.io/3dgs-robotics/splat.html)" in readme
-    assert "huggingface.co/spaces/rsasaki0109/gs-mapper" in readme
+    assert "huggingface.co/spaces/rsasaki0109/3dgs-robotics" in readme
     assert "Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)" in readme
     assert "Lead GIF: dynamic map loading on real robot data" in readme
     assert "true top-down (orthographic gsplat) render" in readme
@@ -470,7 +470,7 @@ def test_readme_quickstart_split_lists_three_entry_points() -> None:
     assert "[Import External SLAM Results](#import-external-slam-results)" in readme
     assert "[Physical AI benchmark path](#physical-ai-benchmark-path)" in readme
     # Minimum commands the Quickstart table advertises must stay runnable.
-    assert "gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat" in readme
+    assert "3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_splat" in readme
     assert "scripts/plan_external_slam_imports.py --format shell" in readme
     assert "scripts/generate_sim_catalog.py --output docs/sim-scenes.json" in readme
     # The old generic "## Quick Start" was renamed so it doesn't collide with the new entry map.

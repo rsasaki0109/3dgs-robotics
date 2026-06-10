@@ -144,7 +144,7 @@ def render_reviews_index_html(entries: list[ReviewIndexEntry]) -> str:
     if not entries:
         rows = (
             '<tr><td colspan="9" class="empty">No review bundles published yet. '
-            "Run <code>gs-mapper route-policy-scenario-ci-review --bundle-dir ...</code> to create one.</td></tr>"
+            "Run <code>3dgs-robotics route-policy-scenario-ci-review --bundle-dir ...</code> to create one.</td></tr>"
         )
     else:
         rows = "\n".join(_render_entry_row_html(entry) for entry in entries)

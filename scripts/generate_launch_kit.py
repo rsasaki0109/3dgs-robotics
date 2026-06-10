@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate static outreach collateral for GS Mapper."""
+"""Generate static outreach collateral for 3DGS Robotics."""
 
 from __future__ import annotations
 

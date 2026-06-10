@@ -9,7 +9,7 @@ ggrt:
     diff-gaussian-rasterization-modified (custom CUDA extension) and outputs
     gaussians in a non-PLY runtime format that doesn't feed into our gsplat
     trainer. If you want a pose-free path that actually ships end-to-end
-    here, use DUSt3R via `gs-mapper photos-to-splat --preprocess dust3r`.
+    here, use DUSt3R via `3dgs-robotics photos-to-splat --preprocess dust3r`.
   paper_url: "https://arxiv.org/abs/2403.10147"
   source_url: "https://github.com/lifuguan/GGRt_official"
   repository: "https://github.com/lifuguan/GGRt_official"

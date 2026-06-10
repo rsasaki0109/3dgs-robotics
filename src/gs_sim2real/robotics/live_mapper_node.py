@@ -7,7 +7,7 @@ map grow in the browser while the robot (or a rosbag replay) drives.
 
 Usage (after sourcing the ROS 2 environment)::
 
-    gs-mapper-live-mapper --image-topic /camera/image_raw/compressed \
+    3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed \
         --odom-topic /odom --workdir outputs/live_mapping --port 8765
 
 The reconstruction backend mirrors ``photos-to-splat`` (DUSt3R pose-free +
@@ -27,7 +27,7 @@ import numpy as np
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gs-mapper-live-mapper",
+        prog="3dgs-robotics-live-mapper",
         description="ROS 2 live 3DGS mapping node (camera topic -> growing .splat)",
     )
     parser.add_argument("--node-name", default="gs_mapper_live_mapper", help="ROS 2 node name")

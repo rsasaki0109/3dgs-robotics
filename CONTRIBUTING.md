@@ -1,4 +1,4 @@
-# Contributing to GS Mapper
+# Contributing to 3DGS Robotics
 
 Thanks for looking at the code. Contributions are welcome — a few practical
 notes so your first PR isn't blocked on nit-picks.
@@ -7,7 +7,7 @@ notes so your first PR isn't blocked on nit-picks.
 
 ```bash
 git clone https://github.com/rsasaki0109/3dgs-robotics.git
-cd gs-mapper
+cd 3dgs-robotics
 pip install -e ".[dev]"
 ```
 
@@ -19,7 +19,7 @@ Optional backends (only if you're touching those code paths):
 - **gsplat** training — `pip install -e ".[gsplat]"`. Needs CUDA.
 - **nerfstudio** secondary trainer — `pip install -e ".[nerfstudio]"`.
 - **COLMAP** — `sudo apt install colmap` (Ubuntu) or `brew install colmap`
-  (macOS). Only needed for `gs-mapper preprocess --method colmap`.
+  (macOS). Only needed for `3dgs-robotics preprocess --method colmap`.
 
 ## Before you push
 
@@ -85,7 +85,7 @@ need to stay in sync or CI will fail:
    scene-specific invariant beyond the shared manifest/picker/README checks.
 
 Shipped splats are capped at the antimatter15 400 000-gauss / 12.8 MB
-budget via `gs-mapper export --format splat --max-points 400000` — please
+budget via `3dgs-robotics export --format splat --max-points 400000` — please
 keep new bundled demos under that cap so GitHub Pages bandwidth stays
 predictable. The supervised `outdoor-demo.splat` uses a tighter 80 000-gauss
 cap because its dense reconstruction already absorbs the supervised signal
@@ -96,7 +96,7 @@ and loads faster on mobile.
 Good small first PRs:
 
 - A new `.splat` demo from your own photos via
-  `gs-mapper photos-to-splat --preprocess mast3r` — follow the "Bundled
+  `3dgs-robotics photos-to-splat --preprocess mast3r` — follow the "Bundled
   demo splats" checklist above.
 - A new pose-free backend (MAST3R was roughly 200 lines in `pose_free.py`
   + the symmetric `scripts/run_mast3r.py`).
@@ -125,7 +125,7 @@ refactors, etc.
 
 Open a GitHub issue with:
 - A one-line summary in the title.
-- The exact `gs-mapper <subcommand> --help` output if the bug is CLI-
+- The exact `3dgs-robotics <subcommand> --help` output if the bug is CLI-
   shaped.
 - For pose-free / training bugs: OS, GPU (`nvidia-smi | head -3`),
   PyTorch + CUDA versions, DUSt3R/MAST3R commit hashes if applicable.

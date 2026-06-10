@@ -1,4 +1,4 @@
-"""Command-line interface for GS Mapper.
+"""Command-line interface for 3DGS Robotics.
 
 Provides subcommands for the full 3DGS pipeline:
 - download: Download datasets from supported sources
@@ -252,7 +252,7 @@ def _add_external_slam_args(parser: argparse.ArgumentParser, *, context: str) ->
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
-        prog="gs-mapper",
+        prog="3dgs-robotics",
         description="Large-scale 3D Gaussian Splatting mapper for robotics and driving datasets",
     )
     parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
@@ -2260,7 +2260,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Skip embedding real-vs-sim correlation reports gathered from each shard's run JSON "
-            "(default: any correlation reports attached via gs-mapper route-policy-scenario-set "
+            "(default: any correlation reports attached via 3dgs-robotics route-policy-scenario-set "
             "--correlation-report flow into the review artifact)"
         ),
     )
@@ -2748,7 +2748,7 @@ LEGACY_EXPERIMENT_ALIASES: dict[str, tuple[str, str]] = {
 
 
 def _rewrite_legacy_experiment_argv(argv: list[str]) -> list[str]:
-    """Rewrite `gs-mapper experiment-foo ...` -> `gs-mapper experiment foo ...`.
+    """Rewrite `3dgs-robotics experiment-foo ...` -> `3dgs-robotics experiment foo ...`.
 
     Keeps old scripts + the READMEs from PR #67 working while the main
     --help listing stays focused on core tools.
@@ -2762,7 +2762,7 @@ def _rewrite_legacy_experiment_argv(argv: list[str]) -> list[str]:
     import warnings
 
     warnings.warn(
-        f"`gs-mapper {legacy}` is deprecated; use `gs-mapper {mapped[0]} {mapped[1]}` instead.",
+        f"`3dgs-robotics {legacy}` is deprecated; use `3dgs-robotics {mapped[0]} {mapped[1]}` instead.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -3698,7 +3698,7 @@ def cmd_splat_inspect(args: argparse.Namespace) -> None:
     if report.low_opacity_ratio >= 0.05 or report.scale_tail_ratio >= 4.0:
         print("Suggested cleanup:")
         print(
-            "  gs-mapper splat-filter "
+            "  3dgs-robotics splat-filter "
             f"--input {args.input} --output <clean.splat> "
             f"--min-opacity {report.low_opacity_threshold:g} --max-scale-percentile 98"
         )
@@ -4249,7 +4249,7 @@ def cmd_experiment(args: argparse.Namespace) -> None:
     }
     subcmd = getattr(args, "experiment_command", None)
     if subcmd is None:
-        print("Error: specify an experiment lab. Run `gs-mapper experiment --help`.", file=sys.stderr)
+        print("Error: specify an experiment lab. Run `3dgs-robotics experiment --help`.", file=sys.stderr)
         sys.exit(2)
     handler = handler_map.get(subcmd)
     if handler is None:
@@ -4378,7 +4378,7 @@ def cmd_experiment_query_response_build(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Entry point for the GS Mapper CLI."""
+    """Entry point for the 3DGS Robotics CLI."""
     parser = build_parser()
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     rewritten = _rewrite_legacy_experiment_argv(raw_argv)

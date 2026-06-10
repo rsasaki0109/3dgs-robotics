@@ -1,4 +1,4 @@
-"""GS Mapper zero-install demo: photos or a short video -> browser 3DGS .splat.
+"""3DGS Robotics zero-install demo: photos or a short video -> browser 3DGS .splat.
 
 Runs on Hugging Face Spaces (ZeroGPU-aware) and locally:
 
@@ -79,7 +79,7 @@ def generate(photos, video, num_frames, iterations, progress=gr.Progress()):
     summary = (
         f"{result.num_used_frames} frames -> {size_mb:.1f} MB .splat "
         f"in {result.elapsed_sec:.0f}s ({result.method}). "
-        f"Tip: drag the downloaded .splat onto the [GS Mapper web viewer]({VIEWER_URL}) "
+        f"Tip: drag the downloaded .splat onto the [3DGS Robotics web viewer]({VIEWER_URL}) "
         f"or self-host it — see the [repo]({REPO_URL})."
     )
     splat = str(result.splat_path)
@@ -87,9 +87,9 @@ def generate(photos, video, num_frames, iterations, progress=gr.Progress()):
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="GS Mapper — Photos to 3D Gaussian Splat") as demo:
+    with gr.Blocks(title="3DGS Robotics — Photos to 3D Gaussian Splat") as demo:
         gr.Markdown(
-            "# GS Mapper — Photos to 3D Gaussian Splat\n"
+            "# 3DGS Robotics — Photos to 3D Gaussian Splat\n"
             "Turn **a handful of photos or a short walkaround video** into a browser-ready "
             "3D Gaussian Splat. Pose-free (DUSt3R) — no COLMAP, no install.\n\n"
             f"[GitHub]({REPO_URL}) · [Live scene gallery]({VIEWER_URL}) · "

@@ -1,6 +1,6 @@
 # Physical AI Simulation Contract
 
-GS Mapper is moving from a 3DGS demo repository toward a scene environment layer for Physical AI agents. The first contract is intentionally small: it standardizes what each reconstructed scene exposes before adding a full physics engine or renderer backend.
+3DGS Robotics is moving from a 3DGS demo repository toward a scene environment layer for Physical AI agents. The first contract is intentionally small: it standardizes what each reconstructed scene exposes before adding a full physics engine or renderer backend.
 
 Generated catalog: [`docs/sim-scenes.json`](sim-scenes.json)
 
@@ -450,7 +450,7 @@ print(render_route_policy_benchmark_markdown(benchmark_report))
 The same flow is available from the CLI:
 
 ```bash
-gs-mapper route-policy-benchmark \
+3dgs-robotics route-policy-benchmark \
   --transitions-jsonl runs/outdoor-policy-transitions.jsonl \
   --scene-catalog docs/scenes-list.json \
   --scene-id outdoor-demo \
@@ -490,7 +490,7 @@ write_route_policy_registry_json("runs/outdoor-policies.json", registry)
 ```
 
 ```bash
-gs-mapper route-policy-benchmark \
+3dgs-robotics route-policy-benchmark \
   --policy-registry runs/outdoor-policies.json \
   --goal-suite runs/outdoor-goals.json \
   --scene-catalog docs/scenes-list.json \
@@ -526,7 +526,7 @@ assert loaded_history.passed
 The same regression gate is available from the CLI. Add `--fail-on-regression` in CI to return exit status 2 when a current report falls outside the blessed baseline envelope.
 
 ```bash
-gs-mapper route-policy-benchmark-history \
+3dgs-robotics route-policy-benchmark-history \
   --report runs/commit-a/outdoor-policy-registry-benchmark.json \
   --report runs/commit-b/outdoor-policy-registry-benchmark.json \
   --baseline-report runs/baseline/outdoor-policy-registry-benchmark.json \
@@ -588,7 +588,7 @@ assert loaded_run.passed
 The CLI keeps the same artifact boundaries:
 
 ```bash
-gs-mapper route-policy-scenario-set \
+3dgs-robotics route-policy-scenario-set \
   --scenario-set runs/scenarios/outdoor-scenarios.json \
   --report-dir runs/scenarios/reports \
   --output runs/scenarios/scenario-run.json \
@@ -642,7 +642,7 @@ print(render_route_policy_scenario_matrix_markdown(expansion))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-matrix \
+3dgs-robotics route-policy-scenario-matrix \
   --matrix runs/scenarios/outdoor-matrix.json \
   --output-dir runs/scenarios/generated \
   --index-output runs/scenarios/matrix-expansion.json \
@@ -879,7 +879,7 @@ print(render_route_policy_scenario_shard_merge_markdown(merge))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-shards \
+3dgs-robotics route-policy-scenario-shards \
   --expansion runs/scenarios/matrix-expansion.json \
   --max-scenarios-per-shard 4 \
   --shard-plan-id outdoor-demo-shards \
@@ -887,13 +887,13 @@ gs-mapper route-policy-scenario-shards \
   --index-output runs/scenarios/shard-plan.json \
   --markdown-output runs/scenarios/shard-plan.md
 
-gs-mapper route-policy-scenario-set \
+3dgs-robotics route-policy-scenario-set \
   --scenario-set runs/scenarios/shards/outdoor-matrix-direct-shard-001.json \
   --report-dir runs/scenarios/shard-reports/001 \
   --output runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001.json \
   --history-output runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001-history.json
 
-gs-mapper route-policy-scenario-shard-merge \
+3dgs-robotics route-policy-scenario-shard-merge \
   --run runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001.json \
   --run runs/scenarios/shard-runs/outdoor-matrix-direct-shard-002.json \
   --merge-id outdoor-demo-shard-merge \
@@ -924,7 +924,7 @@ print(render_route_policy_scenario_ci_manifest_markdown(ci_manifest))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-manifest \
+3dgs-robotics route-policy-scenario-ci-manifest \
   --shard-plan runs/scenarios/shard-plan.json \
   --manifest-id outdoor-demo-ci \
   --report-dir runs/scenarios/ci/reports \
@@ -961,7 +961,7 @@ print(render_route_policy_scenario_ci_workflow_markdown(workflow))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-workflow \
+3dgs-robotics route-policy-scenario-ci-workflow \
   --manifest runs/scenarios/ci-manifest.json \
   --workflow-id outdoor-demo-policy-shards \
   --workflow-name "Outdoor Demo Policy Shards" \
@@ -989,7 +989,7 @@ print(render_route_policy_scenario_ci_workflow_validation_markdown(validation))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-workflow-validate \
+3dgs-robotics route-policy-scenario-ci-workflow-validate \
   --manifest runs/scenarios/ci-manifest.json \
   --workflow-index runs/scenarios/ci-workflow.json \
   --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
@@ -1015,7 +1015,7 @@ print(render_route_policy_scenario_ci_workflow_activation_markdown(activation))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-workflow-activate \
+3dgs-robotics route-policy-scenario-ci-workflow-activate \
   --workflow-index runs/scenarios/ci-workflow.json \
   --validation-report runs/scenarios/ci-workflow-validation.json \
   --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
@@ -1043,7 +1043,7 @@ print(render_route_policy_scenario_ci_review_markdown(review))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-review \
+3dgs-robotics route-policy-scenario-ci-review \
   --shard-merge runs/scenarios/ci/shard-merge.json \
   --validation-report runs/scenarios/ci-workflow-validation.json \
   --activation-report runs/scenarios/ci-workflow-activation.json \
@@ -1070,7 +1070,7 @@ print(render_route_policy_scenario_ci_workflow_promotion_markdown(promotion))
 ```
 
 ```bash
-gs-mapper route-policy-scenario-ci-workflow-promote \
+3dgs-robotics route-policy-scenario-ci-workflow-promote \
   --review runs/scenarios/ci-review.json \
   --review-url https://example.github.io/3dgs-robotics/reviews/outdoor-demo-policy/ \
   --trigger-mode pull-request \
@@ -1115,7 +1115,7 @@ Adoption gates:
 The same flow is also exposed as a CLI command:
 
 ```bash
-gs-mapper route-policy-scenario-ci-workflow-adopt \
+3dgs-robotics route-policy-scenario-ci-workflow-adopt \
   --manifest runs/scenarios/ci-manifest.json \
   --workflow-index runs/scenarios/ci-workflow.json \
   --promotion runs/scenarios/ci-workflow-promotion.json \
@@ -1130,7 +1130,7 @@ gs-mapper route-policy-scenario-ci-workflow-adopt \
 After the adoption lands, the review bundle can be re-published with the adoption info attached so reviewers on Pages see the trigger mode, branches, and a unified diff between the manual-only and the adopted YAMLs without checking out the branch. Pass `--adoption-report` to the review CLI (and, if needed, `--manual-workflow` / `--adopted-workflow` to override which YAMLs are read):
 
 ```bash
-gs-mapper route-policy-scenario-ci-review \
+3dgs-robotics route-policy-scenario-ci-review \
   --shard-merge runs/scenarios/ci/shard-merge.json \
   --validation-report runs/scenarios/ci-workflow-validation.json \
   --activation-report runs/scenarios/ci-workflow-activation.json \
@@ -1268,7 +1268,7 @@ A common task is "evaluate a route policy against noisy pose + obstacles that re
    )
    ```
 
-4. **Run through the standard scenario-set runner.** `run_route_policy_scenario_set` loads every profile and timeline, constructs `HeadlessPhysicalAIEnvironment` + `RoutePolicyGymAdapter` with the pose-facing noise on the adapter and the raw-sensor noise on the env, then evaluates the registry. The same CLI + scenario-shard + review-bundle chain (`gs-mapper route-policy-scenario-set`, `scripts/smoke_route_policy_scenario_ci.py`, etc.) keeps working — partial-information knobs only affect inputs, not the pipeline shape.
+4. **Run through the standard scenario-set runner.** `run_route_policy_scenario_set` loads every profile and timeline, constructs `HeadlessPhysicalAIEnvironment` + `RoutePolicyGymAdapter` with the pose-facing noise on the adapter and the raw-sensor noise on the env, then evaluates the registry. The same CLI + scenario-shard + review-bundle chain (`3dgs-robotics route-policy-scenario-set`, `scripts/smoke_route_policy_scenario_ci.py`, etc.) keeps working — partial-information knobs only affect inputs, not the pipeline shape.
 
 Determinism stays intact across all three knobs: each noise profile's RNG is seeded from `(reset_seed | profile_id | episode_index | step_index | kind)`, and each reactive obstacle is a pure function of the current agent position and the step index. A scenario rerun under the same seeds produces bit-identical observations and bit-identical feature dicts.
 
@@ -1308,11 +1308,11 @@ fused = merge_navsat_with_imu_orientation(navsat, imu, max_pair_dt_seconds=0.05)
 
 NavSatFix samples whose nearest IMU quaternion is more than `max_pair_dt_seconds` away keep `orientation_xyzw=None` so the correlator skips them when reducing heading errors — the mean / max are computed over the matched pairs only.
 
-Pre-computed correlation reports can be attached to a scenario-set run so the headless-vs-bag drift travels alongside the benchmark history report through the same scenario CI artifact channel. Pass one or more `--correlation-report <path>` flags to `gs-mapper route-policy-scenario-set` (repeatable) — each path is loaded via `load_real_vs_sim_correlation_report_json`, embedded into `RoutePolicyScenarioSetRunReport.correlation_reports`, surfaced in `render_route_policy_scenario_set_markdown` as a "Real-vs-sim correlation" table, and round-tripped through `write_route_policy_scenario_set_run_json` / `load_route_policy_scenario_set_run_json`. Library callers can pass the same paths via `run_route_policy_scenario_set(..., correlation_report_paths=[...])`. The report-shape on the wire is `BagPoseStreamMetadata` (the round-trippable summary view of `BagPoseStream`); `BagPoseStream.metadata()` builds it from a live stream and `bag_pose_stream_metadata_from_dict` recovers it from a JSON payload.
+Pre-computed correlation reports can be attached to a scenario-set run so the headless-vs-bag drift travels alongside the benchmark history report through the same scenario CI artifact channel. Pass one or more `--correlation-report <path>` flags to `3dgs-robotics route-policy-scenario-set` (repeatable) — each path is loaded via `load_real_vs_sim_correlation_report_json`, embedded into `RoutePolicyScenarioSetRunReport.correlation_reports`, surfaced in `render_route_policy_scenario_set_markdown` as a "Real-vs-sim correlation" table, and round-tripped through `write_route_policy_scenario_set_run_json` / `load_route_policy_scenario_set_run_json`. Library callers can pass the same paths via `run_route_policy_scenario_set(..., correlation_report_paths=[...])`. The report-shape on the wire is `BagPoseStreamMetadata` (the round-trippable summary view of `BagPoseStream`); `BagPoseStream.metadata()` builds it from a live stream and `bag_pose_stream_metadata_from_dict` recovers it from a JSON payload.
 
-`gs-mapper route-policy-scenario-ci-review` lifts those reports up into the Pages-hosted review bundle automatically: after loading the shard merge report, the CLI walks each `RoutePolicyScenarioShardRunSummary.run_path`, reads the embedded `correlation_reports` from each shard's run JSON, and threads them into `build_route_policy_scenario_ci_review_artifact(..., correlation_reports=..., correlation_report_paths=...)`. The review's Markdown grows a `## Real-vs-sim correlation` section and the HTML grows a matching `<section>` table so reviewers see headless-vs-bag drift next to the validation / activation / merge gate without checking out the branch. Pass `--no-correlation-reports` to skip the auto-collect step (useful in unit tests with fictional shard `run_path`s, or to keep the review JSON shape unchanged for an existing fixture). Shard summaries whose `run_path` is missing from disk are skipped silently, so a partially-published merge keeps building.
+`3dgs-robotics route-policy-scenario-ci-review` lifts those reports up into the Pages-hosted review bundle automatically: after loading the shard merge report, the CLI walks each `RoutePolicyScenarioShardRunSummary.run_path`, reads the embedded `correlation_reports` from each shard's run JSON, and threads them into `build_route_policy_scenario_ci_review_artifact(..., correlation_reports=..., correlation_report_paths=...)`. The review's Markdown grows a `## Real-vs-sim correlation` section and the HTML grows a matching `<section>` table so reviewers see headless-vs-bag drift next to the validation / activation / merge gate without checking out the branch. Pass `--no-correlation-reports` to skip the auto-collect step (useful in unit tests with fictional shard `run_path`s, or to keep the review JSON shape unchanged for an existing fixture). Shard summaries whose `run_path` is missing from disk are skipped silently, so a partially-published merge keeps building.
 
-The review CLI also exposes optional regression thresholds backed by `RealVsSimCorrelationThresholds` and `evaluate_real_vs_sim_correlation_thresholds(report, thresholds)`. Pass any subset of `--max-correlation-translation-mean-meters`, `--max-correlation-translation-p95-meters`, `--max-correlation-translation-max-meters`, or `--max-correlation-heading-mean-radians` to `gs-mapper route-policy-scenario-ci-review` to fail the review (and trip the existing `--fail-on-review` exit) when any embedded correlation report exceeds that bound. Failed gates are recorded as `(report_index, bag_topic, failed_checks)` triples on `RoutePolicyScenarioCIReviewArtifact.correlation_failed_reports` and surfaced in the Markdown's `### Correlation gate failures` and HTML's `<h3>` block; `RoutePolicyScenarioCIReviewArtifact.passed` now also requires `correlation_passed`. Reports without heading data skip the heading-mean check (so a NavSatFix-only correlator stays quiet), and unset thresholds default to "do not check this stat" — the review JSON stays bit-identical to a pre-#125 artifact unless at least one bound is populated.
+The review CLI also exposes optional regression thresholds backed by `RealVsSimCorrelationThresholds` and `evaluate_real_vs_sim_correlation_thresholds(report, thresholds)`. Pass any subset of `--max-correlation-translation-mean-meters`, `--max-correlation-translation-p95-meters`, `--max-correlation-translation-max-meters`, or `--max-correlation-heading-mean-radians` to `3dgs-robotics route-policy-scenario-ci-review` to fail the review (and trip the existing `--fail-on-review` exit) when any embedded correlation report exceeds that bound. Failed gates are recorded as `(report_index, bag_topic, failed_checks)` triples on `RoutePolicyScenarioCIReviewArtifact.correlation_failed_reports` and surfaced in the Markdown's `### Correlation gate failures` and HTML's `<h3>` block; `RoutePolicyScenarioCIReviewArtifact.passed` now also requires `correlation_passed`. Reports without heading data skip the heading-mean check (so a NavSatFix-only correlator stays quiet), and unset thresholds default to "do not check this stat" — the review JSON stays bit-identical to a pre-#125 artifact unless at least one bound is populated.
 
 For multi-bag rollouts where one topic should be held to a tighter standard than another, pass `--correlation-thresholds-config <path>` to load a flat `{"<bag_source_topic>": {<thresholds>}}` JSON. Topics that match an override use that override's bounds; everything else falls through to the scalar `--max-correlation-*` defaults. Overrides round-trip through `RoutePolicyScenarioCIReviewArtifact.correlation_threshold_overrides` (default empty) and surface in the Markdown / HTML gate descriptor (e.g. `Gate FAIL  (default: …; per-topic overrides: 1)`). Empty entries inside the JSON are silently dropped on load (they would behave identically to falling through to the default), and the JSON shape is the same one produced by `correlation_threshold_overrides_to_dict` so config files can be programmatically generated and replayed bit-for-bit.
 
@@ -1330,4 +1330,4 @@ When stratification is configured, the review builder also computes per-window a
 
 ## Next Implementation Layer
 
-The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`). The review bundle is adoption-aware: passing `--adoption-report` to the review CLI (or `adoption=` to `build_route_policy_scenario_ci_review_artifact`) embeds the trigger mode, branches, and unified manual-vs-adopted YAML diff into the Pages-hosted bundle. The next useful layer is surfacing the reviews on the `/reviews/` Pages index so discovery no longer requires knowing the bundle URL in advance.
+The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`3dgs-robotics route-policy-scenario-ci-workflow-adopt`). The review bundle is adoption-aware: passing `--adoption-report` to the review CLI (or `adoption=` to `build_route_policy_scenario_ci_review_artifact`) embeds the trigger mode, branches, and unified manual-vs-adopted YAML diff into the Pages-hosted bundle. The next useful layer is surfacing the reviews on the `/reviews/` Pages index so discovery no longer requires knowing the bundle URL in advance.

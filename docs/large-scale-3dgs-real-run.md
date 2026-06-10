@@ -91,7 +91,7 @@ If the gate reports `needs-preprocess`, run the printed preprocess command. The
 standard shape is:
 
 ```bash
-gs-mapper preprocess \
+3dgs-robotics preprocess \
   --method colmap \
   --data data/large-scale-3dgs-real/route_001/rosbag2 \
   --output outputs/autoware_sparse
@@ -104,7 +104,7 @@ Then rerun the gate against the same root or against the generated sparse output
 When the gate reports `ready-colmap`, run the printed bootstrap command:
 
 ```bash
-gs-mapper large-scale-3dgs-bootstrap \
+3dgs-robotics large-scale-3dgs-bootstrap \
   --root data/large-scale-3dgs-real \
   --output outputs/autoware_large \
   --axes xy \
@@ -128,7 +128,7 @@ outputs/autoware_large/large_scale_3dgs_plan.json
 Train the route-contiguous pilot chunks before launching a full run:
 
 ```bash
-gs-mapper large-scale-3dgs-run \
+3dgs-robotics large-scale-3dgs-run \
   --plan outputs/autoware_large/large_scale_3dgs_pilot_plan.json
 ```
 
@@ -144,7 +144,7 @@ outputs/autoware_large/large_scale_3dgs_run_report.json
 After the pilot looks usable:
 
 ```bash
-gs-mapper large-scale-3dgs-run \
+3dgs-robotics large-scale-3dgs-run \
   --plan outputs/autoware_large/large_scale_3dgs_plan.json
 ```
 
@@ -155,7 +155,7 @@ Resume is enabled by default, so rerunning the command skips existing splats.
 Stage the generated splats, catalog, route, and launch metadata:
 
 ```bash
-gs-mapper large-scale-3dgs-promote \
+3dgs-robotics large-scale-3dgs-promote \
   --plan outputs/autoware_large/large_scale_3dgs_plan.json \
   --run-report outputs/autoware_large/large_scale_3dgs_run_report.json \
   --public-root apps/dreamwalker-web/public \

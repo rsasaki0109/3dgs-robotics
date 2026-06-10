@@ -79,7 +79,7 @@ class RoutePolicyScenarioCIReviewProvenance:
 
 #### 1.2.3 CLI 差分
 
-`gs-mapper route-policy-scenario-ci-review` に追加するフラグ:
+`3dgs-robotics route-policy-scenario-ci-review` に追加するフラグ:
 
 | Flag | 必須 | デフォルト挙動 | 備考 |
 | --- | --- | --- | --- |
@@ -97,7 +97,7 @@ class RoutePolicyScenarioCIReviewProvenance:
 production run の標準呼び出し例:
 
 ```bash
-gs-mapper route-policy-scenario-ci-review \
+3dgs-robotics route-policy-scenario-ci-review \
   --kind production \
   --scene-id outdoor-demo \
   --scenario-set-id outdoor-demo-shard-merge \
@@ -235,7 +235,7 @@ review bundle Markdown / HTML は event-aligned mode のときだけ "Event" 列
 
 ### 2.5 CLI 差分
 
-`gs-mapper route-policy-scenario-ci-review` に追加:
+`3dgs-robotics route-policy-scenario-ci-review` に追加:
 
 | Flag | 説明 |
 | --- | --- |

@@ -398,7 +398,7 @@ def _default_command_runner(args: Sequence[str]) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(command, check=False)
     except FileNotFoundError:
-        if command and command[0] == "gs-mapper":
+        if command and command[0] == "3dgs-robotics":
             return subprocess.run([sys.executable, "-m", "gs_sim2real.cli", *command[1:]], check=False)
         raise
 
@@ -411,7 +411,7 @@ def _build_train_command(
     config: str | None,
 ) -> str:
     parts: list[str | Path | int] = [
-        "gs-mapper",
+        "3dgs-robotics",
         "train",
         "--data",
         chunk_data_dir,
@@ -437,7 +437,7 @@ def _build_export_command(
     splat_max_scale_percentile: float | None,
 ) -> str:
     parts: list[str | Path | int | float] = [
-        "gs-mapper",
+        "3dgs-robotics",
         "export",
         "--model",
         train_dir / "point_cloud.ply",
@@ -633,7 +633,7 @@ def format_large_scale_3dgs_smoke_data_text(manifest: dict[str, Any]) -> str:
     min_images = max(1, int(summary["imagesPerTile"]))
     plan_command = _format_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "large-scale-3dgs-plan",
             "--data",
             data_dir,
@@ -656,7 +656,7 @@ def format_large_scale_3dgs_smoke_data_text(manifest: dict[str, Any]) -> str:
     )
     run_command = _format_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "large-scale-3dgs-run",
             "--plan",
             suggested_output / "large_scale_3dgs_plan.json",
@@ -724,7 +724,7 @@ def _build_discovery_preflight_command(options: LargeScale3DGSDiscoveryOptions, 
     tile_sizes = ",".join(f"{tile_size:g}" for tile_size in options.tile_sizes)
     return _format_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "large-scale-3dgs-preflight",
             "--data",
             data_dir,
@@ -749,7 +749,7 @@ def _build_discovery_preprocess_command(source_path: Path) -> str:
     slug = _slugify(source_path.stem if source_path.is_file() else source_path.name, "robot-log")
     return _format_command(
         [
-            "gs-mapper",
+            "3dgs-robotics",
             "preprocess",
             "--method",
             "colmap",
@@ -885,7 +885,7 @@ def _discover_splat_groups(options: LargeScale3DGSDiscoveryOptions, root_dir: Pa
         if len(splat_paths) == 1:
             catalog_command = _format_command(
                 [
-                    "gs-mapper",
+                    "3dgs-robotics",
                     "splat-tile-catalog",
                     "--input",
                     splat_paths[0],
@@ -1125,13 +1125,13 @@ def build_large_scale_3dgs_bootstrap(options: LargeScale3DGSBootstrapOptions) ->
             "preflightReportPath": preflight_report_path,
             "pilotPlanPath": pilot_plan_path,
             "pilotRunCommand": (
-                _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", pilot_plan_path])
+                _format_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", pilot_plan_path])
                 if pilot_plan_path
                 else ""
             ),
             "fullPlanPath": full_plan_path,
             "fullRunCommand": (
-                _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", full_plan_path])
+                _format_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", full_plan_path])
                 if full_plan_path
                 else ""
             ),
@@ -1471,7 +1471,7 @@ def _recommend_preflight_candidate(candidates: Sequence[dict[str, Any]]) -> dict
 
 def _build_preflight_plan_command(options: LargeScale3DGSPreflightOptions, recommendation: dict[str, Any]) -> str:
     parts: list[str | Path | int | float] = [
-        "gs-mapper",
+        "3dgs-robotics",
         "large-scale-3dgs-plan",
         "--data",
         options.data_dir,
@@ -1496,7 +1496,7 @@ def _build_preflight_plan_command(options: LargeScale3DGSPreflightOptions, recom
 
 def _build_preflight_pilot_command(options: LargeScale3DGSPreflightOptions, recommendation: dict[str, Any]) -> str:
     parts: list[str | Path | int | float] = [
-        "gs-mapper",
+        "3dgs-robotics",
         "large-scale-3dgs-pilot",
         "--data",
         options.data_dir,
@@ -1662,12 +1662,12 @@ def build_large_scale_3dgs_preflight(options: LargeScale3DGSPreflightOptions) ->
             "pilotReportPath": written_pilot_report_path,
             "pilotPlanPath": written_pilot_plan_path,
             "pilotCommand": pilot_command,
-            "pilotRunCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", pilot_plan_path]),
+            "pilotRunCommand": _format_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", pilot_plan_path]),
             "planCommand": plan_command,
-            "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
+            "runCommand": _format_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", plan_path]),
             "catalogCommand": _format_command(
                 [
-                    "gs-mapper",
+                    "3dgs-robotics",
                     "large-scale-3dgs-catalog",
                     "--plan",
                     plan_path,
@@ -1791,7 +1791,7 @@ def _select_route_pilot_chunks(
 
 def _build_pilot_shell_command(options: LargeScale3DGSPilotOptions) -> str:
     parts: list[str | Path | int | float] = [
-        "gs-mapper",
+        "3dgs-robotics",
         "large-scale-3dgs-pilot",
         "--data",
         options.data_dir,
@@ -1955,7 +1955,7 @@ def build_large_scale_3dgs_pilot(options: LargeScale3DGSPilotOptions) -> dict[st
         "next": {
             "reportPath": str(report_path),
             "planPath": str(plan_path),
-            "runCommand": _format_command(["gs-mapper", "large-scale-3dgs-run", "--plan", plan_path]),
+            "runCommand": _format_command(["3dgs-robotics", "large-scale-3dgs-run", "--plan", plan_path]),
             "shellCommand": _build_pilot_shell_command(options),
         },
     }

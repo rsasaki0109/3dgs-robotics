@@ -48,10 +48,10 @@ def test_launch_kit_renderers_include_copy_blocks_and_metadata() -> None:
     assert "Where To Post" in html
     assert "data-copy-target" in html
     assert "snippet-short-social" in html
-    assert "GS Mapper Launch Kit" in markdown
+    assert "3DGS Robotics Launch Kit" in markdown
     assert "## Where To Post" in markdown
     assert "```text" in markdown
-    assert payload["project"] == "GS Mapper"
+    assert payload["project"] == "3DGS Robotics"
     assert payload["destinations"][0]["snippetKey"] == "short-social"
     assert payload["snippets"][0]["withinLimit"] is True
 

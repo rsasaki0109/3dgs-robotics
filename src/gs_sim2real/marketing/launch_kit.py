@@ -1,4 +1,4 @@
-"""Generate shareable launch collateral for GS Mapper."""
+"""Generate shareable launch collateral for 3DGS Robotics."""
 
 from __future__ import annotations
 
@@ -113,17 +113,17 @@ class LaunchKit:
 
 
 def build_default_launch_kit() -> LaunchKit:
-    """Return the canonical GS Mapper launch kit."""
+    """Return the canonical 3DGS Robotics launch kit."""
 
     tagline = "Real robot data to Gaussian-splat Physical AI benchmarks."
     description = (
-        "GS Mapper turns photos, robotics logs, and MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR "
+        "3DGS Robotics turns photos, robotics logs, and MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR "
         "artifacts into browser-viewable Gaussian splats, scene contracts, route-policy benchmarks, "
         "and CI review bundles for Physical AI evaluation."
     )
     links = (
         LaunchLink(
-            "Project page", DEFAULT_SITE_URL, "First-stop page with the GS Mapper pitch and viewer entry points."
+            "Project page", DEFAULT_SITE_URL, "First-stop page with the 3DGS Robotics pitch and viewer entry points."
         ),
         LaunchLink(
             "Live splat viewer", DEFAULT_LIVE_VIEWER_URL, "WebGL scene picker with nine bundled comparison splats."
@@ -151,7 +151,7 @@ def build_default_launch_kit() -> LaunchKit:
             label="Short social post",
             max_chars=280,
             text=(
-                "GS Mapper turns robot logs and MASt3R-SLAM / VGGT-SLAM outputs into browser-viewable "
+                "3DGS Robotics turns robot logs and MASt3R-SLAM / VGGT-SLAM outputs into browser-viewable "
                 "3D Gaussian Splats plus CI-friendly Physical AI policy benchmarks.\n\n"
                 f"Live demos: {DEFAULT_LIVE_VIEWER_URL}\n"
                 "#3DGS #Robotics #PhysicalAI"
@@ -161,7 +161,7 @@ def build_default_launch_kit() -> LaunchKit:
             key="technical-social",
             label="Technical social post",
             text=(
-                "I released GS Mapper: an open-source pipeline for turning real outdoor robot data, "
+                "I released 3DGS Robotics: an open-source pipeline for turning real outdoor robot data, "
                 "DUSt3R / MASt3R pose-free reconstructions, and MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / "
                 "LoGeR artifacts into Gaussian-splat scenes and Physical AI policy benchmark artifacts.\n\n"
                 "It ships nine public comparison scenes, external SLAM dry-run manifests, route-policy "
@@ -175,7 +175,7 @@ def build_default_launch_kit() -> LaunchKit:
             key="community-post",
             label="Community post",
             text=(
-                "GS Mapper is an open-source pipeline for turning real robot data into Gaussian-splat "
+                "3DGS Robotics is an open-source pipeline for turning real robot data into Gaussian-splat "
                 "Physical AI evaluation artifacts. It accepts image folders, robotics logs, and external "
                 "SLAM artifacts, then produces browser-viewable .splat files, scene contracts, policy "
                 "benchmark reports, scenario shards, and review bundles.\n\n"
@@ -193,7 +193,7 @@ def build_default_launch_kit() -> LaunchKit:
             key="awesome-list",
             label="Awesome-list entry",
             text=(
-                "- [GS Mapper](https://github.com/rsasaki0109/3dgs-robotics) - Converts photos, robotics logs, "
+                "- [3DGS Robotics](https://github.com/rsasaki0109/3dgs-robotics) - Converts photos, robotics logs, "
                 "and MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR artifacts into browser-viewable Gaussian splats, "
                 "Physical AI route-policy benchmarks, and CI review bundles."
             ),
@@ -202,7 +202,7 @@ def build_default_launch_kit() -> LaunchKit:
             key="japanese",
             label="Japanese announcement",
             text=(
-                "GS Mapper を公開しました。写真フォルダ、ロボティクスログ、MASt3R-SLAM / VGGT-SLAM 2.0 / "
+                "3DGS Robotics を公開しました。写真フォルダ、ロボティクスログ、MASt3R-SLAM / VGGT-SLAM 2.0 / "
                 "Pi3 / LoGeR の出力を、Web で見られる 3D Gaussian Splatting、Physical AI policy "
                 f"benchmark、scenario CI review bundle につなぐ OSS です。\n\nLive demo: {DEFAULT_LIVE_VIEWER_URL}\n"
                 f"GitHub: {DEFAULT_REPO_URL}"
@@ -279,7 +279,7 @@ def build_default_launch_kit() -> LaunchKit:
         "webgpu",
     )
     return LaunchKit(
-        project="GS Mapper",
+        project="3DGS Robotics",
         tagline=tagline,
         description=description,
         site_url=DEFAULT_SITE_URL,

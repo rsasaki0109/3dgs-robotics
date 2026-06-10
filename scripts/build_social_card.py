@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the GS Mapper social preview card from production 3DGS imagery."""
+"""Build the 3DGS Robotics social preview card from production 3DGS imagery."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def _draw_copy(draw: ImageDraw.ImageDraw, size: tuple[int, int]) -> None:
     muted = (203, 216, 229, 255)
     draw.rounded_rectangle((64, 56, 370, 105), radius=8, fill=(8, 15, 24, 218), outline=(255, 255, 255, 42))
     draw.text((86, 68), "REAL ROBOT LOGS -> 3DGS", font=chip_font, fill=text)
-    draw.text((64, 176), "GS Mapper", font=title_font, fill=text)
+    draw.text((64, 176), "3DGS Robotics", font=title_font, fill=text)
     draw.text((69, 282), "Outdoor 3D Gaussian Splatting", font=subtitle_font, fill=text)
     draw.text((69, 333), "for Physical AI scenario CI", font=subtitle_font, fill=accent)
     bullets = (

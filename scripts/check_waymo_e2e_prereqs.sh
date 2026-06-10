@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-flight for the Waymo preprocess path.
 # Mirrors scripts/check_mcd_e2e_prereqs.sh in intent: print what is present vs
-# missing so the user can decide whether `gs-mapper run --preprocess-method
+# missing so the user can decide whether `3dgs-robotics run --preprocess-method
 # waymo` is runnable on this machine.
 
 set -u
@@ -35,7 +35,7 @@ fi
 
 section "Editable repo install"
 check "gs_sim2real importable" "python3 -c 'import gs_sim2real'"
-check "gs-mapper CLI on PATH"  "command -v gs-mapper"
+check "3dgs-robotics CLI on PATH"  "command -v 3dgs-robotics"
 
 section "Waymo SDK"
 check "waymo_open_dataset importable" \
@@ -58,7 +58,7 @@ fi
 
 section "Summary"
 if [ ${status} -eq 0 ]; then
-    printf "  All prerequisites present. Run: gs-mapper run --preprocess-method waymo --images %s ...\n" "${data_dir}"
+    printf "  All prerequisites present. Run: 3dgs-robotics run --preprocess-method waymo --images %s ...\n" "${data_dir}"
 else
     printf "  One or more prerequisites missing. See above [MISS]/[WARN] lines.\n"
 fi

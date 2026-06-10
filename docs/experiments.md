@@ -165,7 +165,7 @@ Run one experiment lab with `--write-docs` to refresh this index,
 `experiments.generated.md`, `decisions.md`, and `interfaces.md`:
 
 ```bash
-gs-mapper experiment render-backend-selection --write-docs --output outputs/render-backend-selection-experiment-report.json
+3dgs-robotics experiment render-backend-selection --write-docs --output outputs/render-backend-selection-experiment-report.json
 ```
 
-Use `gs-mapper experiment --help` for the full lab list.
+Use `3dgs-robotics experiment --help` for the full lab list.

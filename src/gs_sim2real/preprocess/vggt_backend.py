@@ -3,7 +3,7 @@
 Uses Meta's `facebook/VGGT-1B` model (CVPR 2025) for one-pass camera + depth
 estimation, then exports a COLMAP-text sparse model compatible with the gsplat
 trainer. This is **not** the repo-external VGGT-SLAM 2.0 artifact importer;
-it runs VGGT inside GS Mapper's pose-free preprocess path.
+it runs VGGT inside 3DGS Robotics's pose-free preprocess path.
 
 Requirements:
 - Local clone of https://github.com/facebookresearch/vggt on ``VGGT_PATH``

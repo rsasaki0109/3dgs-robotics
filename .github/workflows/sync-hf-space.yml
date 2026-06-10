@@ -18,7 +18,7 @@ jobs:
       - name: Push apps/hf-space to the Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE_ID: ${{ vars.HF_SPACE_ID || 'rsasaki0109/gs-mapper' }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID || 'rsasaki0109/3dgs-robotics' }}
         run: |
           if [ -z "$HF_TOKEN" ]; then
             echo "HF_TOKEN secret not configured; skipping sync."

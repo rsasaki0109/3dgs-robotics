@@ -1,17 +1,17 @@
-# GS Mapper
+# 3DGS Robotics
 
 [![CI](https://github.com/rsasaki0109/3dgs-robotics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsasaki0109/3dgs-robotics/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/rsasaki0109/3dgs-robotics)](LICENSE)
-[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/rsasaki0109/gs-mapper)
+[![Open in Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/rsasaki0109/3dgs-robotics)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rsasaki0109/3dgs-robotics/blob/main/notebooks/photos_to_splat_colab.ipynb)
 
 **Real outdoor robot logs -> browser 3D Gaussian Splats -> Physical AI scenario CI.**
 
-GS Mapper turns photos, videos, rosbags, and external SLAM outputs into browser
+3DGS Robotics turns photos, videos, rosbags, and external SLAM outputs into browser
 `.splat` scenes, then feeds the same catalog into route-policy benchmarks and
 scenario CI.
 
-**Try it first:** [build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/gs-mapper) |
+**Try it first:** [build your own splat — zero install (HF Spaces)](https://huggingface.co/spaces/rsasaki0109/3dgs-robotics) |
 [live 3DGS demo](https://rsasaki0109.github.io/3dgs-robotics/splat.html) |
 [large-scale Dynamic Map Viewer](https://rsasaki0109.github.io/3dgs-robotics/dreamwalker/?tileCatalog=%2Fmanifests%2Foutdoor-production-grid-large-tile-catalog.json&tilePreload=metadata&tilePreloadLimit=4&tileResidentLimit=6&robotRoute=%2Frobot-routes%2Foutdoor-production-grid-large-route.json&robotRoutePlayback=1&robotRoutePlaybackMs=1200&robotRoutePlaybackLoop=1)
 
@@ -21,8 +21,8 @@ Lead GIF: dynamic map loading on real robot data — the base layer is a true to
 
 ```bash
 pip install -e ".[dev]"
-gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat
-gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
+3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat
+3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_splat
 ```
 
 What ships: nine public outdoor `.splat` scenes; a large-scale Dynamic Map Viewer
@@ -35,11 +35,11 @@ Details: `docs/plan_outdoor_gs.md`, `docs/live-mapping.md`, `docs/physical-ai-si
 
 | What you start with | Minimum command | Deep-dive section |
 | --- | --- | --- |
-| **A walkaround video** | `gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat` | [Video to splat](#video-to-splat-one-shot-pose-free) |
-| **A folder of photos** | `gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
-| **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `gs-mapper preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
-| **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `gs-mapper route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
-| **A live ROS 2 camera topic** | `gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
+| **A walkaround video** | `3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat` | [Video to splat](#video-to-splat-one-shot-pose-free) |
+| **A folder of photos** | `3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
+| **External SLAM artifacts** | `python3 scripts/plan_external_slam_imports.py --format shell` then `3dgs-robotics preprocess --method external-slam ...` | [Import External SLAM Results](#import-external-slam-results) |
+| **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
+| **A live ROS 2 camera topic** | `3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765` | [Live Mapping (ROS 2)](#live-mapping-ros-2--watch-the-map-grow) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
@@ -75,8 +75,8 @@ Preview PNGs: `DISPLAY=:0 python3 scripts/capture_readme_splat_previews.py` · p
 ## Video to splat (one-shot, pose-free)
 
 ```bash
-gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat
-gs-mapper map my_drive.mp4 --quality balanced --no-open-viewer   # alias
+3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat
+3dgs-robotics map my_drive.mp4 --quality balanced --no-open-viewer   # alias
 ```
 
 Optional DUSt3R clone for the default backend; use `--preprocess vggt` with a local
@@ -85,29 +85,29 @@ Optional DUSt3R clone for the default backend; use `--preprocess vggt` with a lo
 ## Bring Your Own Photos (one-shot, pose-free)
 
 ```bash
-gs-mapper photos-to-splat --images ./my_photos --output outputs/my_photos_splat --quality draft
-gs-mapper splat-inspect --input outputs/my_scene.splat
-gs-mapper splat-filter --input outputs/my_scene.splat --output outputs/my_scene.clean.splat --min-opacity 0.08 --max-scale-percentile 98
+3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_photos_splat --quality draft
+3dgs-robotics splat-inspect --input outputs/my_scene.splat
+3dgs-robotics splat-filter --input outputs/my_scene.splat --output outputs/my_scene.clean.splat --min-opacity 0.08 --max-scale-percentile 98
 ```
 
 ## Zero-install demos (HF Spaces / Colab)
 
-- **[Hugging Face Space](https://huggingface.co/spaces/rsasaki0109/gs-mapper)** — upload photos or a short video in the browser (`apps/hf-space/`).
+- **[Hugging Face Space](https://huggingface.co/spaces/rsasaki0109/3dgs-robotics)** — upload photos or a short video in the browser (`apps/hf-space/`).
 - **[Colab notebook](https://colab.research.google.com/github/rsasaki0109/3dgs-robotics/blob/main/notebooks/photos_to_splat_colab.ipynb)** — full `photos-to-splat` on a free T4.
 
 ## Live Mapping (ROS 2) — watch the map grow
 
-`gs-mapper-live-mapper` rebuilds a draft splat as the robot drives; the polling viewer
+`3dgs-robotics-live-mapper` rebuilds a draft splat as the robot drives; the polling viewer
 swaps `live/latest.splat` in place. Full docs: [docs/live-mapping.md](docs/live-mapping.md).
 
 ![Live mapping: the 3DGS map grows as the robot drives](docs/images/live-mapping/live-mapping-grow.gif)
 
 Reproduce the growth GIF with `scripts/run_live_mapping_demo.py` + `scripts/build_live_mapping_gif.py`.
-Localize query frames against a finished session: `gs-mapper localize --map <session> --non-round-keyframes`
+Localize query frames against a finished session: `3dgs-robotics localize --map <session> --non-round-keyframes`
 (see [docs/live-mapping.md](docs/live-mapping.md#3dgs-localization)).
 
 ```bash
-gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765
+3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765
 python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765
 ```
 
@@ -115,7 +115,7 @@ python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --po
 
 ```bash
 python3 scripts/plan_external_slam_imports.py --format shell
-gs-mapper preprocess --method external-slam --images data/my_scene/images \
+3dgs-robotics preprocess --method external-slam --images data/my_scene/images \
   --external-slam-trajectory outputs/slam/poses.txt \
   --external-slam-points outputs/slam/map.ply --output outputs/my_scene_sparse
 ```
@@ -126,7 +126,7 @@ Profiles: MASt3R-SLAM, VGGT-SLAM 2.0, Pi3/Pi3X, LoGeR. Matrix: `docs/plan_outdoo
 
 ```bash
 python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
-gs-mapper route-policy-benchmark --policy-registry runs/scenarios/outdoor-policies.json \
+3dgs-robotics route-policy-benchmark --policy-registry runs/scenarios/outdoor-policies.json \
   --goal-suite runs/scenarios/outdoor-goals.json --scene-catalog docs/scenes-list.json \
   --scene-id outdoor-demo --episode-count 16 \
   --output runs/scenarios/outdoor-policy-benchmark.json \
@@ -138,14 +138,14 @@ Workflow details: `docs/physical-ai-sim.md`.
 ## Outdoor pipeline quickstart (Autoware Leo Drive)
 
 ```bash
-gs-mapper download --dataset autoware_leo_drive_bag6 --output data/autoware
-gs-mapper preprocess --method colmap --data data/autoware --output outputs/autoware_sparse
-gs-mapper train --data outputs/autoware_sparse --method gsplat --iterations 30000
-gs-mapper export --model outputs/train/point_cloud.ply --format splat --output outputs/autoware.splat
+3dgs-robotics download --dataset autoware_leo_drive_bag6 --output data/autoware
+3dgs-robotics preprocess --method colmap --data data/autoware --output outputs/autoware_sparse
+3dgs-robotics train --data outputs/autoware_sparse --method gsplat --iterations 30000
+3dgs-robotics export --model outputs/train/point_cloud.ply --format splat --output outputs/autoware.splat
 ```
 
 Large-scale tiling, real-input staging, and Dynamic Map Viewer promotion:
-`docs/large-scale-3dgs-real-run.md` · `gs-mapper large-scale-3dgs-bootstrap --help`
+`docs/large-scale-3dgs-real-run.md` · `3dgs-robotics large-scale-3dgs-bootstrap --help`
 
 ## Installation
 
@@ -158,11 +158,11 @@ pip install -e ".[app]"          # Streamlit demo (streamlit run app.py)
 ## CLI reference
 
 ```bash
-gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
-gs-mapper video-to-splat my_drive.mp4 --output outputs/my_drive_splat
-gs-mapper localize --map outputs/live_mapping/session --query frame.jpg
-gs-mapper download / preprocess / train / export --help
-gs-mapper-live-mapper --image-topic /camera/image_raw/compressed --port 8765
+3dgs-robotics photos-to-splat --images ./my_photos --output outputs/my_splat
+3dgs-robotics video-to-splat my_drive.mp4 --output outputs/my_drive_splat
+3dgs-robotics localize --map outputs/live_mapping/session --query frame.jpg
+3dgs-robotics download / preprocess / train / export --help
+3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765
 python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
 ```
 

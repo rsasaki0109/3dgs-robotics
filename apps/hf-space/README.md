@@ -1,5 +1,5 @@
 ---
-title: GS Mapper — Photos to 3D Gaussian Splat
+title: 3DGS Robotics — Photos to 3D Gaussian Splat
 emoji: 🗺️
 colorFrom: green
 colorTo: blue
@@ -18,7 +18,7 @@ tags:
   - robotics
 ---
 
-# GS Mapper — Photos to 3D Gaussian Splat
+# 3DGS Robotics — Photos to 3D Gaussian Splat
 
 Zero-install demo for [3dgs-robotics](https://github.com/rsasaki0109/3dgs-robotics):
 upload 8–16 photos (or a short walkaround video) and get a browser-viewable

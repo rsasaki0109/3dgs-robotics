@@ -1,4 +1,4 @@
-"""Physical AI simulation contracts for GS Mapper scenes."""
+"""Physical AI simulation contracts for 3DGS Robotics scenes."""
 
 from .contract import (
     DEFAULT_SITE_URL,

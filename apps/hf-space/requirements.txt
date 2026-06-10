@@ -1,4 +1,4 @@
-# GS Mapper zero-install demo — Hugging Face Space dependencies.
+# 3DGS Robotics zero-install demo — Hugging Face Space dependencies.
 # gsplat ships prebuilt CUDA wheels per torch/CUDA combo; keep the index in
 # sync with the pinned torch below. Available combos are listed at
 # https://docs.gsplat.studio/whl/<ptXXcuYYY>/gsplat/ (pt24cu121 and pt24cu124
@@ -11,8 +11,8 @@ gsplat==1.5.3+pt24cu121
 gradio>=5.0
 spaces
 
-# gs-mapper itself (pulls numpy/opencv/Pillow/tqdm/pyyaml/...)
-gs-mapper @ git+https://github.com/rsasaki0109/3dgs-robotics.git@main
+# 3dgs-robotics itself (pulls numpy/opencv/Pillow/tqdm/pyyaml/...)
+3dgs-robotics @ git+https://github.com/rsasaki0109/3dgs-robotics.git@main
 
 # DUSt3R runtime deps (the clone happens at app startup)
 numpy==1.26.4
