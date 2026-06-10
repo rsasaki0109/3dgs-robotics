@@ -319,6 +319,46 @@ Draft 1500-iteration rounds re-place splats noisily — raise
 `--min-cluster-voxels` / `--min-count` (e.g. 25 / 5) to suppress the
 speckle, or retrain both rounds at higher quality for fine-grained diffs.
 
+### Autonomous navigation in the map
+
+`3dgs-robotics navigate` drives a simulated robot through the map with no
+external simulator — the full loop is repo-built parts: A* plans on the
+occupancy grid, a pure-pursuit controller follows the path, the GS camera
+simulator renders what the robot sees, and the 3DGS localizer closes the
+loop. **Control only ever sees the localizer's estimate**, dead-reckoning on
+the commanded motion between fixes; the true pose renders the observations.
+
+```bash
+# drive from the first mapped keyframe to the last, localizing every 25 steps
+3dgs-robotics navigate --map outputs/live_mapping/session \
+  --output nav/nav_result.json --gif nav/nav.gif
+
+# pure dead reckoning (no GPU), explicit goal in grid-plane coords
+3dgs-robotics navigate --map outputs/live_mapping/session \
+  --localize-every 0 --goal 1.8,0.2 --output nav/nav_result.json
+```
+
+The simulation injects wheel slip (`--odom-noise`): the true motion deviates
+from the commanded one while the estimate dead-reckons on clean commands, so
+without fixes the robot drifts off the road — run once with
+`--localize-every 0` to see it veer away, then with fixes to see the
+localizer pull it back. Accepted fixes pass an innovation gate
+(`max_innovation`, rejects visual-aliasing teleports on self-similar
+streets) and blend into the estimate (`--fix-blend`). The localizer is most
+reliable near mapped keyframe views; between them, fixes are often gated
+out — exactly how sparse global fixes behave on a real robot.
+
+Outputs: `nav_result.json` (reached / steps / localization fixes /
+cross-track stats), a top-down trace PNG (planned path cyan, driven
+trajectory green, fixes orange), and optionally a GIF pairing the robot's
+rendered view with the growing trace. Start/goal default to the first/last
+mapped keyframes (`--start-keyframe` / `--goal-keyframe` / `--goal x,y`).
+Distance knobs (`--robot-radius`, `--speed`, `--goal-tolerance`) are in
+camera-height units. The planner keeps the swept mapping trajectory free
+even where draft-round floaters mark obstacles — the robot drove there.
+The virtual camera follows the local road level (nearest keyframe height),
+so sloping streets render correctly.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |

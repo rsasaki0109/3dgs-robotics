@@ -45,6 +45,10 @@ class GridParams:
     min_points_per_cell: int = 2
     free_radius: float = 1.0
     padding: float = 1.0
+    # keep the swept camera corridor free even where gaussians mark obstacles —
+    # the robot physically drove there, so occupied cells inside it are map
+    # noise (draft-round floaters). Used by the navigation planner.
+    trajectory_wins: bool = False
 
 
 @dataclass
@@ -227,6 +231,9 @@ def build_occupancy_grid(
         counts = np.zeros((height, width), dtype=np.int64)
         np.add.at(counts, (cells[:, 1], cells[:, 0]), 1)
         data[counts >= params.min_points_per_cell] = _OCCUPIED
+
+    if params.trajectory_wins:
+        data[swept[:, 1], swept[:, 0]] = _FREE
 
     return OccupancyGridMap(
         data=data,

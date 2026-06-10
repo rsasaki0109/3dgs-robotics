@@ -1249,6 +1249,42 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dtc.add_argument("--device", default="cuda", help="torch device for --align localize")
 
+    nav = subparsers.add_parser(
+        "navigate",
+        help="Autonomous navigation demo inside a 3DGS map (A* + pure pursuit + 3DGS localization)",
+    )
+    nav.add_argument("--map", required=True, help="Live-mapping session directory")
+    nav.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    nav.add_argument("--output", required=True, help="Output nav_result.json path (a .png trace lands next to it)")
+    nav.add_argument("--start-keyframe", type=int, default=0, help="Index into the mapped keyframes for the start pose")
+    nav.add_argument(
+        "--goal-keyframe", type=int, default=-1, help="Index into the mapped keyframes for the goal position"
+    )
+    nav.add_argument("--goal", default=None, help="Explicit goal as grid-plane x,y (overrides --goal-keyframe)")
+    nav.add_argument("--robot-radius", type=float, default=0.4, help="Robot radius in camera-height units")
+    nav.add_argument("--speed", type=float, default=1.5, help="Cruise speed in camera heights per second")
+    nav.add_argument("--goal-tolerance", type=float, default=1.0, help="Goal radius in camera-height units")
+    nav.add_argument(
+        "--localize-every",
+        type=int,
+        default=25,
+        help="Control steps between 3DGS localization fixes (0 = odometry only)",
+    )
+    nav.add_argument("--max-steps", type=int, default=3000, help="Abort after this many control steps")
+    nav.add_argument(
+        "--odom-noise",
+        type=float,
+        default=0.05,
+        help="Simulated wheel-slip noise std (the estimate dead-reckons on clean commands and drifts)",
+    )
+    nav.add_argument(
+        "--fix-blend", type=float, default=0.7, help="How strongly an accepted localization fix pulls the estimate"
+    )
+    nav.add_argument("--seed", type=int, default=7, help="Random seed for the wheel-slip simulation")
+    nav.add_argument("--render-width", type=int, default=620, help="Width of the rendered observations")
+    nav.add_argument("--gif", default=None, help="Optional GIF path animating the run (camera view + map)")
+    nav.add_argument("--device", default="cuda", help="torch device for rendering and localization")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -3900,6 +3936,169 @@ def cmd_detect_changes(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_navigate(args: argparse.Namespace) -> None:
+    """Handle the navigate subcommand."""
+    import numpy as np
+
+    from gs_sim2real.robotics.camera_sim_node import camera_intrinsics_from_colmap, scale_intrinsics
+    from gs_sim2real.robotics.gauge_alignment import quat_to_rotation
+    from gs_sim2real.robotics.gsplat_render_server import sigmoid
+    from gs_sim2real.robotics.occupancy_grid import build_occupancy_grid
+    from gs_sim2real.robotics.splat_nav import (
+        NavParams,
+        draw_navigation_trace,
+        make_localize_observer,
+        run_navigation,
+        world_to_pose2d,
+    )
+    from gs_sim2real.viewer.web_viewer import load_ply
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    from gs_sim2real.robotics.localize import _load_cameras_txt, load_mapped_records, resolve_live_map_session
+
+    session = resolve_live_map_session(Path(args.map), round_index=args.round)
+    records = load_mapped_records(session)
+    ply = load_ply(session.round.ply_path)
+    opacities = (
+        sigmoid(np.asarray(ply.opacities, dtype=np.float32))
+        if ply.opacities is not None
+        else np.ones(len(ply.positions), dtype=np.float32)
+    )
+    from gs_sim2real.robotics.occupancy_grid import GridParams
+
+    try:
+        grid = build_occupancy_grid(
+            np.asarray(ply.positions),
+            opacities,
+            np.asarray([record.center for record in records], dtype=np.float64),
+            [record.qvec for record in records],
+            # the robot drove the mapped corridor, so draft-round floaters
+            # inside it must not block the planner
+            params=GridParams(trajectory_wins=True),
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    def record_pose2d(index: int):
+        record = records[index]
+        rotation_wc = quat_to_rotation(np.asarray(record.qvec, dtype=np.float64)).T
+        return world_to_pose2d(np.asarray(record.center, dtype=np.float64), rotation_wc, grid)
+
+    start = record_pose2d(args.start_keyframe)
+    if args.goal:
+        try:
+            goal_xy = np.asarray([float(part) for part in args.goal.split(",")], dtype=np.float64)
+            if goal_xy.shape != (2,):
+                raise ValueError
+        except ValueError:
+            raise SystemExit(f"--goal must be x,y: {args.goal!r}") from None
+    else:
+        goal = record_pose2d(args.goal_keyframe)
+        goal_xy = goal.position()
+
+    params = NavParams(
+        robot_radius=args.robot_radius,
+        speed=args.speed,
+        goal_tolerance=args.goal_tolerance,
+        localize_every=args.localize_every,
+        max_steps=args.max_steps,
+        odom_noise=args.odom_noise,
+        fix_blend=args.fix_blend,
+        seed=args.seed,
+    )
+
+    captured: list = []
+    observer = None
+    if args.localize_every > 0:
+        from gs_sim2real.robotics.gsplat_render_server import HeadlessSplatRenderer
+        from gs_sim2real.robotics.localize import LocalizeConfig, SessionLocalizer
+
+        cameras = _load_cameras_txt(session.round.cameras_txt)
+        cam = cameras[records[0].camera_id]
+        native_w, native_h, fx, fy, cx, cy = camera_intrinsics_from_colmap(cam)
+        render_w = args.render_width
+        render_h = int(round(native_h * render_w / native_w))
+        intrinsics = scale_intrinsics((fx, fy, cx, cy), from_size=(native_w, native_h), to_size=(render_w, render_h))
+        renderer = HeadlessSplatRenderer(session.round.ply_path, backend="auto", max_points=None)
+        localizer = SessionLocalizer(
+            Path(args.map),
+            round_index=args.round,
+            config=LocalizeConfig(device=args.device, refine_iters=40, pyramid_scales=(0.25, 0.5)),
+        )
+        observer = make_localize_observer(
+            grid,
+            renderer,
+            localizer,
+            render_size=(render_w, render_h),
+            intrinsics=intrinsics,
+            camera_centers=np.asarray([record.center for record in records], dtype=np.float64),
+            frame_callback=lambda rgb, true_pose, fix, step: captured.append((rgb, step)) if args.gif else None,
+        )
+
+    try:
+        result = run_navigation(grid, start, goal_xy, observe_fn=observer, params=params)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    errors = result.cross_track_errors()
+    payload = {
+        "reached": result.reached,
+        "steps": result.steps,
+        "localization_fixes": result.localization_count,
+        "camera_height": grid.camera_height,
+        "cross_track_median": float(np.median(errors)) if len(errors) else None,
+        "cross_track_max": float(errors.max()) if len(errors) else None,
+        "cross_track_median_camera_heights": (float(np.median(errors) / grid.camera_height) if len(errors) else None),
+        "path_vertices": result.path_xy.tolist(),
+        "goal": goal_xy.tolist(),
+        "note": "distances in the map's reconstruction gauge unless mapped with metric poses",
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    trace_path = draw_navigation_trace(grid, result, output_path.with_suffix(".png"))
+
+    if args.gif and captured:
+        from PIL import Image
+
+        from gs_sim2real.robotics.splat_nav import NavResult, navigation_trace_image
+
+        gif_frames = []
+        for rgb, step in captured:
+            partial = NavResult(
+                reached=False,
+                frames=[frame for frame in result.frames if frame.step <= step],
+                path_xy=result.path_xy,
+            )
+            camera = Image.fromarray(rgb)
+            trace = navigation_trace_image(grid, partial, width=camera.width)
+            frame = Image.new("RGB", (camera.width, camera.height + trace.height), (12, 16, 24))
+            frame.paste(camera, (0, 0))
+            frame.paste(trace, (0, camera.height))
+            gif_frames.append(frame)
+        gif_path = Path(args.gif)
+        gif_path.parent.mkdir(parents=True, exist_ok=True)
+        durations = [300] * (len(gif_frames) - 1) + [2000] if len(gif_frames) > 1 else [2000]
+        gif_frames[0].save(
+            gif_path, save_all=True, append_images=gif_frames[1:], duration=durations, loop=0, optimize=True
+        )
+        print(f"Wrote {gif_path} ({len(gif_frames)} frames)")
+
+    status = "reached the goal" if result.reached else "did NOT reach the goal"
+    print(f"Wrote {output_path} + {trace_path.name}")
+    print(
+        f"Navigation {status} in {result.steps} steps with {result.localization_count} localization fixes "
+        f"(localize every {params.localize_every} steps)"
+    )
+    if len(errors):
+        print(
+            f"Cross-track error: median {np.median(errors):.4f} / max {errors.max():.4f} gauge units "
+            f"({np.median(errors) / grid.camera_height:.2f} camera heights median)"
+        )
+
+
 def cmd_splat_inspect(args: argparse.Namespace) -> None:
     """Handle the splat-inspect subcommand."""
     from gs_sim2real.viewer.web_export import inspect_splat_file
@@ -4649,6 +4848,7 @@ def main(argv: list[str] | None = None) -> None:
         "export-isaac": cmd_export_isaac,
         "export-grid": cmd_export_grid,
         "detect-changes": cmd_detect_changes,
+        "navigate": cmd_navigate,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

@@ -48,6 +48,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **A simulated camera in your map** | `3dgs-robotics-camera-sim --map outputs/live_mapping --replay --loop` | [docs/live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node) |
 | **nav2 needs a map** | `3dgs-robotics export-grid --map outputs/live_mapping --output nav2_map/map.yaml` | [docs/live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | **Two patrols, what changed?** | `3dgs-robotics detect-changes --map-a run1 --map-b run2 --output changes/changes.json` | [docs/live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
+| **Drive a robot through your map** | `3dgs-robotics navigate --map outputs/live_mapping --output nav/nav_result.json` | [docs/live-mapping.md](docs/live-mapping.md#autonomous-navigation-in-the-map) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
@@ -138,7 +139,7 @@ Reproduce it with `python3 scripts/build_robotics_demo_gif.py --session <session
 | --- | --- | --- |
 | Localization | `3dgs-robotics-localizer --map <session>` (PoseStamped + TF) | [live-mapping.md](docs/live-mapping.md#ros-2-localizer-node) |
 | Simulation | `3dgs-robotics-camera-sim --map <session> --replay` / `3dgs-robotics export-isaac` | [live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node), [isaac-sim.md](docs/isaac-sim.md) |
-| Navigation | `3dgs-robotics export-grid --map <session> --output map.yaml` | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
+| Navigation | `3dgs-robotics export-grid` (nav2 map) / `3dgs-robotics navigate` (full autonomy demo) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | Inspection | `3dgs-robotics detect-changes --map-a <run1> --map-b <run2>` | [live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 
 ## Import External SLAM Results
