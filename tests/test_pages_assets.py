@@ -381,7 +381,7 @@ def test_readme_first_view_surfaces_demo_and_review_entrypoints() -> None:
     assert "Dynamic map loading over a real rosbag2 3DGS aerial map (Istanbul Bag6)" in readme
     assert "Lead GIF: dynamic map loading on real robot data" in readme
     assert "true top-down (orthographic gsplat) render" in readme
-    assert "route overlay tracks the loading window" in readme
+    assert "tile window moves along the camera trajectory" in readme
     assert "[dynamic map loading material](docs/images/demo-sweep/dynamic-map-material.png)" in readme
 
 

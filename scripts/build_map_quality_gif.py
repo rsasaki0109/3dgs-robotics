@@ -3,9 +3,10 @@
 
 The base layer is a true orthographic gsplat render of the Istanbul Bag6
 pilot scene (real rosbag2 data) viewed top-down — an actual aerial map of the
-mapped street. The animation reveals 30 m map tiles along the real
-robot-route/tile-visit sequence, so the dynamic-loading story is told on real
-imagery: every pixel, route point, and load state comes from shipped assets.
+mapped street. The resident/preload tile window moves along a continuous
+camera trajectory recovered from the data itself (tile adjacency chain pulled
+onto the splat-density centerline of the road), so the loading boxes follow
+the drive instead of teleporting between grid cells.
 
 Two stages:
 
@@ -233,37 +234,155 @@ class MapTransform:
         return int(round(u0)), int(round(v0)), int(round(u1)), int(round(v1))
 
 
-def _residency(scene: PilotScene, visited: int) -> tuple[list[str], list[str], list[str]]:
-    sequence = scene.tile_sequence
-    visited = max(0, min(visited, len(sequence)))
-    resident = sequence[max(0, visited - RESIDENT_LIMIT) : visited]
-    loaded = sequence[: max(0, visited - RESIDENT_LIMIT)]
-    preload = sequence[visited : visited + PRELOAD_LIMIT]
-    return resident, preload, loaded
+def _tile_center(scene: PilotScene, tile_id: str) -> tuple[float, float]:
+    b = scene.tiles[tile_id].bounds
+    return (b[0] + b[1]) / 2.0, (b[2] + b[3]) / 2.0
 
 
-def _tile_states(scene: PilotScene, progress_index: float) -> tuple[dict[str, str], tuple[int, int, int]]:
-    visited = int(progress_index) + 1
-    resident, preload, loaded = _residency(scene, visited)
-    state: dict[str, str] = {tile_id: "loaded" for tile_id in loaded}
+def _continuous_tile_chain(scene: PilotScene) -> list[str]:
+    """Order the visited tiles into a continuous drive (adjacent cells only).
+
+    The shipped route JSON lists tile centers in grid order, which teleports
+    between columns; the camera obviously drove a connected path, so rebuild
+    it from tile adjacency, starting at the northernmost endpoint.
+    """
+    ids = list(scene.tile_sequence)
+    if len(ids) <= 2:
+        return ids
+    centers = {tile_id: _tile_center(scene, tile_id) for tile_id in ids}
+    tile_step = max(
+        scene.tiles[ids[0]].bounds[1] - scene.tiles[ids[0]].bounds[0],
+        scene.tiles[ids[0]].bounds[3] - scene.tiles[ids[0]].bounds[2],
+    )
+
+    def adjacent(a: str, b: str) -> bool:
+        ax, ay = centers[a]
+        bx, by = centers[b]
+        return abs(ax - bx) + abs(ay - by) <= tile_step * 1.05
+
+    neighbours = {t: [u for u in ids if u != t and adjacent(t, u)] for t in ids}
+    endpoints = [t for t in ids if len(neighbours[t]) == 1]
+    start = max(endpoints or ids, key=lambda t: centers[t][1])
+    chain = [start]
+    seen = {start}
+    while len(chain) < len(ids):
+        options = [u for u in neighbours[chain[-1]] if u not in seen]
+        if not options:
+            remaining = [u for u in ids if u not in seen]
+            options = [
+                min(
+                    remaining,
+                    key=lambda u: (
+                        (centers[u][0] - centers[chain[-1]][0]) ** 2 + (centers[u][1] - centers[chain[-1]][1]) ** 2
+                    ),
+                )
+            ]
+        chain.append(options[0])
+        seen.add(options[0])
+    return chain
+
+
+def build_camera_trajectory(scene: PilotScene, *, samples_per_tile: int = 10, radius_m: float = 14.0) -> np.ndarray:
+    """Estimate the continuous camera path through the mapped street.
+
+    Resample the continuous tile chain, then pull every sample toward the
+    alpha-weighted centroid of the surrounding splat mass — the densest band
+    is the driven road — and smooth. Returns (N, 2) world x/y points.
+    """
+    chain = _continuous_tile_chain(scene)
+    anchors = np.array([_tile_center(scene, tile_id) for tile_id in chain], dtype=np.float64)
+
+    seg = np.linalg.norm(np.diff(anchors, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    count = max(samples_per_tile * len(chain), 16)
+    targets = np.linspace(0.0, total, count)
+    traj = np.stack([np.interp(targets, cum, anchors[:, 0]), np.interp(targets, cum, anchors[:, 1])], axis=1)
+
+    positions = []
+    weights = []
+    for tile in scene.tiles.values():
+        raw = np.fromfile(tile.splat_path, dtype=SPLAT_DTYPE)
+        positions.append(raw["pos"][:, :2].astype(np.float64))
+        weights.append(raw["rgba"][:, 3].astype(np.float64) / 255.0)
+    points = np.concatenate(positions)
+    alpha = np.concatenate(weights)
+
+    for _ in range(2):
+        refined = traj.copy()
+        for index, sample in enumerate(traj):
+            d2 = ((points - sample) ** 2).sum(axis=1)
+            mask = d2 <= radius_m * radius_m
+            if mask.sum() < 50:
+                continue
+            w = alpha[mask]
+            centroid = (points[mask] * w[:, None]).sum(axis=0) / w.sum()
+            refined[index] = 0.45 * sample + 0.55 * centroid
+        traj = refined
+    kernel = np.ones(5) / 5.0
+    for axis in range(2):
+        padded = np.concatenate([np.repeat(traj[0, axis], 2), traj[:, axis], np.repeat(traj[-1, axis], 2)])
+        traj[:, axis] = np.convolve(padded, kernel, mode="valid")
+    return traj
+
+
+def _arc_lengths(traj: np.ndarray) -> np.ndarray:
+    seg = np.linalg.norm(np.diff(traj, axis=0), axis=1)
+    return np.concatenate([[0.0], np.cumsum(seg)])
+
+
+def _camera_pose(traj: np.ndarray, progress: float) -> tuple[float, float, float]:
+    """Camera (x, y, px-space heading) at eased arc-length progress 0..1."""
+    cum = _arc_lengths(traj)
+    s = progress * cum[-1]
+    x = float(np.interp(s, cum, traj[:, 0]))
+    y = float(np.interp(s, cum, traj[:, 1]))
+    ahead = min(s + 2.0, cum[-1])
+    behind = max(s - 2.0, 0.0)
+    dx = float(np.interp(ahead, cum, traj[:, 0]) - np.interp(behind, cum, traj[:, 0]))
+    dy = float(np.interp(ahead, cum, traj[:, 1]) - np.interp(behind, cum, traj[:, 1]))
+    heading = math.atan2(-dy, dx)  # px y grows downward
+    return x, y, heading
+
+
+def _tile_at(scene: PilotScene, x: float, y: float) -> str | None:
+    for tile_id, tile in scene.tiles.items():
+        min_x, max_x, min_y, max_y = tile.bounds
+        if min_x <= x <= max_x and min_y <= y <= max_y:
+            return tile_id
+    return None
+
+
+def _tile_states(
+    scene: PilotScene, traj: np.ndarray, progress: float, *, lookahead_m: float = 35.0
+) -> tuple[dict[str, str], tuple[int, int, int]]:
+    """Residency derived from the camera trajectory: tiles the camera has
+    entered so far (latest RESIDENT_LIMIT stay resident) plus the next tiles
+    the path enters within lookahead_m as preload requests."""
+    cum = _arc_lengths(traj)
+    s = progress * cum[-1]
+    visited: list[str] = []
+    for sample, dist in zip(traj, cum, strict=True):
+        if dist > s:
+            break
+        tile_id = _tile_at(scene, sample[0], sample[1])
+        if tile_id is not None and tile_id not in visited:
+            visited.append(tile_id)
+    preload: list[str] = []
+    for sample, dist in zip(traj, cum, strict=True):
+        if dist <= s or dist > s + lookahead_m:
+            continue
+        tile_id = _tile_at(scene, sample[0], sample[1])
+        if tile_id is not None and tile_id not in visited and tile_id not in preload:
+            preload.append(tile_id)
+        if len(preload) >= PRELOAD_LIMIT:
+            break
+    resident = visited[-RESIDENT_LIMIT:]
+    evicted = visited[:-RESIDENT_LIMIT] if len(visited) > RESIDENT_LIMIT else []
+    state: dict[str, str] = {tile_id: "loaded" for tile_id in evicted}
     state.update({tile_id: "resident" for tile_id in resident})
     state.update({tile_id: "preload" for tile_id in preload})
-    return state, (len(resident), len(preload), len(loaded))
-
-
-def _robot_pose(route: list[tuple[float, float]], progress_index: float) -> tuple[float, float, float]:
-    whole = min(int(progress_index), len(route) - 1)
-    frac = progress_index - int(progress_index)
-    if whole < len(route) - 1:
-        cur, nxt = route[whole], route[whole + 1]
-        x = cur[0] + (nxt[0] - cur[0]) * frac
-        y = cur[1] + (nxt[1] - cur[1]) * frac
-        heading = math.atan2(-(nxt[1] - cur[1]), nxt[0] - cur[0])  # px y grows downward
-    else:
-        x, y = route[-1]
-        prev = route[-2] if len(route) > 1 else route[-1]
-        heading = math.atan2(-(y - prev[1]), x - prev[0])
-    return x, y, heading
+    return state, (len(resident), len(preload), len(evicted))
 
 
 def _load_font(size: int) -> ImageFont.ImageFont:
@@ -283,7 +402,8 @@ def _render_map_panel(
     base: Image.Image,
     meta: dict,
     panel_size: tuple[int, int],
-    progress_index: float,
+    traj: np.ndarray,
+    progress: float,
     *,
     line_scale: float = 1.0,
 ) -> Image.Image:
@@ -297,7 +417,7 @@ def _render_map_panel(
     # unloaded world: heavily dimmed base map
     panel.paste(ImageEnhance.Brightness(fitted).enhance(0.22), origin)
 
-    state, _counts = _tile_states(scene, progress_index)
+    state, _counts = _tile_states(scene, traj, progress)
     brightness = {"loaded": 0.72, "preload": 0.5, "resident": 1.0}
     draw = ImageDraw.Draw(panel)
     for tile_id, tile in scene.tiles.items():
@@ -329,16 +449,14 @@ def _render_map_panel(
         color, width = outline[tile_state]
         draw.rectangle(transform.rect_px(tile.bounds), outline=color, width=width)
 
-    points = [transform.to_px(x, y) for x, y in scene.route]
-    whole = min(int(progress_index), len(points) - 1)
-    rx, ry, heading = _robot_pose(scene.route, progress_index)
+    cum = _arc_lengths(traj)
+    s = progress * cum[-1]
+    rx, ry, heading = _camera_pose(traj, progress)
     robot = transform.to_px(rx, ry)
-    traveled = [*points[: whole + 1], robot]
+    traveled = [transform.to_px(p[0], p[1]) for p, d in zip(traj, cum, strict=True) if d <= s]
+    traveled.append(robot)
     if len(traveled) >= 2:
-        draw.line(traveled, fill=ROUTE_DONE, width=max(3, int(3 * line_scale)))
-    for px, py in points[: whole + 1]:
-        r = 3 * line_scale
-        draw.ellipse([px - r, py - r, px + r, py + r], fill=ROUTE_DONE)
+        draw.line(traveled, fill=ROUTE_DONE, width=max(3, int(3 * line_scale)), joint="curve")
 
     size = 8.0 * line_scale
     tip = []
@@ -364,12 +482,17 @@ def _legend_entries() -> list[tuple[tuple[int, int, int], str]]:
         (RESIDENT_COLOR, "resident 3DGS tiles"),
         (PRELOAD_COLOR, "preload request"),
         (LOADED_COLOR, "loaded (evicted) tiles"),
-        (ROUTE_DONE, "robot route traveled"),
+        (ROUTE_DONE, "camera trajectory"),
     ]
 
 
 def render_frame(
-    scene: PilotScene, base: Image.Image, meta: dict, progress: float, size: tuple[int, int]
+    scene: PilotScene,
+    base: Image.Image,
+    meta: dict,
+    traj: np.ndarray,
+    progress: float,
+    size: tuple[int, int],
 ) -> Image.Image:
     width, height = size
     image = Image.new("RGB", size, BG)
@@ -386,17 +509,16 @@ def render_frame(
     panel_box = (margin, header_h, width - side_w, height - footer_h)
     panel_size = (panel_box[2] - panel_box[0], panel_box[3] - panel_box[1])
 
-    progress_index = progress * (len(scene.route) - 1)
-    panel = _render_map_panel(scene, base, meta, panel_size, progress_index, line_scale=1.4 if big else 1.0)
+    panel = _render_map_panel(scene, base, meta, panel_size, traj, progress, line_scale=1.4 if big else 1.0)
     image.paste(panel, (panel_box[0], panel_box[1]))
     draw.rectangle((panel_box[0] - 1, panel_box[1] - 1, panel_box[2], panel_box[3]), outline=GRID_COLOR)
 
-    _state, (resident, preload, loaded) = _tile_states(scene, progress_index)
+    _state, (resident, preload, loaded) = _tile_states(scene, traj, progress)
     draw.text((margin, 12), "Real rosbag2 -> 3DGS dynamic map (Istanbul Bag6)", font=title_font, fill=TEXT)
-    visited = int(progress_index) + 1
+    total_m = float(_arc_lengths(traj)[-1])
     draw.text(
         (margin, (50 if big else 38)),
-        f"{len(scene.tiles)} streamed .splat tiles - route step {visited}/{len(scene.route)} - "
+        f"{len(scene.tiles)} streamed .splat tiles - camera at {progress * total_m:.0f}/{total_m:.0f} m - "
         f"resident {resident} / preload {preload} / evicted {loaded}",
         font=sub_font,
         fill=TEXT_DIM,
@@ -439,7 +561,7 @@ def render_frame(
     draw.text(
         (margin, height - footer_h + (12 if big else 8)),
         "source: istanbul-bag6-pilot-tile-catalog.json - the map is a real top-down render; "
-        "tiles light up along the actual route",
+        "the loading window follows the camera trajectory",
         font=small_font,
         fill=TEXT_DIM,
     )
@@ -457,11 +579,12 @@ def build_map_quality_gif(
     for proof_scene in MAP_PROOF_SCENES:
         scene = load_pilot_scene(proof_scene)
         base, meta = load_base_map()
+        traj = build_camera_trajectory(scene)
         for index in range(frames_per_scene):
             progress = index / max(frames_per_scene - 1, 1)
-            frames.append(render_frame(scene, base, meta, progress, size))
+            frames.append(render_frame(scene, base, meta, traj, progress, size))
         if map_material_output is not None:
-            material = render_frame(scene, base, meta, 0.6, MAP_MATERIAL_SIZE)
+            material = render_frame(scene, base, meta, traj, 0.6, MAP_MATERIAL_SIZE)
             map_material_output.parent.mkdir(parents=True, exist_ok=True)
             material.save(map_material_output)
             print(f"map material: {map_material_output}")
