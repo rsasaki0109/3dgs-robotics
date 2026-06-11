@@ -56,6 +56,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **"Remove the car from the map"** | `3dgs-robotics splat-clean "car" --map outputs/live_mapping --output clean/no_car.ply` | [docs/live-mapping.md](docs/live-mapping.md#erasing-objects-by-language-remove-the-car) |
 | **"Take the car, put it in map B"** | `3dgs-robotics splat-grab "car" --map mapA --output car.ply` then `splat-paste car.ply --map mapB --at 1.0,0.05 --output scene.ply` | [docs/live-mapping.md](docs/live-mapping.md#grab--paste-objects-between-maps-take-the-car-put-it-there) |
 | **Show robot results in the browser** | `3dgs-robotics export-overlay --map outputs/live_mapping --nav nav/nav_result.json --output overlay.json` then `splat.html?overlay=...` | [docs/live-mapping.md](docs/live-mapping.md#overlaying-robot-results-in-the-browser-viewer) |
+| **Double-click the map, robot drives there** | `3dgs-robotics-click-to-go --map outputs/live_mapping --port 8787` then open the printed viewer URL | [docs/live-mapping.md](docs/live-mapping.md#click-to-go-double-click-the-map-the-robot-drives-there) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).

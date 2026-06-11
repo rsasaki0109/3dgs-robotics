@@ -1,0 +1,244 @@
+"""Tests for click-to-go navigation server."""
+
+from __future__ import annotations
+
+import http.client
+import json
+import threading
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Sequence
+
+import numpy as np
+import pytest
+
+from gs_sim2real.robotics import click_to_go
+from gs_sim2real.robotics.viewer_overlay import SplatFrameMapper
+
+
+def test_splat_ray_to_goal_round_trip() -> None:
+    frame = _synthetic_frame()
+    goal_xy = (1.25, -0.75)
+    point_splat, origin_splat, direction_splat = _ray_for_goal(frame, goal_xy)
+
+    assert point_splat.shape == (3,)
+    actual = click_to_go.splat_ray_to_goal(origin_splat, direction_splat, frame)
+
+    assert actual == pytest.approx(goal_xy, abs=1e-6)
+
+
+def test_splat_ray_to_goal_rejects_parallel_ray() -> None:
+    frame = _synthetic_frame()
+
+    with pytest.raises(ValueError, match="does not hit the ground plane"):
+        click_to_go.splat_ray_to_goal([0.0, 0.0, 1.0], [1.0, 0.0, 0.0], frame)
+
+
+def test_splat_ray_to_goal_rejects_ray_pointing_away() -> None:
+    frame = _synthetic_frame()
+    _, origin_splat, direction_splat = _ray_for_goal(frame, (1.0, 2.0))
+
+    with pytest.raises(ValueError, match="does not hit the ground plane"):
+        click_to_go.splat_ray_to_goal(origin_splat, -direction_splat, frame)
+
+
+def test_run_navigate_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        calls.append(list(args))
+        if args[0] == "navigate":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"reached": True, "steps": 42, "extra": "ignored"}),
+                encoding="utf-8",
+            )
+        return SimpleNamespace(returncode=0)
+
+    config = click_to_go.ClickToGoConfig(round_index=3, localize_every=5, odom_noise=0.25, device="cpu")
+    result = click_to_go.run_navigate_and_overlay(session_dir, (1.5, -2.0), config, run_cli=fake_run_cli)
+
+    nav_json = session_dir / "clickgo" / "nav_result.json"
+    overlay_json = session_dir / "clickgo" / "overlay.json"
+    assert calls == [
+        [
+            "navigate",
+            "--map",
+            str(session_dir),
+            "--goal",
+            "1.5,-2.0",
+            "--output",
+            str(nav_json),
+            "--localize-every",
+            "5",
+            "--odom-noise",
+            "0.25",
+            "--device",
+            "cpu",
+            "--round",
+            "3",
+        ],
+        [
+            "export-overlay",
+            "--map",
+            str(session_dir),
+            "--output",
+            str(overlay_json),
+            "--nav",
+            str(nav_json),
+            "--round",
+            "3",
+        ],
+    ]
+    assert result == {
+        "reached": True,
+        "steps": 42,
+        "goal_xy": [1.5, -2.0],
+        "overlay": "/clickgo/overlay.json",
+        "nav_json": "/clickgo/nav_result.json",
+    }
+
+
+def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    (session_dir / "hello.txt").write_text("hello", encoding="utf-8")
+    frame = _synthetic_frame()
+    monkeypatch.setattr(click_to_go, "load_scene_frame", lambda *args, **kwargs: frame)
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        if args[0] == "navigate":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"reached": True, "steps": 7}),
+                encoding="utf-8",
+            )
+        elif args[0] == "export-overlay":
+            Path(args[args.index("--output") + 1]).write_text("{}", encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    server = click_to_go.make_server(
+        session_dir,
+        click_to_go.ClickToGoConfig(port=0, device="cpu"),
+        run_cli=fake_run_cli,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+
+    try:
+        _, origin_splat, direction_splat = _ray_for_goal(frame, (0.5, -0.25))
+
+        status, headers, body = _request_json(
+            host,
+            port,
+            "POST",
+            "/goal",
+            {"origin": origin_splat.tolist(), "direction": direction_splat.tolist()},
+        )
+        assert status == 200
+        assert headers["Access-Control-Allow-Origin"] == "*"
+        assert body["reached"] is True
+        assert body["steps"] == 7
+        assert body["overlay"] == "/clickgo/overlay.json"
+
+        status, _, body = _request_raw(host, port, "POST", "/goal", b"{", "application/json")
+        assert status == 400
+        assert "error" in body
+
+        status, _, body = _request_json(
+            host,
+            port,
+            "POST",
+            "/goal",
+            {"origin": [0.0, 0.0, 1.0], "direction": [1.0, 0.0, 0.0]},
+        )
+        assert status == 422
+        assert "does not hit the ground plane" in body["error"]
+
+        conn = http.client.HTTPConnection(host, port)
+        conn.request("OPTIONS", "/goal")
+        response = conn.getresponse()
+        response.read()
+        assert response.status == 204
+        assert response.getheader("Access-Control-Allow-Origin") == "*"
+        conn.close()
+
+        conn = http.client.HTTPConnection(host, port)
+        conn.request("GET", "/hello.txt")
+        response = conn.getresponse()
+        assert response.status == 200
+        assert response.getheader("Access-Control-Allow-Origin") == "*"
+        assert response.read() == b"hello"
+        conn.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)
+
+
+def _synthetic_frame() -> click_to_go.SceneFrame:
+    angle = 0.37
+    rotation = np.array(
+        [
+            [np.cos(angle), -np.sin(angle), 0.0],
+            [np.sin(angle), np.cos(angle), 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    mapper = SplatFrameMapper(
+        scale=2.0,
+        rotation=rotation,
+        translation=np.array([1.0, 2.0, 3.0], dtype=np.float64),
+        centroid=np.array([0.5, 0.0, 0.0], dtype=np.float64),
+        factor=3.0,
+    )
+    basis = np.eye(3, dtype=np.float64)
+    return click_to_go.SceneFrame(
+        mapper=mapper,
+        basis=basis,
+        ground_height=0.0,
+        camera_height=1.0,
+        splat_rel="rounds/round_001/scene.splat",
+    )
+
+
+def _ray_for_goal(
+    frame: click_to_go.SceneFrame,
+    goal_xy: tuple[float, float],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    world = goal_xy[0] * frame.basis[0] + goal_xy[1] * frame.basis[1] + frame.ground_height * frame.basis[2]
+    point_splat = frame.mapper.points(np.asarray([world], dtype=np.float64))[0]
+    up_splat = frame.basis[2] @ frame.mapper.rotation.T
+    up_splat = up_splat / np.linalg.norm(up_splat)
+    origin_splat = point_splat + up_splat
+    direction_splat = -up_splat
+    return point_splat, origin_splat, direction_splat
+
+
+def _request_json(
+    host: str,
+    port: int,
+    method: str,
+    path: str,
+    payload: dict[str, object],
+) -> tuple[int, dict[str, str], dict[str, object]]:
+    return _request_raw(host, port, method, path, json.dumps(payload).encode("utf-8"), "application/json")
+
+
+def _request_raw(
+    host: str,
+    port: int,
+    method: str,
+    path: str,
+    body: bytes,
+    content_type: str,
+) -> tuple[int, dict[str, str], dict[str, object]]:
+    conn = http.client.HTTPConnection(host, port)
+    conn.request(method, path, body=body, headers={"Content-Type": content_type})
+    response = conn.getresponse()
+    raw = response.read()
+    headers = {key: value for key, value in response.getheaders()}
+    conn.close()
+    return response.status, headers, json.loads(raw.decode("utf-8"))

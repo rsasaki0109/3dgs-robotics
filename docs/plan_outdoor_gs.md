@@ -218,6 +218,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実走: e2e_bag_live3 → `session.rrd`(18MB、5 ラウンド / 885k 点 / nav 経路込み)を 8.6 秒で生成、`rerun rrd stats` で 5 エンティティパス・チャンク構成を検証。
 - codex 生成専用モード 9 回目。手直しはテストの誤 import 1 行のみ。
 
+### 1.17 2026-06-12(続々): click-to-go 実装(§29)— 残ネタ 3 案コンプリート
+
+- 残ネタ最終弾。実装は §29 参照。`robotics/click_to_go.py`(HTTP サーバ + レイ→ゴール変換)+ `docs/splat-viewer/main.js` パッチ(初のフロントエンド改修、こちらは Claude 直書き)+ console script `3dgs-robotics-click-to-go`。テスト 5 本追加で全 1265 グリーン。
+- 実走: e2e_bag_live3 で合成レイ POST → ゴール (1.18, 0.095) 復元 → navigate 350 步到達 → overlay 配信の全チェーン成立。headless Chrome(SwiftShader)で splat + クリック UI + 走行経路オーバレイの実描画を確認(素材 = docs/images/robotics/click-to-go.png)。
+- codex 手直し 2 件: クラス属性に裸の関数を入れて self が束縛される記述子バグ(staticmethod 化)、main() の partial 越し属性アクセス(server.scene_frame に付け替え)。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1840,3 +1846,20 @@ PR 分割案:
 検証: テスト 7 本(タイムライン組み立て・サブサンプル cap・色フォールバック・ループ範囲外スキップ / fake rr のエンティティパスと per-round set_time / 互換分岐 / MCP argv)→ 全 1260 グリーン。実走 8.6 秒で 18MB rrd、`rerun rrd stats` で構成確認。
 
 残: click-to-go(最終)。
+
+
+## 29. click-to-go — ブラウザでダブルクリック、ロボットが走る(2026-06-12 実装完了)
+
+> **状況: 2026-06-12 完了**(実装 + テスト 5 本 + 実走 + headless Chrome 描画確認。§1.17 参照)
+
+**ゴール**: overlay パイプラインの対話化。Pages のビューワに `?clickgo=<endpoint>` を足し、**地図上をダブルクリックするとロボットがそこへ走り、数秒後に走行経路がスプラットに重なる**。一番伝わるデモ素材。
+
+設計:
+
+- **フロント(`docs/splat-viewer/main.js`、Claude 直書き)**: ダブルクリック → 現フレーム viewProj の逆行列でマウスを 2 深度アンプロジェクト → スプラットフレームのレイを `POST <clickgo>/goal` → 返ってきた overlay URL を再フェッチして既存描画機構(ensureOverlayCanvas にリファクタ)で即描画。右上ステータスチップ(待機 / navigating / reached in N steps)。既存の射影規約(projectOverlayPoint)と同じ列優先行列演算。
+- **サーバ(`robotics/click_to_go.py`)**: フレーム連鎖 = ビューワ正規化の逆写像(SplatFrameMapper 逆変換)→ round ゲージ → 地面平面とレイ交差 → グリッド平面 xy。navigate + export-overlay は **サブプロセス CLI の thin 配線**(mcp_server と同じ _run_cli)。CORS + no-cache でセッションディレクトリを配信、POST /goal はロックで直列化(409 busy)。
+- 正直な挙動: 回廊外クリックは planner が最寄り free セルへスナップし「did not reach」で正直に返る(docs に明記)。座標はゲージ単位。
+
+検証: テスト 5 本(レイ→ゴールの往復(合成 Sim3+正規化)/ 平行・後方レイの 422 / CLI argv 2 連発 / HTTP e2e(port 0、fake runner、CORS/400/422))→ 全 1265 グリーン。実セッション実走でゴール復元誤差ゼロ・350 步到達、headless Chrome(SwiftShader)で「スプラット + クリック UI + 経路オーバレイ」の合成描画をスクリーンショット確認。
+
+**残ネタ 3 案(インベントリ / rerun.io / click-to-go)コンプリート。** ブレスト由来のネタは全消化 — 次はユーザーと新ブレストから。

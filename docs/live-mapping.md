@@ -650,6 +650,30 @@ open-vocabulary query hits, labels included:
 can drift slightly against their older splats; the latest round (what the
 live viewer shows) always matches.
 
+### Click-to-go (double-click the map, the robot drives there)
+
+`3dgs-robotics-click-to-go` turns the overlay pipeline interactive: it serves
+the session (CORS-enabled) and the viewer gains a `?clickgo=<endpoint>` mode —
+**double-click anywhere on the road and the robot navigates there**:
+
+```bash
+3dgs-robotics-click-to-go --map outputs/live_mapping/session --port 8787
+# open the printed viewer URL:
+#   splat.html?url=http://localhost:8787/<round>/scene.splat&clickgo=http://localhost:8787
+```
+
+![the viewer with the click-driven planned path drawn over the splat](images/robotics/click-to-go.png)
+
+The browser unprojects the double-click into a ray in the splat frame and
+POSTs it to the server, which inverts the viewer normalization back into the
+round gauge, intersects the ray with the mapped ground plane, runs `navigate
+--goal` to that point, regenerates the overlay, and returns it — the driven
+path appears over the splat a few seconds later, with a status chip showing
+"reached the goal in N steps". Clicks beside the drivable corridor are
+reported honestly (the planner snaps to the nearest free cell; the run can
+end "did not reach"). `--localize-every`/`--odom-noise` pass through to
+`navigate`. Coordinates are reconstruction-gauge camera-height units.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |

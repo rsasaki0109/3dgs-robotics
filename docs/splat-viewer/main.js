@@ -758,6 +758,15 @@ async function main() {
     // JSON holds splat-frame polylines/markers; see robotics/viewer_overlay.py.
     let overlayData = null;
     let overlayCtx = null;
+    const ensureOverlayCanvas = () => {
+        if (overlayCtx) return;
+        const overlayCanvas = document.createElement("canvas");
+        overlayCanvas.id = "overlay";
+        overlayCanvas.style.cssText =
+            "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50";
+        document.body.appendChild(overlayCanvas);
+        overlayCtx = overlayCanvas.getContext("2d");
+    };
     const overlayUrl = params.get("overlay");
     if (overlayUrl) {
         fetch(new URL(overlayUrl, location.href), { credentials: "omit" })
@@ -765,14 +774,76 @@ async function main() {
             .then((data) => {
                 if (!data) return;
                 overlayData = data;
-                const overlayCanvas = document.createElement("canvas");
-                overlayCanvas.id = "overlay";
-                overlayCanvas.style.cssText =
-                    "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50";
-                document.body.appendChild(overlayCanvas);
-                overlayCtx = overlayCanvas.getContext("2d");
+                ensureOverlayCanvas();
             })
             .catch((err) => console.warn("overlay load failed", err));
+    }
+    // ?clickgo=<endpoint> wires double-click to `3dgs-robotics-click-to-go`:
+    // the click ray (splat frame) is POSTed to <endpoint>/goal, the server
+    // intersects it with the mapped ground plane, drives the simulated robot
+    // there with `navigate`, and returns a fresh ?overlay= payload to draw.
+    const clickGoBase = (params.get("clickgo") || "").replace(/\/$/, "");
+    let lastClickViewProj = null;
+    if (clickGoBase) {
+        const clickStatus = document.createElement("div");
+        clickStatus.style.cssText =
+            "position:absolute;top:10px;right:10px;z-index:60;color:#eee;" +
+            "background:rgba(20,24,34,0.85);padding:6px 10px;border-radius:6px;" +
+            "font:13px sans-serif;pointer-events:none";
+        clickStatus.innerText = "double-click the road to drive there";
+        document.body.appendChild(clickStatus);
+        const applyClickVec4 = (m, v) => [
+            m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
+            m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],
+            m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14] * v[3],
+            m[3] * v[0] + m[7] * v[1] + m[11] * v[2] + m[15] * v[3],
+        ];
+        let driving = false;
+        window.addEventListener("dblclick", async (e) => {
+            if (driving || !lastClickViewProj) return;
+            const inv = invert4(lastClickViewProj);
+            if (!inv) return;
+            const ndcX = (e.clientX / innerWidth) * 2 - 1;
+            const ndcY = 1 - (e.clientY / innerHeight) * 2;
+            const unproject = (z) => {
+                const h = applyClickVec4(inv, [ndcX, ndcY, z, 1]);
+                return [h[0] / h[3], h[1] / h[3], h[2] / h[3]];
+            };
+            const near = unproject(-0.9);
+            const far = unproject(0.9);
+            const len = Math.hypot(far[0] - near[0], far[1] - near[1], far[2] - near[2]) || 1;
+            const direction = [
+                (far[0] - near[0]) / len,
+                (far[1] - near[1]) / len,
+                (far[2] - near[2]) / len,
+            ];
+            driving = true;
+            clickStatus.innerText = "navigating…";
+            try {
+                const res = await fetch(clickGoBase + "/goal", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ origin: near, direction }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                const overlayRes = await fetch(
+                    clickGoBase + data.overlay + "?t=" + Date.now(),
+                    { credentials: "omit" },
+                );
+                if (overlayRes.ok) {
+                    overlayData = await overlayRes.json();
+                    ensureOverlayCanvas();
+                }
+                clickStatus.innerText = data.reached
+                    ? `reached the goal in ${data.steps} steps`
+                    : `did not reach the goal (${data.steps} steps)`;
+            } catch (err) {
+                clickStatus.innerText = "click-to-go failed: " + err.message;
+            } finally {
+                driving = false;
+            }
+        });
     }
     const projectOverlayPoint = (viewProj, p, w, h) => {
         const clipW =
@@ -1467,6 +1538,7 @@ async function main() {
         let actualViewMatrix = invert4(inv2);
 
         const viewProj = multiply4(projectionMatrix, actualViewMatrix);
+        lastClickViewProj = viewProj;
         worker.postMessage({ view: viewProj });
 
         const currentFps = 1000 / (now - lastFrame) || 0;

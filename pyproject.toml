@@ -64,6 +64,7 @@ dev = ["pytest", "ruff", "mypy", "rosbags"]
 3dgs-robotics-localizer = "gs_sim2real.robotics.localizer_node:main"
 3dgs-robotics-camera-sim = "gs_sim2real.robotics.camera_sim_node:main"
 3dgs-robotics-mcp = "gs_sim2real.robotics.mcp_server:main"
+3dgs-robotics-click-to-go = "gs_sim2real.robotics.click_to_go:main"
 # legacy aliases (pre-rename)
 gs-mapper = "gs_sim2real.cli:main"
 gs-sim2real = "gs_sim2real.cli:main"
