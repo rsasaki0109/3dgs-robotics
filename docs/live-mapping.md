@@ -379,6 +379,43 @@ even where draft-round floaters mark obstacles — the robot drove there.
 The virtual camera follows the local road level (nearest keyframe height),
 so sloping streets render correctly.
 
+### Autonomous exploration (the robot picks its own goals)
+
+`3dgs-robotics explore` removes the last human input from the loop: nobody
+gives the robot a destination. Starting from a mapped keyframe it raycasts a
+visibility scan, finds **frontiers** — the boundary between the space it has
+observed and the drivable space it has not — and repeatedly drives to the
+most useful frontier (larger and nearer wins) with the same A* + pure-pursuit
+stack as `navigate`, until a coverage target over the reachable free space is
+met.
+
+```bash
+# CPU-only: dead-reckoning exploration with a coverage GIF
+3dgs-robotics explore --map outputs/live_mapping/session \
+  --output explore/explore_result.json --gif explore/explore.gif
+
+# close the loop with the 3DGS localizer, like navigate
+3dgs-robotics explore --map outputs/live_mapping/session \
+  --localize-every 25 --odom-noise 0.05 --output explore/explore_result.json
+```
+
+Honest framing: the occupancy grid is static, so exploration grows the
+robot's **observed region**, not the map data itself — on a real robot the
+chosen goals are where you would drive to capture the next mapping frames.
+Coverage is measured over free cells reachable from the start (after
+robot-radius inflation), so walled-off pockets do not count against the
+target. `--sensor-range` is in camera-height units like every other distance
+knob.
+
+Outputs: `explore_result.json` (coverage fraction, self-chosen goals with
+per-goal coverage, stop reason), a trace PNG (observed space tinted green,
+numbered goals orange, remaining frontier yellow), and optionally a GIF
+replaying the scans as the observed region sweeps the map. On the KITTI
+drive 0056 demo session the robot covers 97.9% of 30k reachable cells with
+23 self-chosen goals, CPU-only, in ~2.5 minutes:
+
+![autonomous exploration: the observed region sweeps the map as the robot chases frontiers](images/robotics/explore.gif)
+
 ### Open-vocabulary queries ("where is the car?")
 
 `3dgs-robotics query-map` answers free-text questions about the map:

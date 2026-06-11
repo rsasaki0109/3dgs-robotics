@@ -1290,6 +1290,42 @@ def build_parser() -> argparse.ArgumentParser:
     nav.add_argument("--gif", default=None, help="Optional GIF path animating the run (camera view + map)")
     nav.add_argument("--device", default="cuda", help="torch device for rendering and localization")
 
+    exp = subparsers.add_parser(
+        "explore",
+        help="Autonomous frontier exploration: the robot picks its own goals until the map is covered",
+    )
+    exp.add_argument("--map", required=True, help="Live-mapping session directory")
+    exp.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    exp.add_argument("--output", required=True, help="Output explore_result.json path (a .png trace lands next to it)")
+    exp.add_argument("--start-keyframe", type=int, default=0, help="Index into the mapped keyframes for the start pose")
+    exp.add_argument("--sensor-range", type=float, default=4.0, help="Visibility ray length in camera-height units")
+    exp.add_argument("--coverage-target", type=float, default=0.95, help="Target fraction of reachable free cells observed")
+    exp.add_argument("--max-goals", type=int, default=30, help="Maximum number of self-chosen frontier goals")
+    exp.add_argument("--min-frontier-cells", type=int, default=8, help="Ignore frontier clusters smaller than this")
+    exp.add_argument("--robot-radius", type=float, default=0.4, help="Robot radius in camera-height units")
+    exp.add_argument("--speed", type=float, default=1.5, help="Cruise speed in camera heights per second")
+    exp.add_argument("--goal-tolerance", type=float, default=1.0, help="Goal radius in camera-height units")
+    exp.add_argument(
+        "--localize-every",
+        type=int,
+        default=0,
+        help="Control steps between 3DGS localization fixes (0 = odometry only)",
+    )
+    exp.add_argument("--max-steps", type=int, default=1500, help="Abort each frontier segment after this many steps")
+    exp.add_argument(
+        "--odom-noise",
+        type=float,
+        default=0.0,
+        help="Simulated wheel-slip noise std (the estimate dead-reckons on clean commands and drifts)",
+    )
+    exp.add_argument(
+        "--fix-blend", type=float, default=0.7, help="How strongly an accepted localization fix pulls the estimate"
+    )
+    exp.add_argument("--seed", type=int, default=7, help="Random seed for the wheel-slip simulation")
+    exp.add_argument("--render-width", type=int, default=620, help="Width of the rendered observations")
+    exp.add_argument("--gif", default=None, help="Optional GIF path animating the exploration")
+    exp.add_argument("--device", default="cuda", help="torch device for rendering and localization")
+
     mgm = subparsers.add_parser(
         "merge-maps",
         help="Merge two 3DGS maps of the same place into one splat (collaborative mapping)",
@@ -4201,6 +4237,149 @@ def cmd_navigate(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_explore(args: argparse.Namespace) -> None:
+    """Handle the explore subcommand."""
+    import numpy as np
+
+    from gs_sim2real.robotics.camera_sim_node import camera_intrinsics_from_colmap, scale_intrinsics
+    from gs_sim2real.robotics.gauge_alignment import quat_to_rotation
+    from gs_sim2real.robotics.gsplat_render_server import sigmoid
+    from gs_sim2real.robotics.occupancy_grid import GridParams, build_occupancy_grid
+    from gs_sim2real.robotics.splat_explore import (
+        ExploreParams,
+        draw_explore_trace,
+        explore_gif,
+        run_exploration,
+    )
+    from gs_sim2real.robotics.splat_nav import NavParams, make_localize_observer, world_to_pose2d
+    from gs_sim2real.viewer.web_viewer import load_ply
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    from gs_sim2real.robotics.localize import _load_cameras_txt, load_mapped_records, resolve_live_map_session
+
+    session = resolve_live_map_session(Path(args.map), round_index=args.round)
+    records = load_mapped_records(session)
+    ply = load_ply(session.round.ply_path)
+    opacities = (
+        sigmoid(np.asarray(ply.opacities, dtype=np.float32))
+        if ply.opacities is not None
+        else np.ones(len(ply.positions), dtype=np.float32)
+    )
+
+    try:
+        grid = build_occupancy_grid(
+            np.asarray(ply.positions),
+            opacities,
+            np.asarray([record.center for record in records], dtype=np.float64),
+            [record.qvec for record in records],
+            params=GridParams(trajectory_wins=True),
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    def record_pose2d(index: int):
+        record = records[index]
+        rotation_wc = quat_to_rotation(np.asarray(record.qvec, dtype=np.float64)).T
+        return world_to_pose2d(np.asarray(record.center, dtype=np.float64), rotation_wc, grid)
+
+    start = record_pose2d(args.start_keyframe)
+    nav = NavParams(
+        robot_radius=args.robot_radius,
+        speed=args.speed,
+        goal_tolerance=args.goal_tolerance,
+        localize_every=args.localize_every,
+        max_steps=args.max_steps,
+        odom_noise=args.odom_noise,
+        fix_blend=args.fix_blend,
+        seed=args.seed,
+    )
+    params = ExploreParams(
+        sensor_range=args.sensor_range,
+        min_frontier_cells=args.min_frontier_cells,
+        coverage_target=args.coverage_target,
+        max_goals=args.max_goals,
+        nav=nav,
+    )
+
+    observer = None
+    if args.localize_every > 0:
+        from gs_sim2real.robotics.gsplat_render_server import HeadlessSplatRenderer
+        from gs_sim2real.robotics.localize import LocalizeConfig, SessionLocalizer
+
+        cameras = _load_cameras_txt(session.round.cameras_txt)
+        cam = cameras[records[0].camera_id]
+        native_w, native_h, fx, fy, cx, cy = camera_intrinsics_from_colmap(cam)
+        render_w = args.render_width
+        render_h = int(round(native_h * render_w / native_w))
+        intrinsics = scale_intrinsics((fx, fy, cx, cy), from_size=(native_w, native_h), to_size=(render_w, render_h))
+        renderer = HeadlessSplatRenderer(session.round.ply_path, backend="auto", max_points=None)
+        localizer = SessionLocalizer(
+            Path(args.map),
+            round_index=args.round,
+            config=LocalizeConfig(device=args.device, refine_iters=40, pyramid_scales=(0.25, 0.5)),
+        )
+        observer = make_localize_observer(
+            grid,
+            renderer,
+            localizer,
+            render_size=(render_w, render_h),
+            intrinsics=intrinsics,
+            camera_centers=np.asarray([record.center for record in records], dtype=np.float64),
+            frame_callback=None,
+        )
+
+    try:
+        result = run_exploration(grid, start, observe_fn=observer, params=params)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    reachable_free_cells = int(np.count_nonzero(result.reachable & (grid.data == 0)))
+    observed_free_cells = int(np.count_nonzero(result.observed & result.reachable & (grid.data == 0)))
+    history = result.coverage_history
+    if len(history) > 200:
+        indices = np.linspace(0, len(history) - 1, 200).round().astype(int)
+        history = [history[int(index)] for index in indices]
+
+    payload = {
+        "coverage_fraction": result.coverage_fraction,
+        "coverage_target": args.coverage_target,
+        "reachable_free_cells": reachable_free_cells,
+        "observed_free_cells": observed_free_cells,
+        "goals": result.waypoints,
+        "goals_chosen": result.goals_chosen,
+        "total_steps": result.total_steps,
+        "distance": result.distance,
+        "localization_fixes": int(sum(segment.localization_count for segment in result.segments)),
+        "stop_reason": result.stop_reason,
+        "camera_height": grid.camera_height,
+        "coverage_history": [(int(step), float(coverage)) for step, coverage in history],
+        "note": "distances in the map's reconstruction gauge unless mapped with metric poses",
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    trace_path = draw_explore_trace(grid, result, output_path.with_suffix(".png"))
+
+    if args.gif:
+        gif_path = explore_gif(grid, result, Path(args.gif), params=params)
+        print(f"Wrote {gif_path} ({len(result.scans)} scans)")
+
+    print(f"Wrote {output_path} + {trace_path.name}")
+    print(
+        f"Exploration covered {100.0 * result.coverage_fraction:.1f}% of {reachable_free_cells} reachable cells "
+        f"with {result.goals_chosen} self-chosen goals (stop: {result.stop_reason})"
+    )
+    for index, waypoint in enumerate(result.waypoints[:5], start=1):
+        goal_xy = waypoint["goal_xy"]
+        status = "reached" if waypoint["reached"] else "not reached"
+        print(
+            f"  goal {index}: ({goal_xy[0]:.3f}, {goal_xy[1]:.3f}) "
+            f"{status} in {waypoint['steps']} steps, coverage {100.0 * waypoint['coverage']:.1f}%"
+        )
+
+
 def cmd_merge_maps(args: argparse.Namespace) -> None:
     """Handle the merge-maps subcommand."""
     from gs_sim2real.robotics.map_merge import merge_sessions
@@ -5100,6 +5279,7 @@ def main(argv: list[str] | None = None) -> None:
         "export-grid": cmd_export_grid,
         "detect-changes": cmd_detect_changes,
         "navigate": cmd_navigate,
+        "explore": cmd_explore,
         "merge-maps": cmd_merge_maps,
         "query-map": cmd_query_map,
         "export-overlay": cmd_export_overlay,

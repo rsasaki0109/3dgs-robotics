@@ -166,6 +166,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実装は §20 参照。`src/gs_sim2real/robotics/mcp_server.py` + `3dgs-robotics-mcp` console script + `[mcp]` extra。テスト 13 本(mcp パッケージ非依存)を含め全 1201 テストがグリーン。実セッション(KITTI drive 0056)で `query_map("car")` → 17 ヒット + navigate 提案の実走 smoke も成功。
 - **codex CLI(gpt-5.5 / xhigh)をサブエージェントとして併用**(ユーザー指示)。この環境では Ubuntu 24.04 の AppArmor 制限(`apparmor_restrict_unprivileged_userns=1`)で codex 内蔵 bwrap サンドボックスが動かず、サンドボックス解除フラグは Claude Code 側の権限分類器に拒否されるため、**「生成専用モード」**(コンテキスト抜粋を渡し、コード全文をテキスト出力させて Claude 側で適用・修正・検証)が確立した運用。今後 codex を使う際もこの方式で。
 
+### 1.9 2026-06-11(続々): 自律探索 `explore` 実装(§21)
+
+- ユーザー「tugi yattekou! oususumede!」でおすすめの**アクティブマッピング(フロンティア自律探索)**に着手、即日完了。§20 の MCP に続き「言語で指示(navigate --to)→ 誰も指示しない(explore)」の自律性の階段を一段上った。
+- 実装は §21 参照。`robotics/splat_explore.py` + CLI `explore` + MCP ツール `explore`。テスト 12 本追加で全 1212 グリーン。KITTI drive 0056 実走: 到達可能 30,468 セルの 97.9% を 23 個の自己選択ゴールで被覆(CPU-only 約 2.5 分)、トレース PNG + 58 フレーム GIF(docs/images/robotics/explore.gif)。
+- codex 生成専用モード(§1.8 と同方式)で一式生成 → レビューで 2 点修正(select_frontier の距離スケールを camera_height に、explore_gif への params 伝播)。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1637,3 +1643,24 @@ PR 分割案:
 検証: mcp パッケージ非依存のテスト 13 本(argv 構築 / JSON 読み戻し / cap / エラーパスを `_run_cli` seam のモックで)→ 全 1201 テストグリーン。FastMCP 実体での tools/list + stdio エンドツーエンド(initialize → list_map_sessions 呼び出し)+ KITTI drive 0056 実セッションで `query_map("car")` 17 ヒット実走を確認。
 
 次の弾(未着手、ユーザーと要相談): ② アクティブマッピング `navigate --explore`(フロンティア探索 + 地図品質ヒートマップ、技術的本丸)③ マルチロボット・ライブマージ ④ rerun.io 連携 ⑤ シーンインベントリ。§1.7 の保留 4 案(splat-grab/paste / click-to-go / patrol / Isaac 深化)も生きている。MCP との相性は click-to-go(ビューワ経由)と patrol(エージェントが巡回を指揮)が良い。
+
+
+## 21. 自律探索 `explore` — フロンティアベースのアクティブマッピング(2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 12 本 + KITTI 実走 + GIF。§1.9 参照)
+
+**ゴール**: 自律性の最終段。navigate --to は「言語で行き先を指示」だったが、explore は**誰も何も指示しない** — ロボットが可視スキャンから「観測済み空間と未観測の走行可能空間の境界(フロンティア)」を検出し、効用(クラスタサイズ / 距離、camera_height でスケール不変)が最大のフロンティアへ既存 A* + pure pursuit で走行、を到達可能 free セルのカバレッジ目標まで繰り返す。
+
+設計(`src/gs_sim2real/robotics/splat_explore.py`、CPU-only、torch/rclpy 非依存):
+
+- `visible_cells` = レイキャスト可視判定(occupied と unknown でレイ停止 — 壁と「未マップの霧」は見通せない)。`reachable_free_mask` = ロボット半径インフレート後の BFS 到達圏。カバレッジ分母は到達可能 free セルのみ(壁の向こうのポケットは数えない)— §1.2 の「盛らない」原則。
+- `run_exploration` ループ: スキャン → frontier_clusters(8 連結、min_cells フィルタ)→ select_frontier(size/(distance+camera_height))→ plan_path 失敗クラスタは skip-set へ → run_navigation セグメント走行(observe_every ステップごとに途中スキャン)。停止理由 = coverage-target / no-frontiers / all-frontiers-unreachable / stuck(連続 2 セグメント未到達)/ max-goals。
+- localizer 統合: navigate と同じ `--localize-every`(default 0 = CPU-only デッドレコニング、>0 で 3DGS localizer + innovation gate がそのまま効く)。
+- 可視化: trace PNG(観測領域を緑 tint、番号付きゴール、残フロンティア黄)+ GIF(scans リプレイで観測領域が地図を掃く)。ExploreResult.scans は (step, x, y) のみ保持し GIF 側で可視判定を再計算するメモリ設計。
+- CLI `3dgs-robotics explore`(cmd_navigate と同じセッション解決/グリッド構築/observer 配線)+ MCP ツール `explore`(coverage_history は要約から落とす)。
+
+検証: 新テスト 12 本(可視レイの壁/霧停止、到達圏、フロンティア検出、効用選択、コリドー e2e、CLI/MCP argv)→ 全 1212 グリーン。KITTI drive 0056: **97.9% / 30,468 セル / 23 自己選択ゴール / stop=coverage-target**、約 2.5 分(GIF 込み)。
+
+正直な整理(docs/live-mapping.md にも明記): occupancy grid は静的なので、explore が育てるのは**ロボットの観測領域**であって地図データそのものではない。実ロボットでは選択されたゴールが「次のマッピングフレームを撮りに行く場所」になる — live mapping のラウンド給餌と接続すれば真のアクティブマッピングになる(v2 候補)。
+
+次の弾(未着手): マルチロボット・ライブマージ / rerun.io 連携 / シーンインベントリ / §1.7 保留 4 案(splat-grab/paste / click-to-go / patrol / Isaac 深化)。explore の v2 として「live mapping ラウンドとの接続(本物のアクティブマッピング)」も選択肢に加わった。

@@ -340,3 +340,77 @@ def test_splat_clean_builds_argv_and_returns_stdout_tail(tmp_path: Path, monkeyp
     assert result["output_ply"].endswith("cleaned_traffic-sign_20260102-030405.ply")
     assert result["preview_png"].endswith("cleaned_traffic-sign_20260102-030405.png")
     assert result["stdout_tail"] == "\n".join(f"out {index}" for index in range(2, 12))
+
+
+def test_explore_builds_argv_and_drops_coverage_history(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _write_session(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        out_path = Path(args[args.index("--output") + 1])
+        out_path.write_text(
+            json.dumps(
+                {
+                    "coverage_fraction": 0.91,
+                    "coverage_target": 0.9,
+                    "reachable_free_cells": 100,
+                    "observed_free_cells": 91,
+                    "goals": [{"goal_xy": [1.0, 2.0], "reached": True, "steps": 12}],
+                    "goals_chosen": 1,
+                    "total_steps": 12,
+                    "distance": 3.4,
+                    "localization_fixes": 0,
+                    "stop_reason": "coverage-target",
+                    "camera_height": 1.0,
+                    "coverage_history": [[0, 0.2], [12, 0.91]],
+                    "note": "distances in the map's reconstruction gauge unless mapped with metric poses",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.explore(
+        str(session),
+        sensor_range=5.0,
+        coverage_target=0.9,
+        max_goals=7,
+        gif=True,
+        round_index=1,
+        device="cpu",
+        localize_every=10,
+    )
+
+    assert calls == [
+        [
+            "explore",
+            "--map",
+            str(session),
+            "--output",
+            str(session / "mcp" / "explore_20260102-030405.json"),
+            "--device",
+            "cpu",
+            "--localize-every",
+            "10",
+            "--round",
+            "1",
+            "--sensor-range",
+            "5.0",
+            "--coverage-target",
+            "0.9",
+            "--max-goals",
+            "7",
+            "--gif",
+            str(session / "mcp" / "explore_20260102-030405.gif"),
+        ]
+    ]
+    assert result["coverage_fraction"] == 0.91
+    assert result["goals_chosen"] == 1
+    assert "coverage_history" not in result
+    assert result["output_json"].endswith("explore_20260102-030405.json")
+    assert result["trace_png"].endswith("explore_20260102-030405.png")
+    assert result["gif"].endswith("explore_20260102-030405.gif")

@@ -423,6 +423,59 @@ def export_overlay(
     }
 
 
+def explore(
+    map_dir: str,
+    sensor_range: float = 4.0,
+    coverage_target: float = 0.95,
+    max_goals: int = 30,
+    gif: bool = False,
+    round_index: int | None = None,
+    device: str = "cuda",
+    localize_every: int = 0,
+) -> dict[str, Any]:
+    """Autonomously explore reachable free space in a static 3DGS occupancy map.
+
+    The robot chooses its own frontier goals until coverage is met or no useful frontier remains; use navigate for a
+    specific destination. Distances are in map-gauge camera-height units, not meters unless the reconstruction was built
+    with metric poses.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"explore_{_timestamp()}.json"
+    args = [
+        "explore",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(out_path),
+        "--device",
+        device,
+        "--localize-every",
+        str(localize_every),
+    ]
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+    if sensor_range != 4.0:
+        args.extend(["--sensor-range", str(sensor_range)])
+    if coverage_target != 0.95:
+        args.extend(["--coverage-target", str(coverage_target)])
+    if max_goals != 30:
+        args.extend(["--max-goals", str(max_goals)])
+
+    gif_path = out_path.with_suffix(".gif") if gif else None
+    if gif_path is not None:
+        args.extend(["--gif", str(gif_path)])
+
+    _run_cli(args)
+    payload = _json(out_path)
+    payload.pop("coverage_history", None)
+    summary = dict(payload)
+    summary["output_json"] = str(out_path)
+    summary["trace_png"] = _preview_for(out_path)
+    if gif_path is not None:
+        summary["gif"] = str(gif_path)
+    return summary
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -433,7 +486,16 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
 
     _DEFAULT_ROOT = root
     server = FastMCP("talk-to-your-map")
-    for tool in (list_map_sessions, map_info, query_map, navigate, splat_clean, detect_changes, export_overlay):
+    for tool in (
+        list_map_sessions,
+        map_info,
+        query_map,
+        navigate,
+        explore,
+        splat_clean,
+        detect_changes,
+        export_overlay,
+    ):
         server.add_tool(tool)
     return server
 

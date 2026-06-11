@@ -144,15 +144,15 @@ Reproduce it with `python3 scripts/build_robotics_demo_gif.py --session <session
 | --- | --- | --- |
 | Localization | `3dgs-robotics-localizer --map <session>` (PoseStamped + TF) | [live-mapping.md](docs/live-mapping.md#ros-2-localizer-node) |
 | Simulation | `3dgs-robotics-camera-sim --map <session> --replay` / `3dgs-robotics export-isaac` | [live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node), [isaac-sim.md](docs/isaac-sim.md) |
-| Navigation | `3dgs-robotics export-grid` (nav2 map) / `3dgs-robotics navigate --to "car"` (language-directed autonomy) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
+| Navigation | `3dgs-robotics export-grid` (nav2 map) / `navigate --to "car"` (language-directed) / `explore` (the robot picks its own goals) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | Perception | `3dgs-robotics detect-changes` / `query-map "car"` / `splat-clean "car"` (erase the ghost car) | [live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 
 ## Talk to Your Map — MCP server
 
 Your 3DGS map becomes a set of tools for LLM agents. The bundled
 [MCP](https://modelcontextprotocol.io) server exposes session discovery,
-open-vocabulary queries, language-goal navigation, object erasure, change
-detection, and viewer overlays — so you can ask Claude to
+open-vocabulary queries, language-goal navigation, autonomous exploration,
+object erasure, change detection, and viewer overlays — so you can ask Claude to
 *"find the car in the parking-lot map, erase it, then drive to the entrance"*
 and it chains `query_map` → `splat_clean` → `navigate` for you.
 
