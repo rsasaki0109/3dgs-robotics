@@ -699,6 +699,56 @@ def export_isaac_route(
     }
 
 
+def inventory(
+    map_dir: str,
+    vocab: str | None = None,
+    threshold: float = 0.4,
+    round_index: int | None = None,
+    device: str = "cuda",
+) -> dict[str, Any]:
+    """Run an open-vocabulary census of the map.
+
+    Per-hit goal_xy feeds navigate and patrol. Hit positions and extents are in the map reconstruction gauge, typically
+    camera-height units, not meters, and counts depend on threshold and map quality.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"inventory_{_timestamp()}.json"
+    args = [
+        "inventory",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(out_path),
+        "--threshold",
+        str(threshold),
+        "--device",
+        device,
+    ]
+    if vocab is not None:
+        args.extend(["--vocab", vocab])
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+    _run_cli(args)
+
+    payload = _json(out_path)
+    categories = []
+    for category in payload.get("categories") or []:
+        capped = dict(category)
+        hits = list(capped.get("hits") or [])
+        capped["hits"] = hits[:3]
+        capped["hit_count"] = len(hits)
+        categories.append(capped)
+
+    return {
+        "categories": categories,
+        "total_clusters": payload.get("total_clusters", 0),
+        "output_json": str(out_path),
+        "markdown": str(out_path.with_suffix(".md")),
+        "preview_png": _preview_for(out_path),
+        "note": payload.get("note"),
+    }
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -713,6 +763,7 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         list_map_sessions,
         map_info,
         query_map,
+        inventory,
         navigate,
         explore,
         patrol,

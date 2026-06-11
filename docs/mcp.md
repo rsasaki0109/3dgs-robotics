@@ -46,6 +46,7 @@ pass one explicitly. Every other tool takes the session directory as `map_dir`.
 | `list_map_sessions` | in-process scan | sessions under root: keyframe/round counts, last successful round, `live/latest.splat` presence |
 | `map_info` | in-process scan | rounds, resolved round, artifact paths for one session |
 | `query_map` | `query-map` | up to 10 open-vocabulary 3D hits + a ready-to-use `navigate` suggestion for the best hit |
+| `inventory` | `inventory` | whole-map census over a vocabulary: counts/positions per category, report + annotated map |
 | `navigate` | `navigate` | nav summary (reached / steps / cross-track stats), trace PNG, optional GIF; goal via `to` (language), `goal_xy`, or `goal_keyframe` |
 | `explore` | `explore` | autonomous frontier exploration — the robot picks its own goals; coverage summary, trace PNG, optional GIF |
 | `patrol` | `patrol` | multi-stop inspection patrol; pass `detect_changes`' output_json as `from_changes` and the robot drives to each change |

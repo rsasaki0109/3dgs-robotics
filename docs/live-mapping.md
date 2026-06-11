@@ -540,6 +540,28 @@ Dynamic objects smear along their motion (a car driving ahead appears as a
 chain of hits down the street); lower `--threshold` for fainter concepts and
 raise `--min-cluster-gaussians` to suppress speckle.
 
+### Map inventory ("what is in this map?")
+
+`3dgs-robotics inventory` runs the open-vocabulary query over a whole
+vocabulary and aggregates the hits into a census — counts, positions, sizes,
+scores per category. CLIPSeg loads once and is shared across all prompts:
+
+```bash
+3dgs-robotics inventory --map outputs/live_mapping/session \
+  --output inventory/inventory.json          # default outdoor vocabulary
+# or your own: --vocab "excavator;crane;container" / --vocab-file vocab.txt
+```
+
+![map census: every detected object cluster colored by category with a legend](images/robotics/inventory.png)
+
+Outputs `inventory.json` (per-hit centroids/extents/`goal_xy`), a Markdown
+report, and the annotated top-down PNG. On the KITTI drive 0056 demo map the
+default vocabulary finds 74 clusters (43 trees, 17 cars, 9 poles, 4 bushes,
+1 building) in ~2.5 minutes; unmatched prompts are listed as "not found".
+Counts depend on the CLIPSeg threshold and draft map quality — a census, not
+ground truth. Each hit's `goal_xy` feeds `navigate --goal` and `patrol`
+directly, and categories feed `splat-grab`.
+
 ### Erasing objects by language ("remove the car")
 
 ![splat-clean before/after](images/robotics/splat-clean.gif)

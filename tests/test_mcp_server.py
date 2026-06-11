@@ -684,3 +684,54 @@ def test_export_isaac_route_mcp_builds_cli_argv_and_returns_summary(
         result["stdout_tail"].splitlines()[-1]
         == "Note: route distances are reconstruction-gauge camera-height units, not meters."
     )
+
+
+def test_inventory_builds_argv_reads_summary_and_caps_hits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _write_session(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        out_path = Path(args[args.index("--output") + 1])
+        hits = [{"goal_xy": [float(index), float(index + 1)], "rank": index} for index in range(5)]
+        payload = {
+            "categories": [
+                {"prompt": "chair", "clusters": 5, "gaussians": 50, "hits": hits},
+                {"prompt": "table", "clusters": 0, "gaussians": 0, "hits": []},
+            ],
+            "total_clusters": 5,
+            "note": "positions in gauge units",
+        }
+        out_path.write_text(json.dumps(payload), encoding="utf-8")
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.inventory(str(session), vocab="chair;table", threshold=0.7, round_index=1, device="cpu")
+
+    assert calls == [
+        [
+            "inventory",
+            "--map",
+            str(session),
+            "--output",
+            str(session / "mcp" / "inventory_20260102-030405.json"),
+            "--threshold",
+            "0.7",
+            "--device",
+            "cpu",
+            "--vocab",
+            "chair;table",
+            "--round",
+            "1",
+        ]
+    ]
+    assert result["total_clusters"] == 5
+    assert result["categories"][0]["prompt"] == "chair"
+    assert len(result["categories"][0]["hits"]) == 3
+    assert result["categories"][0]["hit_count"] == 5
+    assert result["output_json"].endswith("inventory_20260102-030405.json")
+    assert result["markdown"].endswith("inventory_20260102-030405.md")
+    assert result["preview_png"].endswith("inventory_20260102-030405.png")
+    assert result["note"] == "positions in gauge units"

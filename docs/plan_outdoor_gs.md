@@ -205,6 +205,13 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実走: e2e_bag_live3 で nav(クリーン走行 598 步到達)→ export-isaac(USDZ 20.5MB 再生成)→ route.usda。**pxr 読み戻しで USDZ 参照が解決され、NuRec Volume(OmniNuRecFieldAsset)とルート(BasisCurves 2 本 + goal Sphere)が同一ステージに合成されることを確認**。Isaac Sim 本体でのレンダ確認はユーザー側(docs に明記)。
 - codex 生成専用モード 7 回目。手直し: pxr API 1 件(SetTypeAttr→CreateTypeAttr)、未使用 import/変数、テストの文字列 [-1] バグ。
 
+### 1.15 2026-06-12: シーンインベントリ実装(§27)
+
+- ユーザー「やってこう!」で残ネタ 3 案(インベントリ → rerun.io → click-to-go)に着手。第 1 弾の **inventory** 完了。Isaac route の CI 赤(usd-core 不在で suffix テストが ImportError)は検証順入替 `62f0de7` で即修正済み。
+- 実装は §27 参照。`robotics/inventory.py` + CLI `inventory` + MCP ツール(計 13 ツール)。テスト 5 本追加で全 1253 グリーン。
+- KITTI 0056 実走: デフォルト 8 語彙で **74 クラスタ / 5 カテゴリ**(tree 43 / car 17 / pole 9 / bush 4 / building 1、traffic sign・fence・person は not found)を 2 分 20 秒。素材 = docs/images/robotics/inventory.png。
+- codex 生成専用モード 8 回目。手直しゼロ(deviations: none、統合時の整形のみ)。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1791,3 +1798,21 @@ PR 分割案:
 検証: テスト 5 本(route_geometry のリフト・件数 / USD ラウンドトリップ(pxr importorskip): プリム型・頂点数・半径・customLayerData・参照 / suffix バリデーション / MCP argv)→ 全 1248 グリーン。実走で合成ステージに OmniNuRecFieldAsset(splat)と Route プリムの同居を確認。**正直な限界**: usd-core での読み戻し検証まで。Isaac Sim 本体でのレンダリング確認・メトリックスケール化はユーザー側。
 
 **順送り 3 案(explore v2 / splat-grab/paste / Isaac 深化)コンプリート。** 残ネタ: rerun.io 連携 / シーンインベントリ / click-to-go。
+
+
+## 27. シーンインベントリ `inventory` — 地図の国勢調査(2026-06-12 実装完了)
+
+> **状況: 2026-06-12 完了**(実装 + テスト 5 本 + KITTI 実走。§1.15 参照)
+
+**ゴール**: 「この地図に何が、どこに、何個あるか」への一括回答。query-map(単発)を語彙総当たりに拡張し、カテゴリ別の件数・位置・サイズ・スコアを `inventory.json` + 注釈付き俯瞰マップ PNG + Markdown レポートに集約する。
+
+設計(`src/gs_sim2real/robotics/inventory.py`、thin):
+
+- 中身は **query_map のループ**。効率の肝は `heatmap_fn` 注入 — `clipseg_heatmap_fn(device)` を 1 回だけ構築して全プロンプトで共有(モデル再ロードなし。テストでセンチネル同一性を検証)。
+- デフォルト語彙は屋外 8 種(car/tree/building/traffic sign/pole/fence/bush/person)、`--vocab "a;b"` / `--vocab-file` で差し替え。カテゴリはクラスタ数降順、未検出も "not found" として正直に列挙。
+- プレビューはカテゴリ色分け(8 色パレット巡回)の塗り円 + 番号 + 凡例。各ヒットの `goal_xy` は navigate/patrol の座標系そのまま — 「インベントリ → 巡回」「インベントリ → splat-grab」が直結。
+- MCP ツール `inventory`(ヒットはカテゴリごと 3 件 cap で要約)。
+
+検証: テスト 5 本(集計順序 / heatmap_fn 共有 / 空語彙 / Markdown / プレビュー)→ 全 1253 グリーン。KITTI 実走 74 クラスタ / 2 分 20 秒。「国勢調査であって ground truth ではない」(閾値・draft 品質依存)を docs/JSON note に明記。
+
+残: rerun.io 連携(次)→ click-to-go。

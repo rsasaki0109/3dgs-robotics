@@ -1460,6 +1460,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     qmp.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
 
+    invp = subparsers.add_parser(
+        "inventory",
+        help='Open-vocabulary census of a trained map ("what is here, where, and how many?")',
+    )
+    invp.add_argument("--map", required=True, help="Live-mapping session directory")
+    invp.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    invp.add_argument("--output", required=True, help="Output inventory.json path (a .md and .png land next to it)")
+    invp.add_argument("--vocab", default=None, help="Semicolon-separated prompts; default: built-in outdoor set")
+    invp.add_argument("--vocab-file", default=None, help="One prompt per line")
+    invp.add_argument("--threshold", type=float, default=0.4, help="CLIPSeg relevance threshold in [0, 1]")
+    invp.add_argument("--max-keyframes", type=int, default=12, help="Keyframes scored with CLIPSeg")
+    invp.add_argument(
+        "--min-cluster-gaussians", type=int, default=20, help="Smallest gaussian cluster reported as a hit"
+    )
+    invp.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
+
     spc = subparsers.add_parser(
         "splat-clean",
         help='Erase objects from a map by language prompt ("car" -> cleaned splat without the ghost car)',
@@ -4914,6 +4930,73 @@ def cmd_query_map(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_inventory(args: argparse.Namespace) -> None:
+    """Handle the inventory subcommand."""
+    from gs_sim2real.robotics.inventory import (
+        DEFAULT_VOCAB,
+        build_inventory,
+        write_inventory_markdown,
+        write_inventory_preview,
+    )
+    from gs_sim2real.robotics.language_query import QueryParams
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+    if args.vocab and args.vocab_file:
+        raise SystemExit("--vocab and --vocab-file are mutually exclusive")
+
+    if args.vocab_file:
+        vocab = [
+            line.strip()
+            for line in Path(args.vocab_file).read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+    elif args.vocab:
+        vocab = [prompt.strip() for prompt in args.vocab.split(";") if prompt.strip()]
+    else:
+        vocab = list(DEFAULT_VOCAB)
+
+    params = QueryParams(
+        score_threshold=args.threshold,
+        max_keyframes=args.max_keyframes,
+        min_cluster_gaussians=args.min_cluster_gaussians,
+    )
+    try:
+        report, points, basis = build_inventory(
+            Path(args.map),
+            vocab=vocab,
+            round_index=args.round,
+            params=params,
+            device=args.device,
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(f"inventory needs the optional `transformers` package: {error}") from error
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    preview = write_inventory_preview(report, points, basis, output_path.with_suffix(".png"))
+    markdown = write_inventory_markdown(report, output_path.with_suffix(".md"))
+
+    print(f"Wrote {output_path} + {markdown.name} + {preview.name}")
+    missing: list[str] = []
+    for category in report["categories"]:
+        hits = category.get("hits") or []
+        if not hits:
+            missing.append(category["prompt"])
+            continue
+        best = hits[0]
+        goal_xy = best.get("goal_xy") or [0.0, 0.0]
+        print(
+            f"  {category['prompt']}: {category['clusters']} cluster(s), {category['gaussians']:,} gaussians, "
+            f"best at ({goal_xy[0]:.3f}, {goal_xy[1]:.3f})"
+        )
+    if missing:
+        print(f"not found: {', '.join(missing)}")
+
+
 def cmd_splat_clean(args: argparse.Namespace) -> None:
     """Handle the splat-clean subcommand."""
     from gs_sim2real.robotics.splat_clean import CleanParams, clean_map, write_clean_preview
@@ -5841,6 +5924,7 @@ def main(argv: list[str] | None = None) -> None:
         "merge-maps": cmd_merge_maps,
         "merge-live": cmd_merge_live,
         "query-map": cmd_query_map,
+        "inventory": cmd_inventory,
         "export-overlay": cmd_export_overlay,
         "export-isaac-route": cmd_export_isaac_route,
         "splat-clean": cmd_splat_clean,
