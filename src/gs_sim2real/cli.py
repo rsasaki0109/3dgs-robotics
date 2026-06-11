@@ -1582,6 +1582,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eir.add_argument("--no-trajectory", action="store_true", help="Skip the mapped-trajectory polyline")
 
+    rr_replay = subparsers.add_parser(
+        "rerun-replay",
+        help="Replay a live-mapping session into rerun as a growing point cloud and trajectory",
+    )
+    rr_replay.add_argument("--map", required=True, help="Live-mapping session directory")
+    rr_replay.add_argument("--save", default=None, help="Output .rrd path")
+    rr_replay.add_argument("--spawn", action="store_true", help="Launch the rerun viewer")
+    rr_replay.add_argument("--nav", default=None, help="nav_result.json from `navigate` to overlay the planned path")
+    rr_replay.add_argument("--max-points", type=int, default=200000, help="Maximum map points logged per round")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -5143,6 +5153,44 @@ def cmd_export_isaac_route(args: argparse.Namespace) -> None:
     print("Note: route distances are reconstruction-gauge camera-height units, not meters.")
 
 
+def cmd_rerun_replay(args: argparse.Namespace) -> None:
+    """Handle the rerun-replay subcommand."""
+    from gs_sim2real.robotics.rerun_bridge import log_session, session_timeline
+
+    session_dir = Path(args.map)
+    save_path = Path(args.save) if args.save else None
+    if save_path is None and not args.spawn:
+        save_path = session_dir / "rerun" / "session.rrd"
+
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        entries, extras = session_timeline(
+            session_dir,
+            max_points_per_round=args.max_points,
+            nav_json=Path(args.nav) if args.nav else None,
+        )
+        stats = log_session(entries, extras, save=save_path, spawn=args.spawn)
+    except FileNotFoundError as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(str(error)) from error
+
+    suffix = []
+    if stats["rrd"]:
+        suffix.append(str(stats["rrd"]))
+    if args.spawn:
+        suffix.append("viewer spawned")
+    destination = f" ({', '.join(suffix)})" if suffix else ""
+    print(f"Logged {stats['rounds']} rounds ({stats['points_logged']} points) to rerun{destination}")
+    print(
+        "Note: rerun shows gaussian centers as colored Points3D; distances are camera-height gauge units, not meters."
+    )
+    if stats["rrd"]:
+        print(f"Open with: rerun {stats['rrd']}")
+
+
 def cmd_export_overlay(args: argparse.Namespace) -> None:
     """Handle the export-overlay subcommand."""
     from gs_sim2real.robotics.viewer_overlay import build_overlay
@@ -5927,6 +5975,7 @@ def main(argv: list[str] | None = None) -> None:
         "inventory": cmd_inventory,
         "export-overlay": cmd_export_overlay,
         "export-isaac-route": cmd_export_isaac_route,
+        "rerun-replay": cmd_rerun_replay,
         "splat-clean": cmd_splat_clean,
         "splat-grab": cmd_splat_grab,
         "splat-paste": cmd_splat_paste,

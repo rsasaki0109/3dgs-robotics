@@ -53,6 +53,7 @@ vggt = []
 rosbag = ["rosbags"]
 app = ["streamlit>=1.30", "plotly>=5.0"]
 mcp = ["mcp>=1.2"]
+rerun = ["rerun-sdk"]
 metrics = ["lpips"]
 dev = ["pytest", "ruff", "mypy", "rosbags"]
 

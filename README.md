@@ -129,6 +129,7 @@ Localize query frames against a finished session: `3dgs-robotics localize --map 
 3dgs-robotics-camera-sim --map outputs/live_mapping --replay --loop                      # virtual camera in the map
 python3 scripts/run_live_mapping_demo.py --images ./my_drive_frames --fps 2 --port 8765 # image-folder replay
 python3 scripts/run_live_mapping_demo.py --bag ./my_drive_bag --port 8765               # rosbag replay, no ROS needed
+3dgs-robotics rerun-replay --map outputs/live_mapping                                    # session -> rerun.io timeline (.rrd)
 ```
 
 ## Robotics applications — one map, four pillars

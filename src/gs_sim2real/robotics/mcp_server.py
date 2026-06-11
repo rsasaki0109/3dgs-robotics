@@ -749,6 +749,27 @@ def inventory(
     }
 
 
+def rerun_replay(map_dir: str, nav_json: str | None = None, max_points: int = 200000) -> dict[str, Any]:
+    """Create a shareable rerun recording of the growing map.
+
+    The recording logs gaussian centers as colored Points3D, not native splats. Distances are reconstruction-gauge
+    camera-height units, not meters. Requires the [rerun] extra.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"session_{_timestamp()}.rrd"
+    args = ["rerun-replay", "--map", str(session_dir), "--save", str(out_path)]
+    if nav_json is not None:
+        args.extend(["--nav", nav_json])
+    if max_points != 200000:
+        args.extend(["--max-points", str(max_points)])
+
+    proc = _run_cli(args)
+    return {
+        "rrd": str(out_path),
+        "stdout_tail": _tail(proc.stdout, 5),
+    }
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -774,6 +795,7 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         detect_changes,
         export_overlay,
         export_isaac_route,
+        rerun_replay,
     ):
         server.add_tool(tool)
     return server

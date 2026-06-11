@@ -212,6 +212,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - KITTI 0056 実走: デフォルト 8 語彙で **74 クラスタ / 5 カテゴリ**(tree 43 / car 17 / pole 9 / bush 4 / building 1、traffic sign・fence・person は not found)を 2 分 20 秒。素材 = docs/images/robotics/inventory.png。
 - codex 生成専用モード 8 回目。手直しゼロ(deviations: none、統合時の整形のみ)。
 
+### 1.16 2026-06-12(続): rerun.io 連携実装(§28)
+
+- 残ネタ第 2 弾。実装は §28 参照。`robotics/rerun_bridge.py` + CLI `rerun-replay` + MCP ツール(計 14 ツール)+ `[rerun]` extra。テスト 7 本追加で全 1260 グリーン。
+- 実走: e2e_bag_live3 → `session.rrd`(18MB、5 ラウンド / 885k 点 / nav 経路込み)を 8.6 秒で生成、`rerun rrd stats` で 5 エンティティパス・チャンク構成を検証。
+- codex 生成専用モード 9 回目。手直しはテストの誤 import 1 行のみ。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1816,3 +1822,21 @@ PR 分割案:
 検証: テスト 5 本(集計順序 / heatmap_fn 共有 / 空語彙 / Markdown / プレビュー)→ 全 1253 グリーン。KITTI 実走 74 クラスタ / 2 分 20 秒。「国勢調査であって ground truth ではない」(閾値・draft 品質依存)を docs/JSON note に明記。
 
 残: rerun.io 連携(次)→ click-to-go。
+
+
+## 28. rerun.io 連携 `rerun-replay` — セッションを rerun タイムラインへ(2026-06-12 実装完了)
+
+> **状況: 2026-06-12 完了**(実装 + テスト 7 本 + 実走 + rrd stats 検証。§1.16 参照)
+
+**ゴール**: robotics コミュニティで標準化しつつある rerun ビューワに「地図が育つ」を載せる。`round` タイムラインをスクラブすると、セッションゲージの色付き点群(ガウシアン中心)が round ごとに成長し、軌跡が伸び、車載カメラ画像が更新され、ループ候補エッジと nav 経路が重なる。`.rrd` は共有可能 — rerun examples / awesome 系リストへの導線になる。
+
+設計(`src/gs_sim2real/robotics/rerun_bridge.py`):
+
+- **組み立てとロギングを分離**: `session_timeline`(純データ、round ごとの positions/colors/centers/画像パス + loop_edges/nav_points — セッションゲージ整合・サブサンプリング込み)と `log_session`(rr 注入可能)。テストは rerun-sdk なしで両方カバー(fake rr レコーダ)。
+- **SDK バージョン互換**: `set_time_sequence`(〜0.26)と `set_time(sequence=)`(新 API)を hasattr で分岐する `_set_round` ヘルパ。ローカル 0.26 / 最新 0.33 の両対応。
+- optional extra `rerun = ["rerun-sdk"]`。正直な注記: rerun に 3DGS ネイティブレンダラはないため点群表現(docs / CLI 出力に明記)。
+- CLI `rerun-replay`(--save 既定 `<map>/rerun/session.rrd` / --spawn / --nav / --max-points)+ MCP ツール `rerun_replay`(headless なので --spawn は出さない)。
+
+検証: テスト 7 本(タイムライン組み立て・サブサンプル cap・色フォールバック・ループ範囲外スキップ / fake rr のエンティティパスと per-round set_time / 互換分岐 / MCP argv)→ 全 1260 グリーン。実走 8.6 秒で 18MB rrd、`rerun rrd stats` で構成確認。
+
+残: click-to-go(最終)。

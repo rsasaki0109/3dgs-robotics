@@ -153,6 +153,25 @@ same place; long chords across the map are false positives — raise
 `--revisit-min-time-separation` or lower `--revisit-max-distance` (demo
 script flags; `LiveMapperConfig.revisit_*` in code).
 
+## Replay a session into rerun
+
+`3dgs-robotics rerun-replay` logs a finished session onto the
+[rerun](https://rerun.io) timeline — scrub the `round` timeline and watch the
+map grow as colored 3D points (session gauge), the trajectory extend, the
+onboard camera update, loop-candidate edges appear, and optionally a
+navigation path overlay:
+
+```bash
+pip install -e ".[rerun]"
+3dgs-robotics rerun-replay --map outputs/live_mapping/session \
+  --nav nav/nav_result.json          # writes <map>/rerun/session.rrd
+rerun outputs/live_mapping/session/rerun/session.rrd   # or --spawn
+```
+
+The `.rrd` file is shareable. Honest note: rerun has no native gaussian-splat
+renderer, so the map appears as the gaussian centers (colored point cloud);
+distances are camera-height gauge units.
+
 ## 3DGS localization
 
 After a live-mapping session finishes, localize query frames against the

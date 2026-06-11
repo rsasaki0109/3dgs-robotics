@@ -735,3 +735,37 @@ def test_inventory_builds_argv_reads_summary_and_caps_hits(tmp_path: Path, monke
     assert result["markdown"].endswith("inventory_20260102-030405.md")
     assert result["preview_png"].endswith("inventory_20260102-030405.png")
     assert result["note"] == "positions in gauge units"
+
+
+def test_rerun_replay_builds_cli_argv_and_returns_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(mcp_server, "_ensure_session", lambda map_dir: Path(map_dir))
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260612-010203")
+
+    def fake_run_cli(args: list[str]) -> SimpleNamespace:
+        calls.append(args)
+        return SimpleNamespace(stdout="line1\nline2\nline3\nline4\nline5\nline6\n", stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+
+    result = mcp_server.rerun_replay(str(session_dir), nav_json=str(tmp_path / "nav_result.json"), max_points=123)
+
+    expected_rrd = session_dir / "mcp" / "session_20260612-010203.rrd"
+    assert calls == [
+        [
+            "rerun-replay",
+            "--map",
+            str(session_dir),
+            "--save",
+            str(expected_rrd),
+            "--nav",
+            str(tmp_path / "nav_result.json"),
+            "--max-points",
+            "123",
+        ]
+    ]
+    assert result["rrd"] == str(expected_rrd)
+    assert result["stdout_tail"] == "line2\nline3\nline4\nline5\nline6"

@@ -57,6 +57,7 @@ pass one explicitly. Every other tool takes the session directory as `map_dir`.
 | `detect_changes` | `detect-changes` | alignment info, appeared/disappeared counts, top 10 clusters |
 | `export_overlay` | `export-overlay` | overlay JSON for the browser viewer (`splat.html?url=...&overlay=...`) |
 | `export_isaac_route` | `export-isaac-route` | USD layer with nav paths/goals/hits in the USDZ's frame (Isaac Sim / usdview) |
+| `rerun_replay` | `rerun-replay` | shareable `.rrd` recording of the growing map for the rerun viewer |
 
 Outputs land under `<session>/mcp/` with timestamped names, so agent runs never
 overwrite each other or the session's own artifacts.
