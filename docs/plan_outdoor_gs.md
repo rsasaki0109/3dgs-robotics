@@ -160,6 +160,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - **PyPI スキップの再確認と `publish.yml` の手動化 `3be92c2`**: release トリガーだった `publish.yml`(PyPI trusted publishing)がリリース作成で自動起動し失敗(pypi.org に trusted publisher 未設定、claims は `environment: MISSING`)。ユーザー「pypi は skip!」で改めてスキップ確定し、トリガーを `workflow_dispatch:` 専用に変更 — 今後のリリースで赤い失敗ランが付かない。将来公開する場合は pypi.org で trusted publisher(project `3dgs-robotics` / workflow `publish.yml`)を登録して手動実行するだけ。
 - **次開発の提案済み 4 案(未着手・保留、再開時はここから選ぶ)**: ① splat-grab/paste(言語でオブジェクト切り出し→別マップへ配置、query-map + merge-maps の組み合わせ)② ブラウザ click-to-go(splat.html クリック→navigate ゴール、overlay 基盤の逆写像)③ patrol(navigate + カメラシム + detect-changes を 1 コマンドに束ねた巡回点検)④ Isaac 連携深化(USDZ に nav 経路を USD レイヤ焼き込み)。おすすめ順は ①→②→③、④はユーザーの Isaac 興味シグナルあり。
 
+### 1.8 2026-06-11(続): MCP サーバー「Talk to Your Map」実装(§20)
+
+- 2026-06-11 のブレストで新ネタ 5 案(MCP サーバー / アクティブマッピング `--explore` / マルチロボット・ライブマージ / rerun.io 連携 / シーンインベントリ)を提示し、ユーザー「yattekou!」でイチオシの **MCP サーバー** に着手。§1.7 の保留 4 案は引き続き保留(消えていない)。
+- 実装は §20 参照。`src/gs_sim2real/robotics/mcp_server.py` + `3dgs-robotics-mcp` console script + `[mcp]` extra。テスト 13 本(mcp パッケージ非依存)を含め全 1201 テストがグリーン。実セッション(KITTI drive 0056)で `query_map("car")` → 17 ヒット + navigate 提案の実走 smoke も成功。
+- **codex CLI(gpt-5.5 / xhigh)をサブエージェントとして併用**(ユーザー指示)。この環境では Ubuntu 24.04 の AppArmor 制限(`apparmor_restrict_unprivileged_userns=1`)で codex 内蔵 bwrap サンドボックスが動かず、サンドボックス解除フラグは Claude Code 側の権限分類器に拒否されるため、**「生成専用モード」**(コンテキスト抜粋を渡し、コード全文をテキスト出力させて Claude 側で適用・修正・検証)が確立した運用。今後 codex を使う際もこの方式で。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1614,3 +1620,20 @@ PR 分割案:
 - **スマホ実写動画デモ**: 今期は未採用。§18.2 の「縦動画 × DUSt3R/VGGT の 512 リサイズ」リスクは**未消化のまま残っている**ので、video-to-splat を告知に使う前に 1 本実写で確認するのが安全。
 - **小粒(.spz 等圧縮 export / v0.1 GitHub Release)**: .spz は引き続き保留。Release は **v0.2.0 として 2026-06-11 に公開済み**(§1.7)。
 - **PyPI 公開 / ZeroGPU / 告知の代行**: §18.5 のとおり。再提案しない。
+
+## 20. MCP サーバー「Talk to Your Map」(2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 13 本 + KITTI 実走 smoke。§1.8 参照)
+
+**ゴール**: 3DGS 地図を LLM エージェントのツール群にする。「あなたの 3DGS 地図が MCP サーバーになる」は 2026 年の文脈で最もスター獲得力のある切り口で、既存の言語 3 部作(query-map / navigate --to / splat-clean)+ detect-changes + export-overlay を 1 つの会話型インターフェースに束ねる。デモは「Claude に『駐車場の車を消して、入口まで行って』と頼む」一発で伝わる。
+
+設計(thin 配線の原則そのまま):
+
+- `src/gs_sim2real/robotics/mcp_server.py` + console script `3dgs-robotics-mcp`(stdio)。`mcp` SDK は optional extra `[mcp]`(`mcp>=1.2`)。モジュール自体は mcp / torch / rclpy を import せず即起動、重い処理は `python -m gs_sim2real.cli` のサブプロセスに委ね、CLI が書く JSON を読み戻して返す。**新しい reconstruction logic はゼロ**。
+- ツール 7 本: `list_map_sessions` / `map_info`(in-process のセッション発見)、`query_map`(ヒット 10 件 cap + 最良ヒットへの navigate 提案を自動添付)、`navigate`(`to` / `goal_xy` / `goal_keyframe` の排他指定、`path_vertices` を落とした要約 + trace PNG / 任意 GIF)、`splat_clean`、`detect_changes`(クラスタ 10 件 cap)、`export_overlay`(ブラウザビューワ連携)。出力は `<session>/mcp/` にタイムスタンプ付きで隔離。
+- docstring がエージェント向け API。ゲージ単位(camera-height、メートルではない)の注意を全ツールに明記 — §1.2 の「盛らない」原則。
+- ドキュメント: README「Talk to Your Map — MCP server」セクション + `docs/mcp.md`(ツール表、Claude Code / Claude Desktop 設定例)。
+
+検証: mcp パッケージ非依存のテスト 13 本(argv 構築 / JSON 読み戻し / cap / エラーパスを `_run_cli` seam のモックで)→ 全 1201 テストグリーン。FastMCP 実体での tools/list + stdio エンドツーエンド(initialize → list_map_sessions 呼び出し)+ KITTI drive 0056 実セッションで `query_map("car")` 17 ヒット実走を確認。
+
+次の弾(未着手、ユーザーと要相談): ② アクティブマッピング `navigate --explore`(フロンティア探索 + 地図品質ヒートマップ、技術的本丸)③ マルチロボット・ライブマージ ④ rerun.io 連携 ⑤ シーンインベントリ。§1.7 の保留 4 案(splat-grab/paste / click-to-go / patrol / Isaac 深化)も生きている。MCP との相性は click-to-go(ビューワ経由)と patrol(エージェントが巡回を指揮)が良い。

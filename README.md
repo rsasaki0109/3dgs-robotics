@@ -147,6 +147,23 @@ Reproduce it with `python3 scripts/build_robotics_demo_gif.py --session <session
 | Navigation | `3dgs-robotics export-grid` (nav2 map) / `3dgs-robotics navigate --to "car"` (language-directed autonomy) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | Perception | `3dgs-robotics detect-changes` / `query-map "car"` / `splat-clean "car"` (erase the ghost car) | [live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 
+## Talk to Your Map — MCP server
+
+Your 3DGS map becomes a set of tools for LLM agents. The bundled
+[MCP](https://modelcontextprotocol.io) server exposes session discovery,
+open-vocabulary queries, language-goal navigation, object erasure, change
+detection, and viewer overlays — so you can ask Claude to
+*"find the car in the parking-lot map, erase it, then drive to the entrance"*
+and it chains `query_map` → `splat_clean` → `navigate` for you.
+
+```bash
+pip install "3dgs-robotics[mcp]"
+claude mcp add talk-to-your-map -- 3dgs-robotics-mcp --root outputs/live_mapping
+```
+
+Works with any MCP client (Claude Code, Claude Desktop, …). Tool reference and
+client configs: [docs/mcp.md](docs/mcp.md).
+
 ## Import External SLAM Results
 
 ```bash
@@ -199,6 +216,7 @@ pip install -e ".[app]"          # Streamlit demo (streamlit run app.py)
 3dgs-robotics localize --map outputs/live_mapping/session --query frame.jpg
 3dgs-robotics download / preprocess / train / export --help
 3dgs-robotics-live-mapper --image-topic /camera/image_raw/compressed --port 8765
+3dgs-robotics-mcp --root outputs/live_mapping   # MCP server for LLM agents (docs/mcp.md)
 python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json
 ```
 

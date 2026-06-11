@@ -52,6 +52,7 @@ gsplat = ["gsplat"]
 vggt = []
 rosbag = ["rosbags"]
 app = ["streamlit>=1.30", "plotly>=5.0"]
+mcp = ["mcp>=1.2"]
 metrics = ["lpips"]
 dev = ["pytest", "ruff", "mypy", "rosbags"]
 
@@ -61,6 +62,7 @@ dev = ["pytest", "ruff", "mypy", "rosbags"]
 3dgs-robotics-live-mapper = "gs_sim2real.robotics.live_mapper_node:main"
 3dgs-robotics-localizer = "gs_sim2real.robotics.localizer_node:main"
 3dgs-robotics-camera-sim = "gs_sim2real.robotics.camera_sim_node:main"
+3dgs-robotics-mcp = "gs_sim2real.robotics.mcp_server:main"
 # legacy aliases (pre-rename)
 gs-mapper = "gs_sim2real.cli:main"
 gs-sim2real = "gs_sim2real.cli:main"
