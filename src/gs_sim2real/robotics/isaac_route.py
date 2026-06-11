@@ -149,14 +149,14 @@ def write_route_layer(
     geometry: dict[str, Any], output_path: Path, *, usdz_reference: str | None = None
 ) -> dict[str, Any]:
     """Write route geometry into a USD layer readable by usdview and Isaac Sim."""
+    output_path = Path(output_path)
+    if output_path.suffix not in _ROUTE_SUFFIXES:
+        raise ValueError(f"output path must end with one of {sorted(_ROUTE_SUFFIXES)}: {output_path}")
+
     try:
         from pxr import Gf, Usd, UsdGeom
     except ImportError as error:
         raise ImportError(_USD_IMPORT_HINT) from error
-
-    output_path = Path(output_path)
-    if output_path.suffix not in _ROUTE_SUFFIXES:
-        raise ValueError(f"output path must end with one of {sorted(_ROUTE_SUFFIXES)}: {output_path}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     stage = Usd.Stage.CreateNew(str(output_path))
