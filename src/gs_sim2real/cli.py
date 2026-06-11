@@ -1550,6 +1550,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     exo.add_argument("--no-trajectory", action="store_true", help="Skip the mapped-trajectory polyline")
 
+    eir = subparsers.add_parser(
+        "export-isaac-route",
+        help="Bake nav/query robot results into a USD route layer for Isaac Sim next to a NuRec USDZ",
+    )
+    eir.add_argument("--map", required=True, help="Live-mapping session directory")
+    eir.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    eir.add_argument("--output", required=True, help="Output route .usda path (.usd/.usdc also accepted)")
+    eir.add_argument("--nav", default=None, help="nav_result.json from `navigate` (draws the planned path + goal)")
+    eir.add_argument("--query", default=None, help="query.json from `query-map` (draws the 3D hits)")
+    eir.add_argument(
+        "--usdz",
+        default=None,
+        help="Optional export-isaac USDZ path/URI to reference from /World/Splat so one file opens scene + route",
+    )
+    eir.add_argument("--no-trajectory", action="store_true", help="Skip the mapped-trajectory polyline")
+
     stc = subparsers.add_parser(
         "splat-tile-catalog",
         help="Split an existing browser .splat into dynamic-map tile splats and a tile catalog",
@@ -5016,6 +5032,34 @@ def cmd_splat_paste(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_export_isaac_route(args: argparse.Namespace) -> None:
+    """Handle the export-isaac-route subcommand."""
+    from gs_sim2real.robotics.isaac_route import route_geometry, write_route_layer
+
+    output_path = Path(args.output)
+
+    try:
+        geometry = route_geometry(
+            Path(args.map),
+            round_index=args.round,
+            nav_json=Path(args.nav) if args.nav else None,
+            query_json=Path(args.query) if args.query else None,
+            include_trajectory=not args.no_trajectory,
+        )
+        stats = write_route_layer(geometry, output_path, usdz_reference=args.usdz)
+    except (ValueError, FileNotFoundError, KeyError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(str(error)) from error
+
+    print(f"Wrote {stats['output']} ({stats['polylines']} polyline(s), {stats['markers']} marker(s))")
+    if args.usdz:
+        print(f"Open it: usdview {stats['output']} (the route references {args.usdz})")
+    else:
+        print("Open it: usdview route.usda; pass --usdz or load the route and NuRec USDZ in the same stage")
+    print("Note: route distances are reconstruction-gauge camera-height units, not meters.")
+
+
 def cmd_export_overlay(args: argparse.Namespace) -> None:
     """Handle the export-overlay subcommand."""
     from gs_sim2real.robotics.viewer_overlay import build_overlay
@@ -5798,6 +5842,7 @@ def main(argv: list[str] | None = None) -> None:
         "merge-live": cmd_merge_live,
         "query-map": cmd_query_map,
         "export-overlay": cmd_export_overlay,
+        "export-isaac-route": cmd_export_isaac_route,
         "splat-clean": cmd_splat_clean,
         "splat-grab": cmd_splat_grab,
         "splat-paste": cmd_splat_paste,

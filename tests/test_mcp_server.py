@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -628,3 +629,58 @@ def test_splat_paste_builds_argv_and_returns_stdout_tail(tmp_path: Path, monkeyp
     assert result["output_ply"].endswith("pasted_20260102-030405.ply")
     assert result["preview_png"].endswith("pasted_20260102-030405.png")
     assert result["stdout_tail"] == "\n".join(f"paste {index}" for index in range(1, 11))
+
+
+def test_export_isaac_route_mcp_builds_cli_argv_and_returns_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(mcp_server, "_ensure_session", lambda map_dir: Path(map_dir))
+    monkeypatch.setattr(mcp_server, "_mcp_out_dir", lambda session: tmp_path / "mcp")
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102_030405")
+
+    def fake_run_cli(args: list[str]) -> Any:
+        captured["args"] = args
+        out_path = tmp_path / "mcp" / "route_20260102_030405.usda"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout = (
+            f"Wrote {out_path} (2 polyline(s), 3 marker(s))\n"
+            "Open it: usdview route.usda (the route references scene.usdz)\n"
+            "Note: route distances are reconstruction-gauge camera-height units, not meters.\n"
+        )
+        return SimpleNamespace(stdout=stdout)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+
+    result = mcp_server.export_isaac_route(
+        str(session_dir),
+        nav_json="nav_result.json",
+        query_json="query.json",
+        usdz="scene.usdz",
+        round_index=7,
+    )
+
+    assert captured["args"] == [
+        "export-isaac-route",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(tmp_path / "mcp" / "route_20260102_030405.usda"),
+        "--round",
+        "7",
+        "--nav",
+        "nav_result.json",
+        "--query",
+        "query.json",
+        "--usdz",
+        "scene.usdz",
+    ]
+    assert result["output_usda"] == str(tmp_path / "mcp" / "route_20260102_030405.usda")
+    assert result["usdz_reference"] == "scene.usdz"
+    assert (
+        result["stdout_tail"].splitlines()[-1]
+        == "Note: route distances are reconstruction-gauge camera-height units, not meters."
+    )

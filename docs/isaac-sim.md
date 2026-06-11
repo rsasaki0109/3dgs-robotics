@@ -54,6 +54,29 @@ See NVIDIA's
 [smartphone-to-Isaac-Sim walkthrough](https://developer.nvidia.com/blog/reconstruct-a-scene-in-nvidia-isaac-sim-using-only-a-smartphone/)
 for the same flow with screenshots.
 
+## Route layers: bring the robot's results along
+
+`export-isaac-route` bakes navigation paths, goals, query hits, and the
+mapped trajectory into a USD layer **in the same round-gauge frame as the
+USDZ**, and (with `--usdz`) references the scene from `/World/Splat` — one
+file opens the splat scene with the robot's route drawn through it:
+
+```bash
+3dgs-robotics navigate --map <session> --output nav/nav_result.json
+3dgs-robotics export-isaac --map <session> --output isaac/scene.usdz
+3dgs-robotics export-isaac-route --map <session> --nav nav/nav_result.json \
+  --usdz scene.usdz --output isaac/route.usda
+usdview isaac/route.usda   # or open in Isaac Sim
+```
+
+The stage composes `/World/Splat` (the NuRec volume from the USDZ) next to
+`/World/Route/planned_path` + `/World/Route/trajectory` (BasisCurves) and
+`/World/Route/goal` / `hit_N` (Spheres). Nav paths are lifted to the local
+road level the same way the browser overlay does. Verified by reading the
+composed stage back with usd-core (`pxr`); rendering inside Isaac Sim itself
+is on you. Distances are reconstruction-gauge camera-height units (see
+Caveats).
+
 ## Caveats
 
 - **Scale is not metric.** Pose-free monocular maps live in an arbitrary

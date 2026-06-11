@@ -667,6 +667,38 @@ def splat_paste(
     }
 
 
+def export_isaac_route(
+    map_dir: str,
+    nav_json: str | None = None,
+    query_json: str | None = None,
+    usdz: str | None = None,
+    round_index: int | None = None,
+) -> dict[str, Any]:
+    """Bake nav/query results into a USD layer for Isaac Sim.
+
+    Combine navigate -> export_isaac_route to draw the robot path, goal, mapped trajectory, and query hits next to the
+    NuRec USDZ. Distances are reconstruction-gauge camera-height units, not meters unless the reconstruction is metric.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"route_{_timestamp()}.usda"
+    args = ["export-isaac-route", "--map", str(session_dir), "--output", str(out_path)]
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+    if nav_json is not None:
+        args.extend(["--nav", nav_json])
+    if query_json is not None:
+        args.extend(["--query", query_json])
+    if usdz is not None:
+        args.extend(["--usdz", usdz])
+
+    proc = _run_cli(args)
+    return {
+        "output_usda": str(out_path),
+        "usdz_reference": usdz,
+        "stdout_tail": _tail(proc.stdout, 5),
+    }
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -690,6 +722,7 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         merge_maps,
         detect_changes,
         export_overlay,
+        export_isaac_route,
     ):
         server.add_tool(tool)
     return server

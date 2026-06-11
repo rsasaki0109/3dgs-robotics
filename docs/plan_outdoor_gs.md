@@ -199,6 +199,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実走: live_demo_kitti0056 から `splat-grab "car"` → 当初 19 クラスタ 219k gaussians が「ドライブ全長の先行車ゴースト」をまとめて掴む問題が発覚 → **best-cluster 既定動作を追加**(ベストヒット最近傍の連結成分のみ、`--all-clusters` で無効化)→ 1 台分 21.8k gaussians。`splat-paste --at 1.0,0.05` で e2e_bag_live3 へ **ゲージスケール 0.408 自動適用 + 接地配置**。プレビュー = docs/images/robotics/splat-grab-paste.png。
 - codex 生成専用モード 6 回目。今回も防衛的シェイプ探りヘルパ 2 本を直接アクセスに置換(実 API は確定済みのため)。
 
+### 1.14 2026-06-12(未明): Isaac ルートレイヤ実装(§26)— 順送り 3 案コンプリート
+
+- 順送り 3 案(explore v2 → splat-grab/paste → Isaac 深化)の最終弾。実装は §26 参照。`robotics/isaac_route.py` + CLI `export-isaac-route` + MCP ツール(計 12 ツール)。テスト 5 本追加で全 1248 グリーン。
+- 実走: e2e_bag_live3 で nav(クリーン走行 598 步到達)→ export-isaac(USDZ 20.5MB 再生成)→ route.usda。**pxr 読み戻しで USDZ 参照が解決され、NuRec Volume(OmniNuRecFieldAsset)とルート(BasisCurves 2 本 + goal Sphere)が同一ステージに合成されることを確認**。Isaac Sim 本体でのレンダ確認はユーザー側(docs に明記)。
+- codex 生成専用モード 7 回目。手直し: pxr API 1 件(SetTypeAttr→CreateTypeAttr)、未使用 import/変数、テストの文字列 [-1] バグ。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1768,3 +1774,20 @@ PR 分割案:
 検証: テスト 8 本(mask 保持 + sidecar / 空マッチ / Rodrigues 回転(平行・反平行)/ placement_sim3 の接地とスケール / sidecar 欠落 / best-cluster 選択 / MCP argv 2 本)→ 全 1244 グリーン。実走: KITTI "car" grab 46 秒 → ゲージ差 1.8 倍の別セッションへ paste 2 秒、1 台の車が目標路上に接地。
 
 残: Isaac 深化(次)→ rerun.io / シーンインベントリ / click-to-go。
+
+
+## 26. Isaac ルートレイヤ `export-isaac-route` — ロボットの結果を USD に焼く(2026-06-12 実装完了)
+
+> **状況: 2026-06-12 完了**(実装 + テスト 5 本 + 実走 + pxr 検証。§1.14 参照)
+
+**ゴール**: `export-isaac`(NuRec USDZ)を「シーンだけ」から「シーン + ロボットの計画」へ深化。navigate の経路・ゴール、query-map のヒット、マッピング軌跡を USD レイヤ(BasisCurves / Sphere)として焼き、`--usdz` で `/World/Splat` から USDZ を参照 — **1 ファイル開けば Isaac Sim / usdview に splat シーンとルートが揃う**。
+
+設計(`src/gs_sim2real/robotics/isaac_route.py`):
+
+- **フレーム不変条件**: USDZ は round ゲージの raw PLY から transcode されるため、ルート幾何も round ゲージで書く。`route_geometry` は viewer_overlay.build_overlay のデータ準備を鏡写しにして **SplatFrameMapper(ブラウザ用正規化)を適用しない**。nav 経路の道路高さ追従リフト(`_lift_plane_points`)は流用。
+- `write_route_layer`: pxr 遅延 import(無ければ `pip install usd-core` のヒント)。/World デフォルトプリム、`--usdz` 参照、カーブ幅 = camera_height×0.08、customLayerData にゲージ注記。StageUpAxis は**意図的に設定しない**(ゲージの up は任意で、splat とルートは同一フレームなので Isaac 側の補正が両方に等しく効く)。
+- CLI `export-isaac-route`(--map/--nav/--query/--usdz/--no-trajectory)+ MCP ツール `export_isaac_route`(navigate → export_isaac_route のチェーンを docstring で誘導)。
+
+検証: テスト 5 本(route_geometry のリフト・件数 / USD ラウンドトリップ(pxr importorskip): プリム型・頂点数・半径・customLayerData・参照 / suffix バリデーション / MCP argv)→ 全 1248 グリーン。実走で合成ステージに OmniNuRecFieldAsset(splat)と Route プリムの同居を確認。**正直な限界**: usd-core での読み戻し検証まで。Isaac Sim 本体でのレンダリング確認・メトリックスケール化はユーザー側。
+
+**順送り 3 案(explore v2 / splat-grab/paste / Isaac 深化)コンプリート。** 残ネタ: rerun.io 連携 / シーンインベントリ / click-to-go。
