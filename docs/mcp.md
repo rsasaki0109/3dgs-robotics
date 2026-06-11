@@ -50,6 +50,8 @@ pass one explicitly. Every other tool takes the session directory as `map_dir`.
 | `explore` | `explore` | autonomous frontier exploration — the robot picks its own goals; coverage summary, trace PNG, optional GIF |
 | `patrol` | `patrol` | multi-stop inspection patrol; pass `detect_changes`' output_json as `from_changes` and the robot drives to each change |
 | `splat_clean` | `splat-clean` | cleaned PLY + preview paths |
+| `splat_grab` | `splat-grab` | a language-selected object as a standalone splat + gauge sidecar |
+| `splat_paste` | `splat-paste` | object placed into a target map (auto gauge scale, grounded, `--yaw`) |
 | `merge_maps` | `merge-maps` | one merged PLY in map A's gauge (collaborative mapping) |
 | `detect_changes` | `detect-changes` | alignment info, appeared/disappeared counts, top 10 clusters |
 | `export_overlay` | `export-overlay` | overlay JSON for the browser viewer (`splat.html?url=...&overlay=...`) |

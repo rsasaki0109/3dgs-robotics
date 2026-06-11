@@ -1482,6 +1482,57 @@ def build_parser() -> argparse.ArgumentParser:
     )
     spc.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
 
+    spg = subparsers.add_parser(
+        "splat-grab",
+        help='Extract objects from a map by language prompt ("car" -> standalone object splat)',
+    )
+    spg.add_argument("prompt", help="Free-text prompt describing what to grab, e.g. 'car'")
+    spg.add_argument("--map", required=True, help="Live-mapping session directory")
+    spg.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    spg.add_argument(
+        "--output", required=True, help="Output grabbed .ply path (a .json sidecar and .png preview land next to it)"
+    )
+    spg.add_argument("--threshold", type=float, default=0.5, help="CLIPSeg relevance threshold in [0, 1]")
+    spg.add_argument("--min-views", type=int, default=1, help="Keyframes a gaussian must score in before grabbing")
+    spg.add_argument("--max-keyframes", type=int, default=12, help="Keyframes scored with CLIPSeg")
+    spg.add_argument(
+        "--min-cluster-gaussians",
+        type=int,
+        default=20,
+        help="Smallest connected gaussian blob that gets grabbed",
+    )
+    spg.add_argument(
+        "--dilate",
+        type=float,
+        default=0.125,
+        help="Dilation radius in camera-height units pulling in the transparent smear around hits",
+    )
+    spg.add_argument(
+        "--all-clusters",
+        action="store_true",
+        help="Grab every matching cluster (default: only the one nearest the best hit)",
+    )
+    spg.add_argument("--device", default="cuda", help="torch device for CLIPSeg")
+
+    spp = subparsers.add_parser(
+        "splat-paste",
+        help="Paste a grabbed object splat into a target map at grid-plane coordinates",
+    )
+    spp.add_argument("object", help="Grabbed object .ply path written by splat-grab")
+    spp.add_argument("--map", required=True, help="Target live-mapping session directory")
+    spp.add_argument("--round", type=int, default=None, help="Target rebuild round (default: last successful)")
+    spp.add_argument("--output", required=True, help="Output merged .ply path (a .png preview lands next to it)")
+    spp.add_argument(
+        "--at",
+        required=True,
+        help="Target grid-plane coordinates as x,y, in the same frame as query-map goal_xy and navigate --goal",
+    )
+    spp.add_argument("--yaw", type=float, default=0.0, help="Yaw in degrees about the target map up axis")
+    spp.add_argument("--scale", type=float, default=None, help="Manual scale (default: auto-match camera-height gauge)")
+    spp.add_argument(
+        "--dc-only", action="store_true", help="Zero pasted object's f_rest_* coefficients after placement"
+    )
+
     exo = subparsers.add_parser(
         "export-overlay",
         help="Export nav paths / query hits as a splat.html?overlay= JSON drawn over the browser splat",
@@ -4885,6 +4936,86 @@ def cmd_splat_clean(args: argparse.Namespace) -> None:
     print("The cleaned map keeps the original gauge - navigate/export-grid/merge-maps work unchanged.")
 
 
+def cmd_splat_grab(args: argparse.Namespace) -> None:
+    """Handle the splat-grab subcommand."""
+    from gs_sim2real.robotics.splat_clean import CleanParams, write_clean_preview
+    from gs_sim2real.robotics.splat_grab import grab_map
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".ply":
+        raise SystemExit(f"--output must be a .ply path: {output_path}")
+
+    params = CleanParams(
+        score_threshold=args.threshold,
+        min_views=args.min_views,
+        max_keyframes=args.max_keyframes,
+        min_cluster_gaussians=args.min_cluster_gaussians,
+        dilate_camera_heights=args.dilate,
+    )
+    try:
+        stats, points, mask = grab_map(
+            Path(args.map),
+            args.prompt,
+            output_path,
+            round_index=args.round,
+            params=params,
+            device=args.device,
+            best_cluster=not args.all_clusters,
+        )
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(f"splat-grab needs the optional `transformers` package: {error}") from error
+
+    import numpy as np
+
+    preview = write_clean_preview(points, mask, np.asarray(stats["basis"]), output_path.with_suffix(".png"))
+    print(
+        f'Grabbed {stats["grabbed"]:,} of {stats["total"]:,} gaussians matching "{args.prompt}" '
+        f"-> {stats['output']} (+ {Path(stats['sidecar']).name}, {preview.name})"
+    )
+
+
+def cmd_splat_paste(args: argparse.Namespace) -> None:
+    """Handle the splat-paste subcommand."""
+    from gs_sim2real.robotics.splat_grab import paste_map, write_paste_preview
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".ply":
+        raise SystemExit(f"--output must be a .ply path: {output_path}")
+
+    parts = [part.strip() for part in args.at.split(",")]
+    if len(parts) != 2:
+        raise SystemExit('--at must be "x,y"')
+    try:
+        at_xy = (float(parts[0]), float(parts[1]))
+    except ValueError as error:
+        raise SystemExit('--at must be "x,y" with numeric coordinates') from error
+
+    try:
+        stats, target_xyz, object_xyz_transformed, basis2 = paste_map(
+            Path(args.object),
+            Path(args.map),
+            output_path,
+            at_xy=at_xy,
+            yaw_deg=args.yaw,
+            scale=args.scale,
+            round_index=args.round,
+            dc_only=args.dc_only,
+        )
+        preview = write_paste_preview(target_xyz, object_xyz_transformed, basis2, output_path.with_suffix(".png"))
+    except (ValueError, FileNotFoundError) as error:
+        raise SystemExit(str(error)) from error
+    except ImportError as error:
+        raise SystemExit(f"splat-paste needs the optional `Pillow` package for previews: {error}") from error
+
+    scale_mode = "manual scale" if args.scale is not None else "gauge-matched"
+    print(
+        f"Pasted {stats['gaussians_object']:,} gaussians (scale {stats['scale']:.3g}, {scale_mode}) "
+        f"at ({at_xy[0]:.3g}, {at_xy[1]:.3g}) -> {stats['output']} (+ {preview.name})"
+    )
+
+
 def cmd_export_overlay(args: argparse.Namespace) -> None:
     """Handle the export-overlay subcommand."""
     from gs_sim2real.robotics.viewer_overlay import build_overlay
@@ -5668,6 +5799,8 @@ def main(argv: list[str] | None = None) -> None:
         "query-map": cmd_query_map,
         "export-overlay": cmd_export_overlay,
         "splat-clean": cmd_splat_clean,
+        "splat-grab": cmd_splat_grab,
+        "splat-paste": cmd_splat_paste,
         "splat-inspect": cmd_splat_inspect,
         "splat-tile-catalog": cmd_splat_tile_catalog,
         "benchmark": cmd_benchmark,

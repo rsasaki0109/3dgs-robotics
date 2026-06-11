@@ -193,6 +193,12 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - KITTI 0056 実走(VGGT): 15 フレームのブートストラップ地図 2.09M gaussians → **ロボットが選んだ 6 ラウンドで 3.05M に成長**、追跡した全フロンティアが許容内に地図化(frontier_distance 0.05〜0.14 vs 閾値 0.08〜0.20)。GIF = docs/images/robotics/active-mapping.gif。
 - codex 生成専用モード 5 回目。レビューで実害バグ 2 件を修正: ① codex が API 不確実時に入れた多重シグネチャ試行ハック 90 行 → 直接呼び出し化 ② **成長判定の「centers 追記」前提**(round はストライド再サンプルするので破綻)→「次 round の最近傍キーフレーム距離 ≤ 閾値」に修正。さらに設計バグ ③ inflate_obstacles が unknown も膨張させるためマップフロンティアが原理的に空 → フロンティアを到達圏近傍に再定義。
 
+### 1.13 2026-06-11(深夜続々): splat-grab/paste 実装(§25)
+
+- 順送り 3 案の第 2 弾。実装は §25 参照。`robotics/splat_grab.py` + CLI `splat-grab`/`splat-paste` + MCP ツール 2 本(計 11 ツール)。テスト 8 本追加で全 1244 グリーン。
+- 実走: live_demo_kitti0056 から `splat-grab "car"` → 当初 19 クラスタ 219k gaussians が「ドライブ全長の先行車ゴースト」をまとめて掴む問題が発覚 → **best-cluster 既定動作を追加**(ベストヒット最近傍の連結成分のみ、`--all-clusters` で無効化)→ 1 台分 21.8k gaussians。`splat-paste --at 1.0,0.05` で e2e_bag_live3 へ **ゲージスケール 0.408 自動適用 + 接地配置**。プレビュー = docs/images/robotics/splat-grab-paste.png。
+- codex 生成専用モード 6 回目。今回も防衛的シェイプ探りヘルパ 2 本を直接アクセスに置換(実 API は確定済みのため)。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1745,3 +1751,20 @@ PR 分割案:
 検証: テスト 7 本(フロンティア検出 / 成長・枯渇 / フレーム枯渇 / max-rounds / bootstrap 失敗 / qvec 回転)→ 全 1235 グリーン。KITTI 0056 実走(VGGT、計 13 分): bootstrap 15 フレーム 2.09M → 6 自律ラウンドで 3.05M gaussians、全フロンティア grew=True(距離 0.05〜0.14、閾値 0.08〜0.20)、stop=frames-exhausted(59 フレーム消費完了)。`active_mapping_log.json` に全意思決定を記録。GIF は round ごとの地図伸長 + ロボット軌跡 + 追跡フロンティア。
 
 残ネタ: splat-grab/paste(次)→ Isaac 深化 → rerun.io / シーンインベントリ / click-to-go。
+
+
+## 25. splat-grab / splat-paste — 言語でオブジェクトを地図間カット&ペースト(2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 8 本 + 実走 + 素材。§1.13 参照)
+
+**ゴール**: splat-clean(消す)の対になる「つまむ・置く」。実スキャンされたオブジェクトをシナリオ作成資産にする — 「map A の車をつまんで map B の駐車場に置く」「同じ車を 3 台並べてテストシーンを作る」。Physical AI ベンチマークのシーン作成と直結する。
+
+設計(`src/gs_sim2real/robotics/splat_grab.py`、全て既存機構の流用):
+
+- **grab** = clean_map と同一の言語選択パイプライン(query_map スコア → removal_mask)で、mask を**捨てずに残す**。`--best-cluster` 既定: プロンプトが動体(車)だとドライブ全長の出現が全部マッチするため、ベストヒット最近傍の連結ボクセル成分のみ採用(実走で 219k→21.8k に絞れた)。出力は object .ply + **sidecar .json**(camera_height / up / centroid / bottom = ゲージメタデータ)。
+- **paste** = sidecar を読み、Sim3 を構成して merge_raw_gaussians(merge-maps の機構)に流す: s = 目標 camera_height / 元 camera_height(**ゲージ自動スケール**、`--scale` で上書き)、R = 目標 up への整列 × `--yaw`、t = オブジェクト底面中心(bottom-center アンカー)が `--at x,y` の目標地面に着地。`--at` は query-map の goal_xy / navigate --goal と同じグリッド平面座標 — 「query で場所を探して paste」がそのまま繋がる。
+- placement_sim3 を純関数に分離(単体テスト可能)。プレビューは対象=グレー / 貼付オブジェクト=オレンジの俯瞰。
+
+検証: テスト 8 本(mask 保持 + sidecar / 空マッチ / Rodrigues 回転(平行・反平行)/ placement_sim3 の接地とスケール / sidecar 欠落 / best-cluster 選択 / MCP argv 2 本)→ 全 1244 グリーン。実走: KITTI "car" grab 46 秒 → ゲージ差 1.8 倍の別セッションへ paste 2 秒、1 台の車が目標路上に接地。
+
+残: Isaac 深化(次)→ rerun.io / シーンインベントリ / click-to-go。

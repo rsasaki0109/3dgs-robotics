@@ -561,6 +561,32 @@ gaussians in red. The cleaned map keeps the original gauge, so `navigate`,
 (CLIPSeg relevance, default 0.5), `--min-cluster-gaussians` (speckle
 suppression), `--dilate` (smear shell in camera-height units, default 0.125).
 
+### Grab & paste objects between maps ("take the car, put it there")
+
+`splat-grab` is splat-clean's complement: the same language selection, but it
+KEEPS the matched gaussians as a standalone object splat (plus a `.json`
+sidecar recording the source gauge — camera height, up direction, the
+object's bottom). By default only the cluster nearest the best query hit is
+grabbed, so a moving car sighted along the whole drive doesn't smear into one
+giant "object" (`--all-clusters` disables this). `splat-paste` then places
+the object into any map: scaled by the camera-height ratio of the two gauges
+(maps reconstructed at 1.8x different scales just work), rotated by `--yaw`,
+and grounded so the object's bottom lands on the target's road:
+
+```bash
+3dgs-robotics splat-grab "car" --map outputs/mapA --output objects/car.ply
+3dgs-robotics splat-paste objects/car.ply --map outputs/mapB \
+  --at 1.0,0.05 --yaw 45 --output scenes/with_car.ply
+```
+
+![a car grabbed from one map standing in another map's street](images/robotics/splat-grab-paste.png)
+
+`--at` uses the same grid-plane coordinates `query-map` returns as `goal_xy`
+and `navigate --goal` accepts, so "find a parking spot in map B, paste the
+car there" chains directly. Real reconstructed objects become scenario
+assets: paste the same object several times to author test scenes for the
+Physical AI benchmarks. The merged map keeps the target session's gauge.
+
 ### Overlaying robot results in the browser viewer
 
 ![browser viewer with the mapped trajectory, planned path and query hits overlaid](images/robotics/viewer-overlay.png)

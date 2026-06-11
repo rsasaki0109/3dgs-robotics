@@ -541,3 +541,90 @@ def test_patrol_builds_argv_and_caps_stops(tmp_path: Path, monkeypatch: pytest.M
     assert result["output_json"].endswith("patrol_20260102-030405.json")
     assert result["trace_png"].endswith("patrol_20260102-030405.png")
     assert result["gif"].endswith("patrol_20260102-030405.gif")
+
+
+def test_splat_grab_builds_argv_and_reads_sidecar_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _write_session(tmp_path)
+    calls: list[list[str]] = []
+    stdout = "\n".join(f"out {index}" for index in range(12))
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        sidecar = session / "mcp" / "grabbed_traffic-sign_20260102-030405.json"
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text('{"prompt": "traffic sign", "gaussians": 5}\n', encoding="utf-8")
+        return SimpleNamespace(stdout=stdout, stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.splat_grab(str(session), "traffic sign", threshold=0.6, round_index=1, device="cpu")
+
+    assert calls == [
+        [
+            "splat-grab",
+            "traffic sign",
+            "--map",
+            str(session),
+            "--output",
+            str(session / "mcp" / "grabbed_traffic-sign_20260102-030405.ply"),
+            "--threshold",
+            "0.6",
+            "--device",
+            "cpu",
+            "--round",
+            "1",
+        ]
+    ]
+    assert result["output_ply"].endswith("grabbed_traffic-sign_20260102-030405.ply")
+    assert result["sidecar"].endswith("grabbed_traffic-sign_20260102-030405.json")
+    assert result["preview_png"].endswith("grabbed_traffic-sign_20260102-030405.png")
+    assert result["summary"]["prompt"] == "traffic sign"
+    assert result["summary"]["gaussians"] == 5
+    assert result["stdout_tail"] == "\n".join(f"out {index}" for index in range(2, 12))
+
+
+def test_splat_paste_builds_argv_and_returns_stdout_tail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _write_session(tmp_path)
+    object_ply = tmp_path / "object.ply"
+    object_ply.write_text("ply\n", encoding="utf-8")
+    calls: list[list[str]] = []
+    stdout = "\n".join(f"paste {index}" for index in range(11))
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        return SimpleNamespace(stdout=stdout, stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.splat_paste(
+        str(session),
+        str(object_ply),
+        [1.2, 0.3],
+        yaw_deg=15.0,
+        scale=2.0,
+        round_index=3,
+    )
+
+    assert calls == [
+        [
+            "splat-paste",
+            str(object_ply),
+            "--map",
+            str(session),
+            "--output",
+            str(session / "mcp" / "pasted_20260102-030405.ply"),
+            "--at",
+            "1.2,0.3",
+            "--yaw",
+            "15.0",
+            "--scale",
+            "2.0",
+            "--round",
+            "3",
+        ]
+    ]
+    assert result["output_ply"].endswith("pasted_20260102-030405.ply")
+    assert result["preview_png"].endswith("pasted_20260102-030405.png")
+    assert result["stdout_tail"] == "\n".join(f"paste {index}" for index in range(1, 11))

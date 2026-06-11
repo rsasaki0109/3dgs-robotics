@@ -580,6 +580,93 @@ def patrol(
     return summary
 
 
+def splat_grab(
+    map_dir: str,
+    prompt: str,
+    threshold: float = 0.5,
+    all_clusters: bool = False,
+    round_index: int | None = None,
+    device: str = "cuda",
+) -> dict[str, Any]:
+    """Grab a language-described object as a reusable object splat.
+
+    The sidecar enables auto gauge scaling during paste. Combine query_map -> splat_grab -> splat_paste to move real
+    reconstructed objects between maps.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"grabbed_{_slug(prompt)}_{_timestamp()}.ply"
+    args = [
+        "splat-grab",
+        prompt,
+        "--map",
+        str(session_dir),
+        "--output",
+        str(out_path),
+        "--threshold",
+        str(threshold),
+        "--device",
+        device,
+    ]
+    if all_clusters:
+        args.append("--all-clusters")
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+    proc = _run_cli(args)
+    sidecar = out_path.with_suffix(".json")
+    result: dict[str, Any] = {
+        "output_ply": str(out_path),
+        "sidecar": str(sidecar),
+        "preview_png": _preview_for(out_path),
+        "stdout_tail": _tail(proc.stdout, 10),
+    }
+    if sidecar.is_file():
+        result["summary"] = _json(sidecar)
+    return result
+
+
+def splat_paste(
+    map_dir: str,
+    object_ply: str,
+    at_xy: list[float],
+    yaw_deg: float = 0.0,
+    scale: float | None = None,
+    round_index: int | None = None,
+) -> dict[str, Any]:
+    """Paste a grabbed object into a target map at query/navigation grid-plane coordinates.
+
+    ``at_xy`` uses the same grid-plane coordinates that query_map returns as goal_xy and navigate accepts as --goal.
+    Scale defaults to auto gauge scaling via the grab sidecar. Combine query_map -> splat_grab -> splat_paste moves real
+    reconstructed objects between maps.
+    """
+    if len(at_xy) != 2:
+        raise ValueError("at_xy must contain exactly two numbers")
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"pasted_{_timestamp()}.ply"
+    args = [
+        "splat-paste",
+        object_ply,
+        "--map",
+        str(session_dir),
+        "--output",
+        str(out_path),
+        "--at",
+        f"{float(at_xy[0])},{float(at_xy[1])}",
+    ]
+    if yaw_deg != 0.0:
+        args.extend(["--yaw", str(yaw_deg)])
+    if scale is not None:
+        args.extend(["--scale", str(scale)])
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+
+    proc = _run_cli(args)
+    return {
+        "output_ply": str(out_path),
+        "preview_png": _preview_for(out_path),
+        "stdout_tail": _tail(proc.stdout, 10),
+    }
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -598,6 +685,8 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         explore,
         patrol,
         splat_clean,
+        splat_grab,
+        splat_paste,
         merge_maps,
         detect_changes,
         export_overlay,

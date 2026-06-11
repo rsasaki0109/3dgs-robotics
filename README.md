@@ -53,6 +53,7 @@ Physical AI benchmark + scenario CI tooling. Details: `docs/plan_outdoor_gs.md`,
 | **"Where is the car?"** | `3dgs-robotics query-map "car" --map outputs/live_mapping --output query/car.json` | [docs/live-mapping.md](docs/live-mapping.md#open-vocabulary-queries-where-is-the-car) |
 | **"Drive to the car"** | `3dgs-robotics navigate --map outputs/live_mapping --to "car" --output nav/nav_result.json` | [docs/live-mapping.md](docs/live-mapping.md#autonomous-navigation-in-the-map) |
 | **"Remove the car from the map"** | `3dgs-robotics splat-clean "car" --map outputs/live_mapping --output clean/no_car.ply` | [docs/live-mapping.md](docs/live-mapping.md#erasing-objects-by-language-remove-the-car) |
+| **"Take the car, put it in map B"** | `3dgs-robotics splat-grab "car" --map mapA --output car.ply` then `splat-paste car.ply --map mapB --at 1.0,0.05 --output scene.ply` | [docs/live-mapping.md](docs/live-mapping.md#grab--paste-objects-between-maps-take-the-car-put-it-there) |
 | **Show robot results in the browser** | `3dgs-robotics export-overlay --map outputs/live_mapping --nav nav/nav_result.json --output overlay.json` then `splat.html?overlay=...` | [docs/live-mapping.md](docs/live-mapping.md#overlaying-robot-results-in-the-browser-viewer) |
 | **Just a browser** | HF Spaces / Colab badges above | [Zero-install demos](#zero-install-demos-hf-spaces--colab) |
 
