@@ -172,6 +172,13 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実装は §21 参照。`robotics/splat_explore.py` + CLI `explore` + MCP ツール `explore`。テスト 12 本追加で全 1212 グリーン。KITTI drive 0056 実走: 到達可能 30,468 セルの 97.9% を 23 個の自己選択ゴールで被覆(CPU-only 約 2.5 分)、トレース PNG + 58 フレーム GIF(docs/images/robotics/explore.gif)。
 - codex 生成専用モード(§1.8 と同方式)で一式生成 → レビューで 2 点修正(select_frontier の距離スケールを camera_height に、explore_gif への params 伝播)。
 
+### 1.10 2026-06-11(夜): マルチロボット・ライブマージ `merge-live` 実装(§22)
+
+- ユーザー「プッシュ!次!」で explore を push(`495f48f`、CI 緑)→ 残候補からおすすめの**マルチロボット・ライブマージ**に着手、即日完了。
+- 実装は §22 参照。`robotics/live_merge.py` + CLI `merge-live` + MCP ツール `merge_maps` + `scripts/build_live_merge_gif.py`。テスト 6 本追加で全 1218 グリーン。
+- 実走: live_demo_kitti0056(A、2,448k gaussians)× e2e_bag_live3(B、174k)— 同じ場所の独立 2 セッションがキーフレーム名を共有していたため **shared 整合(GPU 不要)が 12 キーフレームで成立、ゲージ差 scale 1.802 を吸収**して 2,566k gaussians(56k 重複除去)。`--once` 47 秒。リプレイ GIF は 10 イベント(docs/images/robotics/live-merge.gif)。
+- codex 生成専用モード 3 回目。手直しは merge_preview の見栄え(外れ値で bounds 爆発 → percentile bounds、長軸の水平化、配色)のみ。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1664,3 +1671,25 @@ PR 分割案:
 正直な整理(docs/live-mapping.md にも明記): occupancy grid は静的なので、explore が育てるのは**ロボットの観測領域**であって地図データそのものではない。実ロボットでは選択されたゴールが「次のマッピングフレームを撮りに行く場所」になる — live mapping のラウンド給餌と接続すれば真のアクティブマッピングになる(v2 候補)。
 
 次の弾(未着手): マルチロボット・ライブマージ / rerun.io 連携 / シーンインベントリ / §1.7 保留 4 案(splat-grab/paste / click-to-go / patrol / Isaac 深化)。explore の v2 として「live mapping ラウンドとの接続(本物のアクティブマッピング)」も選択肢に加わった。
+
+
+## 22. マルチロボット・ライブマージ `merge-live` — collaborative live mapping(2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 6 本 + 実セッション実走 + GIF。§1.10 参照)
+
+**ゴール**: 2 台のロボットが独立にライブマッピングしている 2 セッションを、ランタイムで 1 枚の地図に合流させ続ける。「two robots, one map」。既存ビューワの `?refresh=` ポーリング契約をそのまま満たすので、ブラウザには**2 台分の地図が 1 枚として育つ**様子が映る。
+
+設計(`src/gs_sim2real/robotics/live_merge.py`、thin 配線):
+
+- 整合とマージは**既存 `merge_sessions()` をそのまま呼ぶ**(auto: shared keyframes → localize フォールバック)。新規 reconstruction logic ゼロ。
+- `watch_and_merge`: 両セッションの `live/state.json` をポーリングし、`lastSuccessfulRound` ペアが変わるたびに `merge_once` → `<output>/live/merged.ply` + `latest.splat` を tmp+os.replace で原子的に publish(live mapping の `_publish` と同じ契約)。state.json にマージログを書く。
+- ビューワ正規化は**初回マージで凍結**(`compute_splat_normalization` を 1 回だけ計算し再利用)— 地図が育っても再センタリングで飛ばない(live mapping の凍結正規化と同じ思想)。
+- 失敗ペア(書き込み途中の round 等)は記録してスキップ、タイトループで再試行しない。`--once` / `--max-merges` でデモ・テスト制御。
+- `merge_preview`: A=青 / B=オレンジの俯瞰スキャッタ。外れ値 floater で bounds が爆発しないよう **percentile(0.5/99.5)bounds**、長軸を水平に揃える。
+- CLI `merge-live`(--map-a/--map-b/--output/--align/--dedup-radius 0.1/--interval/--once/--max-merges/--preview)+ MCP ツール `merge_maps`(ワンショット merge-maps の薄ラップ)+ リプレイ GIF スクリプト `scripts/build_live_merge_gif.py`(完了済み 2 セッションの round を交互到着スケジュールで再生)。
+
+検証: テスト 6 本(read_last_round / merge_once の原子性と正規化凍結 / watch ループのペア検出 / once の actionable エラー / 失敗ペア耐性 / MCP argv)→ 全 1218 グリーン。実走は live_demo_kitti0056 × e2e_bag_live3(同一 KITTI drive 0056 の独立セッション、ゲージ差 1.8 倍): shared 整合 12 キーフレームで GPU 不要、`--once` 47 秒で 2,566k gaussians(56k dedup)。GIF 10 イベント = docs/images/robotics/live-merge.gif。
+
+正直な整理: 今回の実走は「同じドライブの 2 セッション」なのでキーフレーム名共有による shared 整合が効いた。完全に独立な 2 ロボットでは `--align localize`(GPU)になり、その経路は merge-maps/detect-changes で実証済みだが merge-live としての実走は未消化。ラウンドごとに再整合するコスト(localize 時)は v2 で Sim3 キャッシュ化の余地あり。
+
+次の弾(未着手): rerun.io 連携 / シーンインベントリ / §1.7 保留 4 案 / explore v2(live mapping 接続)。MCP には query→clean→navigate→merge が揃ったので「LLM が複数ロボットの統合地図を操作する」デモが組める状態になった。

@@ -414,3 +414,48 @@ def test_explore_builds_argv_and_drops_coverage_history(tmp_path: Path, monkeypa
     assert result["output_json"].endswith("explore_20260102-030405.json")
     assert result["trace_png"].endswith("explore_20260102-030405.png")
     assert result["gif"].endswith("explore_20260102-030405.gif")
+
+
+def test_merge_maps_builds_argv_and_returns_stdout_tail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session_a = _write_session(tmp_path, "session_a")
+    session_b = _write_session(tmp_path, "session_b")
+    calls: list[list[str]] = []
+    stdout = "\n".join(f"merge out {index}" for index in range(12))
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        return SimpleNamespace(stdout=stdout, stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.merge_maps(
+        str(session_a),
+        str(session_b),
+        dedup_radius=0.25,
+        round_a=1,
+        round_b=2,
+        device="cpu",
+    )
+
+    assert calls == [
+        [
+            "merge-maps",
+            "--map-a",
+            str(session_a),
+            "--map-b",
+            str(session_b),
+            "--output",
+            str(session_a / "mcp" / "merged_20260102-030405.ply"),
+            "--device",
+            "cpu",
+            "--dedup-radius",
+            "0.25",
+            "--round-a",
+            "1",
+            "--round-b",
+            "2",
+        ]
+    ]
+    assert result["output_ply"].endswith("merged_20260102-030405.ply")
+    assert result["stdout_tail"] == "\n".join(f"merge out {index}" for index in range(2, 12))

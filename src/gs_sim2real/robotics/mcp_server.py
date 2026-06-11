@@ -476,6 +476,46 @@ def explore(
     return summary
 
 
+def merge_maps(
+    map_a: str,
+    map_b: str,
+    dedup_radius: float = 0.1,
+    round_a: int | None = None,
+    round_b: int | None = None,
+    device: str = "cuda",
+) -> dict[str, Any]:
+    """Merge two maps into one PLY for collaborative mapping.
+
+    The merged map keeps map A's reconstruction gauge. Dedup distances are camera-height gauge units, not meters,
+    unless the source map was calibrated metrically.
+    """
+    session_a = _ensure_session(map_a)
+    session_b = _ensure_session(map_b)
+    out_path = _mcp_out_dir(session_a) / f"merged_{_timestamp()}.ply"
+    args = [
+        "merge-maps",
+        "--map-a",
+        str(session_a),
+        "--map-b",
+        str(session_b),
+        "--output",
+        str(out_path),
+        "--device",
+        device,
+        "--dedup-radius",
+        str(dedup_radius),
+    ]
+    if round_a is not None:
+        args.extend(["--round-a", str(round_a)])
+    if round_b is not None:
+        args.extend(["--round-b", str(round_b)])
+    proc = _run_cli(args)
+    return {
+        "output_ply": str(out_path),
+        "stdout_tail": _tail(proc.stdout, 10),
+    }
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -493,6 +533,7 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         navigate,
         explore,
         splat_clean,
+        merge_maps,
         detect_changes,
         export_overlay,
     ):

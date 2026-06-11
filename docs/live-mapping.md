@@ -339,6 +339,35 @@ are copied unrotated, so after a large gauge rotation its view-dependent
 shading is slightly off — `--dc-only` zeroes them for a fully consistent (if
 more matte) result.
 
+### Collaborative LIVE mapping (multi-robot merge-live)
+
+`3dgs-robotics merge-live` turns the one-shot merge into a watcher: it polls
+two live-mapping sessions' `live/state.json` and, whenever either robot
+publishes a new successful round, re-merges the two latest rounds and
+atomically replaces `<output>/live/merged.ply` + `<output>/live/latest.splat`
+— the same publish contract as a single live session, so the browser viewer's
+`?refresh=` polling shows **one map growing from two robots**:
+
+```bash
+# robots A and B are live-mapping into their own sessions; merge them live
+3dgs-robotics merge-live --map-a outputs/robotA --map-b outputs/robotB \
+  --output outputs/combined --dedup-radius 0.1 --interval 5
+
+# one merge and exit (also: --max-merges N, --preview for a colored PNG)
+3dgs-robotics merge-live --map-a outputs/robotA --map-b outputs/robotB \
+  --output outputs/combined --once --preview
+```
+
+The viewer normalization is frozen on the first merge so the combined map does
+not re-center as it grows. A failed pair (e.g. a round still being written) is
+logged and skipped, not retried in a tight loop. The merged map lives in A's
+gauge; everything downstream (`export-grid`, `navigate`, `query-map`) works on
+it unchanged. Replay two finished sessions as a concurrent-robots demo with
+`python3 scripts/build_live_merge_gif.py --session-a <A> --session-b <B>
+--output live_merge.gif`:
+
+![two robots, one map: each merge event fuses the latest rounds of both sessions](images/robotics/live-merge.gif)
+
 ### Autonomous navigation in the map
 
 `3dgs-robotics navigate` drives a simulated robot through the map with no

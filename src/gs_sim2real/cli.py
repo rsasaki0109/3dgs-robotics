@@ -1356,6 +1356,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mgm.add_argument("--device", default="cuda", help="torch device for --align localize")
 
+    merge_live = subparsers.add_parser(
+        "merge-live",
+        help="Watch two live-mapping sessions and publish one merged live map",
+    )
+    merge_live.add_argument("--map-a", required=True, help="First live-mapping session directory")
+    merge_live.add_argument("--map-b", required=True, help="Second live-mapping session directory")
+    merge_live.add_argument("--output", required=True, help="Combined live session directory")
+    merge_live.add_argument(
+        "--align",
+        choices=["auto", "shared", "localize"],
+        default="auto",
+        help="Alignment mode (default: auto)",
+    )
+    merge_live.add_argument(
+        "--dedup-radius",
+        type=float,
+        default=0.1,
+        help="Drop B gaussians within this camera-height radius of A",
+    )
+    merge_live.add_argument("--dc-only", action="store_true", help="Zero B's SH rest coefficients after alignment")
+    merge_live.add_argument("--interval", type=float, default=5.0, help="Polling interval in seconds")
+    merge_live.add_argument("--once", action="store_true", help="Run one merge attempt and exit")
+    merge_live.add_argument("--max-merges", type=int, default=None, help="Stop after this many successful merges")
+    merge_live.add_argument(
+        "--normalize-extent",
+        type=float,
+        default=2.0,
+        help="Frozen viewer normalization extent (<=0 disables)",
+    )
+    merge_live.add_argument("--preview", action="store_true", help="Write live/merge_preview.png after each merge")
+    merge_live.add_argument("--device", default="cuda", help="Device for localization alignment")
+
     qmp = subparsers.add_parser(
         "query-map",
         help='Open-vocabulary 3D query against a trained map ("car" -> 3D hits + a navigation goal)',
@@ -4424,6 +4456,36 @@ def cmd_merge_maps(args: argparse.Namespace) -> None:
     print("Inspect it: 3dgs-robotics splat-inspect after converting, or load the PLY in your viewer.")
 
 
+def cmd_merge_live(args: argparse.Namespace) -> None:
+    """Handle the merge-live subcommand."""
+    from gs_sim2real.robotics.live_merge import LiveMergeConfig, watch_and_merge
+
+    config = LiveMergeConfig(
+        align=args.align,
+        dedup_radius_camera_heights=args.dedup_radius,
+        dc_only_b=args.dc_only,
+        device=args.device,
+        interval_s=args.interval,
+        normalize_extent=args.normalize_extent,
+    )
+
+    try:
+        results = watch_and_merge(
+            Path(args.map_a),
+            Path(args.map_b),
+            Path(args.output),
+            config=config,
+            once=args.once,
+            max_merges=args.max_merges,
+            log_fn=print,
+            write_preview=args.preview,
+        )
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
+
+    print(f"merge-live finished after {len(results)} merge{'s' if len(results) != 1 else ''}")
+
+
 def cmd_query_map(args: argparse.Namespace) -> None:
     """Handle the query-map subcommand."""
     from gs_sim2real.robotics.language_query import QueryParams, query_map, write_query_preview
@@ -5283,6 +5345,7 @@ def main(argv: list[str] | None = None) -> None:
         "navigate": cmd_navigate,
         "explore": cmd_explore,
         "merge-maps": cmd_merge_maps,
+        "merge-live": cmd_merge_live,
         "query-map": cmd_query_map,
         "export-overlay": cmd_export_overlay,
         "splat-clean": cmd_splat_clean,

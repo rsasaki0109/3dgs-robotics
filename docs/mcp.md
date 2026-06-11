@@ -49,6 +49,7 @@ pass one explicitly. Every other tool takes the session directory as `map_dir`.
 | `navigate` | `navigate` | nav summary (reached / steps / cross-track stats), trace PNG, optional GIF; goal via `to` (language), `goal_xy`, or `goal_keyframe` |
 | `explore` | `explore` | autonomous frontier exploration — the robot picks its own goals; coverage summary, trace PNG, optional GIF |
 | `splat_clean` | `splat-clean` | cleaned PLY + preview paths |
+| `merge_maps` | `merge-maps` | one merged PLY in map A's gauge (collaborative mapping) |
 | `detect_changes` | `detect-changes` | alignment info, appeared/disappeared counts, top 10 clusters |
 | `export_overlay` | `export-overlay` | overlay JSON for the browser viewer (`splat.html?url=...&overlay=...`) |
 
