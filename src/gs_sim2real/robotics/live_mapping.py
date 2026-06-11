@@ -489,6 +489,17 @@ class LiveMappingSession:
         self._wakeup.set()
         return True
 
+    def build_pending_round(self) -> bool:
+        """Synchronously build one round from pending keyframes (active-mapping driver).
+
+        Use without :meth:`start` — the caller owns the schedule. Returns True
+        when a round was built and succeeded.
+        """
+        if self._pending_new_keyframes() <= 0 or len(self.keyframes) < 2:
+            return False
+        self._build_round()
+        return bool(self.rounds) and self.rounds[-1].error is None
+
     # ----------------------------------------------------------------- worker
 
     def start(self) -> None:

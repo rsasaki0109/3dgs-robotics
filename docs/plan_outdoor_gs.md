@@ -186,6 +186,13 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実走(e2e_bag_live3、round5 vs 4 の changes): 全 119 クラスタ巡回 22 分(78/119 到達、到達不能は正直にスキップ記録)→ `--max-stops` を追加し大クラスタ優先 8 ストップ + `--return-to-start` で 97 秒、7/9 到達、視点レンダ 8 枚 + スライドショー GIF。トレース = docs/images/robotics/patrol-trace.png。
 - codex 生成専用モード 4 回目。手直しは mkdir 1 箇所と `--max-stops` の後付けのみ。
 
+### 1.12 2026-06-11(深夜続): アクティブマッピング(explore v2)実装(§24)
+
+- ユーザー「順にやっていこう!」で残ネタ 3 案(explore v2 / splat-grab/paste / Isaac 深化)を順送りに。第 1 弾の **explore v2 = 本物のアクティブマッピング** を実装、patrol push(`c459148`)で CI 緑継続。
+- 実装は §24 参照。`robotics/active_mapping.py` + `scripts/run_active_mapping_demo.py` + `LiveMappingSession.build_pending_round()`(本体追加 10 行)。テスト 7 本追加で全 1235 グリーン。
+- KITTI 0056 実走(VGGT): 15 フレームのブートストラップ地図 2.09M gaussians → **ロボットが選んだ 6 ラウンドで 3.05M に成長**、追跡した全フロンティアが許容内に地図化(frontier_distance 0.05〜0.14 vs 閾値 0.08〜0.20)。GIF = docs/images/robotics/active-mapping.gif。
+- codex 生成専用モード 5 回目。レビューで実害バグ 2 件を修正: ① codex が API 不確実時に入れた多重シグネチャ試行ハック 90 行 → 直接呼び出し化 ② **成長判定の「centers 追記」前提**(round はストライド再サンプルするので破綻)→「次 round の最近傍キーフレーム距離 ≤ 閾値」に修正。さらに設計バグ ③ inflate_obstacles が unknown も膨張させるためマップフロンティアが原理的に空 → フロンティアを到達圏近傍に再定義。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1719,3 +1726,22 @@ PR 分割案:
 検証: テスト 10 本(xy パース / 等間隔選択 / changes 射影と kind フィルタ / limit 大クラスタ優先 / 到達不能スキップ / capture_fn / return-to-start / トレース)→ 全 1228 グリーン。実走は e2e_bag_live3 の round5 vs 4 changes で 119 クラスタ完走(22 分、78 到達)と `--max-stops 8` デモ(97 秒、7/9 到達、視点 8 枚 + GIF)。
 
 次の弾(未着手): rerun.io 連携 / シーンインベントリ / explore v2(live mapping 接続)/ 保留残 3 案(splat-grab/paste / click-to-go / Isaac 深化)。**MCP は 9 ツール**になり、「detect_changes → patrol」「query_map → navigate」のチェーンをエージェントが自律で組める構成が完成。
+
+
+## 24. アクティブマッピング — 地図はロボットが決めた方向に育つ(explore v2、2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 7 本 + KITTI 実走 + GIF。§1.12 参照)
+
+**ゴール**: §21 の explore は静的グリッド上で「観測領域」が育つだけだった。v2 は live mapping のラウンドループに接続し、**地図データそのものがロボットの選んだ方向に伸びる**: 現在の地図のマップフロンティア(走行可能空間と unknown の境界)を検出 → 効用最大のフロンティアへ走行 → そこで「撮影」(リプレイでは録画ドライブの次バッチを給餌)→ 再構築ラウンドで地図がそちらへ拡張 → 新フロンティア出現、の完全ループ。
+
+設計(`src/gs_sim2real/robotics/active_mapping.py`):
+
+- **セッションゲージ不変条件**: round の raw PLY / images.txt は round 固有ゲージなので、`gauge_transform.json` の Sim3 を位置・キーフレーム中心・qvec(`q' = q ⊗ quat(Rᵀ)`)に適用してから全幾何を計算。round をまたぐロボット位置・成長判定が座標比較可能になる。
+- **マップフロンティアの罠**: `inflate_obstacles` は unknown も膨張させるため「到達可能 ∧ unknown 隣接」は恒真で空。フロンティア = 「free ∧ unknown 隣接 ∧ 到達圏の near_steps 近傍」に定義し、ゴールへの接近は planner の nearest_free_cell スナップに委ねる。
+- **成長判定**: ラウンドは全履歴をストライド再サンプルするので mapped centers は追記列ではない。判定は「次 round の最近傍キーフレーム距離 ≤ growth_tolerance × camera_height」。届かなければそのフロンティアを exhausted として放棄(リプレイに映像が残っていない方向の検出を兼ねる)。
+- ドライバは LiveMappingSession を `build_pending_round()`(新設の同期ビルド、本体変更 10 行)で直接駆動。`grid_loader` 注入で CPU テスト可能。
+- 正直な枠組み(docstring / docs に明記): 撮影源は録画リプレイであり実カメラ制御ではない。ロボットが本当に決めるのは「どのフロンティアを追うか」と「育ったかの検証」。実ロボットでは同じゴールがプラットフォーム操縦に置き換わる。
+
+検証: テスト 7 本(フロンティア検出 / 成長・枯渇 / フレーム枯渇 / max-rounds / bootstrap 失敗 / qvec 回転)→ 全 1235 グリーン。KITTI 0056 実走(VGGT、計 13 分): bootstrap 15 フレーム 2.09M → 6 自律ラウンドで 3.05M gaussians、全フロンティア grew=True(距離 0.05〜0.14、閾値 0.08〜0.20)、stop=frames-exhausted(59 フレーム消費完了)。`active_mapping_log.json` に全意思決定を記録。GIF は round ごとの地図伸長 + ロボット軌跡 + 追跡フロンティア。
+
+残ネタ: splat-grab/paste(次)→ Isaac 深化 → rerun.io / シーンインベントリ / click-to-go。

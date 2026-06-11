@@ -473,6 +473,38 @@ drive 0056 demo session the robot covers 97.9% of 30k reachable cells with
 
 ![autonomous exploration: the observed region sweeps the map as the robot chases frontiers](images/robotics/explore.gif)
 
+### Active mapping (the map grows where the robot decides)
+
+`scripts/run_active_mapping_demo.py` upgrades exploration from "observe a
+static map" to **the map itself growing in the direction the robot chooses**.
+The loop per round: load the current live map in the session gauge → find
+**map frontiers** (drivable space bordering unknown) → drive to the most
+useful one with the navigate stack → feed the next batch of recorded frames
+to the live mapper → rebuild → verify that the new round actually placed a
+keyframe near the chased frontier (otherwise that frontier is marked
+exhausted and abandoned):
+
+```bash
+python3 scripts/run_active_mapping_demo.py \
+  --images ./my_drive_frames --workdir outputs/active_mapping \
+  --initial-frames 15 --batch-frames 8 --method vggt --vggt-root /path/to/vggt \
+  --gif outputs/active_mapping/active_mapping.gif
+```
+
+![active mapping: the map extends round by round toward the frontiers the robot chases](images/robotics/active-mapping.gif)
+
+Honest framing: the capture source is a replay of a recorded drive, not a
+real camera controller — the imagery arrives in recorded order. What the
+robot genuinely decides is which frontier to chase and whether each rebuild
+grew toward it; on a real robot the same goals would steer the platform that
+captures the next frames. On KITTI drive 0056, a 15-frame bootstrap map
+(2.09M gaussians) grows to 3.05M across 6 self-directed rounds, every chased
+frontier confirmed mapped within tolerance (`active_mapping_log.json` keeps
+the per-round decisions and frontier distances). All geometry — grids, robot
+pose, frontier goals, growth checks — lives in the session gauge via each
+round's `gauge_transform.json`, so positions stay comparable as the map
+rebuilds.
+
 ### Open-vocabulary queries ("where is the car?")
 
 `3dgs-robotics query-map` answers free-text questions about the map:

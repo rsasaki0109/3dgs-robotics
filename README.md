@@ -144,7 +144,7 @@ Reproduce it with `python3 scripts/build_robotics_demo_gif.py --session <session
 | --- | --- | --- |
 | Localization | `3dgs-robotics-localizer --map <session>` (PoseStamped + TF) | [live-mapping.md](docs/live-mapping.md#ros-2-localizer-node) |
 | Simulation | `3dgs-robotics-camera-sim --map <session> --replay` / `3dgs-robotics export-isaac` | [live-mapping.md](docs/live-mapping.md#ros-2-gs-camera-simulator-node), [isaac-sim.md](docs/isaac-sim.md) |
-| Navigation | `3dgs-robotics export-grid` (nav2 map) / `navigate --to "car"` (language-directed) / `explore` (the robot picks its own goals) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
+| Navigation | `3dgs-robotics export-grid` (nav2 map) / `navigate --to "car"` (language-directed) / `explore` (self-chosen goals) / active mapping (the map grows where the robot decides) | [live-mapping.md](docs/live-mapping.md#nav2-occupancy-grid-export) |
 | Perception | `3dgs-robotics detect-changes` / `query-map "car"` / `splat-clean "car"` / `patrol --from-changes` (go look at what changed) | [live-mapping.md](docs/live-mapping.md#change-detection-inspection) |
 | Collaboration | `3dgs-robotics merge-live` (two robots, one live map) / `merge-maps` (one-shot) | [live-mapping.md](docs/live-mapping.md#collaborative-live-mapping-multi-robot-merge-live) |
 
