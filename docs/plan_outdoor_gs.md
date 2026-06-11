@@ -179,6 +179,13 @@ robotics 応用マップ(Localization / Simulation / Navigation / Perception)の
 - 実走: live_demo_kitti0056(A、2,448k gaussians)× e2e_bag_live3(B、174k)— 同じ場所の独立 2 セッションがキーフレーム名を共有していたため **shared 整合(GPU 不要)が 12 キーフレームで成立、ゲージ差 scale 1.802 を吸収**して 2,566k gaussians(56k 重複除去)。`--once` 47 秒。リプレイ GIF は 10 イベント(docs/images/robotics/live-merge.gif)。
 - codex 生成専用モード 3 回目。手直しは merge_preview の見栄え(外れ値で bounds 爆発 → percentile bounds、長軸の水平化、配色)のみ。
 
+### 1.11 2026-06-11(深夜): 巡回点検 `patrol` 実装(§23)
+
+- ユーザー「次行こう!」で保留案③の **patrol** に着手、即日完了。merge-live push(`ce20a5f`)で CI も緑復帰(explore の format 修正 `aee6a33` 込み、ユーザー「プッシュ」)。
+- 実装は §23 参照。`robotics/patrol.py` + CLI `patrol` + MCP ツール。waypoint 源 4 種(xy / keyframe / 言語 / **changes.json = 変化点へ見に行く**)。テスト 10 本追加で全 1228 グリーン。
+- 実走(e2e_bag_live3、round5 vs 4 の changes): 全 119 クラスタ巡回 22 分(78/119 到達、到達不能は正直にスキップ記録)→ `--max-stops` を追加し大クラスタ優先 8 ストップ + `--return-to-start` で 97 秒、7/9 到達、視点レンダ 8 枚 + スライドショー GIF。トレース = docs/images/robotics/patrol-trace.png。
+- codex 生成専用モード 4 回目。手直しは mkdir 1 箇所と `--max-stops` の後付けのみ。
+
 ## 2. 現在の主戦場
 
 今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Dynamic Map Viewer + Physical AI 用 simulation / evaluation environment** に寄せることです。
@@ -1693,3 +1700,22 @@ PR 分割案:
 正直な整理: 今回の実走は「同じドライブの 2 セッション」なのでキーフレーム名共有による shared 整合が効いた。完全に独立な 2 ロボットでは `--align localize`(GPU)になり、その経路は merge-maps/detect-changes で実証済みだが merge-live としての実走は未消化。ラウンドごとに再整合するコスト(localize 時)は v2 で Sim3 キャッシュ化の余地あり。
 
 次の弾(未着手): rerun.io 連携 / シーンインベントリ / §1.7 保留 4 案 / explore v2(live mapping 接続)。MCP には query→clean→navigate→merge が揃ったので「LLM が複数ロボットの統合地図を操作する」デモが組める状態になった。
+
+
+## 23. 巡回点検 `patrol` — 変化点へ見に行くロボット(2026-06-11 実装完了)
+
+> **状況: 2026-06-11 完了**(実装 + テスト 10 本 + 実走 + 素材。§1.11 参照)
+
+**ゴール**: 点検ストーリーの完結。「地図を作る(live mapping)→ 何が変わったか分かる(detect-changes)→ **変わった場所へロボットが見に行く(patrol --from-changes)**」。保留案③の実装だが、当初案の「detect-changes を内包する 1 コマンド」ではなく **compose 設計**(detect-changes の changes.json を入力に取る)にした — 各コマンドが単機能のまま、点検ループは 2 行で繋がる。
+
+設計(`src/gs_sim2real/robotics/patrol.py`、thin 配線):
+
+- waypoint 源 4 種: `--goals "x,y;x,y"` / `--goal-keyframes` / `--to "car;traffic sign"`(プロンプトごとに query_map の最良ヒット)/ `--from-changes changes.json`(クラスタ重心を grid 平面へ射影、`--change-kinds` で appeared/disappeared 選択、`--max-stops` で大クラスタ優先)。無指定なら `--num-waypoints` 個の等間隔キーフレーム巡回。
+- 走行は waypoint ごとに既存 plan_path + run_navigation。**計画不能な stop は記録してスキップ**(変化クラスタは走行可能回廊の外にも出る — 正直に planned: false)。`--return-to-start` で帰投。
+- `--render`: 各 stop 到着時に HeadlessSplatRenderer + pose2d_to_camera_pose(最寄りキーフレーム高さ追従)でロボット視点を PNG 保存、`--gif` でラベル付きスライドショー。`--localize-every` で navigate と同じ localizer ループ。
+- トレース PNG: stop を源別に色分け(keyframe=シアン / language=オレンジ / appeared=赤 / disappeared=青 / xy=白)、計画パス + 走行軌跡。
+- MCP ツール `patrol`(from_changes に detect_changes の output_json をそのまま渡せる、と docstring に明記 — エージェントの 2 ツールチェーンを誘導)。
+
+検証: テスト 10 本(xy パース / 等間隔選択 / changes 射影と kind フィルタ / limit 大クラスタ優先 / 到達不能スキップ / capture_fn / return-to-start / トレース)→ 全 1228 グリーン。実走は e2e_bag_live3 の round5 vs 4 changes で 119 クラスタ完走(22 分、78 到達)と `--max-stops 8` デモ(97 秒、7/9 到達、視点 8 枚 + GIF)。
+
+次の弾(未着手): rerun.io 連携 / シーンインベントリ / explore v2(live mapping 接続)/ 保留残 3 案(splat-grab/paste / click-to-go / Isaac 深化)。**MCP は 9 ツール**になり、「detect_changes → patrol」「query_map → navigate」のチェーンをエージェントが自律で組める構成が完成。

@@ -48,6 +48,7 @@ pass one explicitly. Every other tool takes the session directory as `map_dir`.
 | `query_map` | `query-map` | up to 10 open-vocabulary 3D hits + a ready-to-use `navigate` suggestion for the best hit |
 | `navigate` | `navigate` | nav summary (reached / steps / cross-track stats), trace PNG, optional GIF; goal via `to` (language), `goal_xy`, or `goal_keyframe` |
 | `explore` | `explore` | autonomous frontier exploration — the robot picks its own goals; coverage summary, trace PNG, optional GIF |
+| `patrol` | `patrol` | multi-stop inspection patrol; pass `detect_changes`' output_json as `from_changes` and the robot drives to each change |
 | `splat_clean` | `splat-clean` | cleaned PLY + preview paths |
 | `merge_maps` | `merge-maps` | one merged PLY in map A's gauge (collaborative mapping) |
 | `detect_changes` | `detect-changes` | alignment info, appeared/disappeared counts, top 10 clusters |

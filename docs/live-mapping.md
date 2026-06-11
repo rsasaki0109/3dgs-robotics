@@ -319,6 +319,34 @@ Draft 1500-iteration rounds re-place splats noisily — raise
 `--min-cluster-voxels` / `--min-count` (e.g. 25 / 5) to suppress the
 speckle, or retrain both rounds at higher quality for fine-grained diffs.
 
+### Inspection patrol (drive to every stop — or to every change)
+
+`3dgs-robotics patrol` drives the simulated robot through a sequence of
+stops and optionally captures what it sees at each one (GS render). Stops
+come from one of four sources — explicit `--goals "x,y;x,y"`, mapped
+`--goal-keyframes`, language `--to "car;traffic sign"`, or, the closed
+inspection loop, the clusters of a change report:
+
+```bash
+# what changed since the last patrol?
+3dgs-robotics detect-changes --map-a run2 --map-b run1 --output changes/changes.json
+# ...now GO LOOK at the 8 biggest changes, photograph each, return home
+3dgs-robotics patrol --map run2 --from-changes changes/changes.json \
+  --change-kinds appeared,disappeared --max-stops 8 --render --return-to-start \
+  --gif patrol/patrol.gif --output patrol/patrol_result.json
+```
+
+![change-driven patrol: appeared clusters red, disappeared blue, driven trail green, home white](images/robotics/patrol-trace.png)
+
+With no waypoint source, the robot visits `--num-waypoints` evenly spaced
+mapped keyframes (a route patrol). Unreachable stops are recorded and
+skipped, not fatal — a change cluster can sit off the drivable corridor.
+Outputs: `patrol_result.json` (per-stop reached/steps/capture paths),
+a trace PNG (stops colored by source), per-stop view PNGs with `--render`,
+and a stop-view slideshow GIF with `--gif`. The same localizer loop as
+`navigate` engages with `--localize-every`; distances are in camera-height
+gauge units.
+
 ### Merging two maps (collaborative mapping)
 
 `3dgs-robotics merge-maps` fuses two maps of the same place into one splat —

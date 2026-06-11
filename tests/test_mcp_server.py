@@ -459,3 +459,85 @@ def test_merge_maps_builds_argv_and_returns_stdout_tail(tmp_path: Path, monkeypa
     ]
     assert result["output_ply"].endswith("merged_20260102-030405.ply")
     assert result["stdout_tail"] == "\n".join(f"merge out {index}" for index in range(2, 12))
+
+
+def test_patrol_builds_argv_and_caps_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _write_session(tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args):
+        calls.append(list(args))
+        out_path = Path(args[args.index("--output") + 1])
+        out_path.write_text(
+            json.dumps(
+                {
+                    "stops": [
+                        {
+                            "label": f"stop {index}",
+                            "source": "xy",
+                            "goal_xy": [float(index), 2.0],
+                            "planned": True,
+                            "reached": True,
+                            "steps": 3,
+                            "capture": None,
+                        }
+                        for index in range(25)
+                    ],
+                    "totals": {
+                        "total_steps": 75,
+                        "distance": 12.5,
+                        "reached_count": 25,
+                        "waypoint_count": 25,
+                        "localization_fixes": 0,
+                    },
+                    "start_keyframe": 0,
+                    "camera_height": 1.0,
+                    "note": "distances in the map's reconstruction gauge unless mapped with metric poses",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+    monkeypatch.setattr(mcp_server, "_run_cli", fake_run_cli)
+    monkeypatch.setattr(mcp_server, "_timestamp", lambda: "20260102-030405")
+
+    result = mcp_server.patrol(
+        str(session),
+        to="car;traffic sign",
+        num_waypoints=6,
+        render=True,
+        gif=True,
+        round_index=1,
+        device="cpu",
+        localize_every=10,
+    )
+
+    assert calls == [
+        [
+            "patrol",
+            "--map",
+            str(session),
+            "--output",
+            str(session / "mcp" / "patrol_20260102-030405.json"),
+            "--device",
+            "cpu",
+            "--localize-every",
+            "10",
+            "--round",
+            "1",
+            "--to",
+            "car;traffic sign",
+            "--num-waypoints",
+            "6",
+            "--render",
+            "--gif",
+            str(session / "mcp" / "patrol_20260102-030405.gif"),
+        ]
+    ]
+    assert result["totals"]["reached_count"] == 25
+    assert result["stops_total"] == 25
+    assert len(result["stops"]) == 20
+    assert result["output_json"].endswith("patrol_20260102-030405.json")
+    assert result["trace_png"].endswith("patrol_20260102-030405.png")
+    assert result["gif"].endswith("patrol_20260102-030405.gif")

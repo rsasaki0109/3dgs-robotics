@@ -516,6 +516,70 @@ def merge_maps(
     }
 
 
+def patrol(
+    map_dir: str,
+    to: str | None = None,
+    goal_keyframes: str | None = None,
+    from_changes: str | None = None,
+    num_waypoints: int = 4,
+    max_stops: int | None = None,
+    render: bool = False,
+    gif: bool = False,
+    round_index: int | None = None,
+    device: str = "cuda",
+    localize_every: int = 0,
+) -> dict[str, Any]:
+    """Drive an inspection patrol through several stops in a 3DGS occupancy map.
+
+    Stops can come from language prompts, keyframes, change clusters, or evenly spaced keyframes. To combine with
+    detect_changes: pass its output_json as from_changes and the robot drives to each appeared object. Distances are in
+    map-gauge camera-height units, not meters unless the reconstruction was built with metric poses.
+    """
+    session_dir = _ensure_session(map_dir)
+    out_path = _mcp_out_dir(session_dir) / f"patrol_{_timestamp()}.json"
+    args = [
+        "patrol",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(out_path),
+        "--device",
+        device,
+        "--localize-every",
+        str(localize_every),
+    ]
+    if round_index is not None:
+        args.extend(["--round", str(round_index)])
+    if to is not None:
+        args.extend(["--to", to])
+    if goal_keyframes is not None:
+        args.extend(["--goal-keyframes", goal_keyframes])
+    if from_changes is not None:
+        args.extend(["--from-changes", from_changes])
+    if num_waypoints != 4:
+        args.extend(["--num-waypoints", str(num_waypoints)])
+    if max_stops is not None:
+        args.extend(["--max-stops", str(max_stops)])
+    if render:
+        args.append("--render")
+
+    gif_path = out_path.with_suffix(".gif") if gif else None
+    if gif_path is not None:
+        args.extend(["--gif", str(gif_path)])
+
+    _run_cli(args)
+    payload = _json(out_path)
+    summary = dict(payload)
+    stops = list(summary.get("stops", []))
+    summary["stops_total"] = len(stops)
+    summary["stops"] = stops[:20]
+    summary["output_json"] = str(out_path)
+    summary["trace_png"] = _preview_for(out_path)
+    if gif_path is not None:
+        summary["gif"] = str(gif_path)
+    return summary
+
+
 def build_server(root: str = _DEFAULT_ROOT) -> Any:
     """Build the talk-to-your-map FastMCP server and register all tools."""
     global _DEFAULT_ROOT
@@ -532,6 +596,7 @@ def build_server(root: str = _DEFAULT_ROOT) -> Any:
         query_map,
         navigate,
         explore,
+        patrol,
         splat_clean,
         merge_maps,
         detect_changes,

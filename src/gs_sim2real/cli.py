@@ -1328,6 +1328,63 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--gif", default=None, help="Optional GIF path animating the exploration")
     exp.add_argument("--device", default="cuda", help="torch device for rendering and localization")
 
+    patrol = subparsers.add_parser(
+        "patrol",
+        help="Drive an inspection patrol through multiple stops inside a mapped 3DGS session",
+    )
+    patrol.add_argument("--map", required=True, help="Live-mapping session directory")
+    patrol.add_argument("--round", type=int, default=None, help="Rebuild round (default: last successful)")
+    patrol.add_argument(
+        "--output", required=True, help="Output patrol_result.json path (a .png trace lands next to it)"
+    )
+    patrol.add_argument(
+        "--start-keyframe", type=int, default=0, help="Index into the mapped keyframes for the start pose"
+    )
+    patrol.add_argument("--to", default=None, help='Semicolon-separated language prompts, e.g. "car;traffic sign"')
+    patrol.add_argument("--goals", default=None, help='Explicit grid-plane stops as "x,y;x,y"')
+    patrol.add_argument("--goal-keyframes", default=None, help="Comma-separated mapped keyframe indices to visit")
+    patrol.add_argument("--from-changes", default=None, help="changes.json path from detect-changes")
+    patrol.add_argument(
+        "--change-kinds", default="appeared", help='Comma-separated change kinds, e.g. "appeared,disappeared"'
+    )
+    patrol.add_argument(
+        "--num-waypoints",
+        type=int,
+        default=4,
+        help="Number of evenly spaced keyframes to visit when no waypoint source is given",
+    )
+    patrol.add_argument(
+        "--max-stops",
+        type=int,
+        default=None,
+        help="Patrol only this many waypoints (changes mode keeps the largest clusters)",
+    )
+    patrol.add_argument("--return-to-start", action="store_true", help="Append the start pose as a final home stop")
+    patrol.add_argument("--render", action="store_true", help="Capture the robot's rendered view at each driven stop")
+    patrol.add_argument("--render-width", type=int, default=620, help="Width of rendered stop observations")
+    patrol.add_argument("--robot-radius", type=float, default=0.4, help="Robot radius in camera-height units")
+    patrol.add_argument("--speed", type=float, default=1.5, help="Cruise speed in camera heights per second")
+    patrol.add_argument("--goal-tolerance", type=float, default=1.0, help="Goal radius in camera-height units")
+    patrol.add_argument(
+        "--localize-every",
+        type=int,
+        default=0,
+        help="Control steps between 3DGS localization fixes (0 = odometry only)",
+    )
+    patrol.add_argument("--max-steps", type=int, default=1500, help="Abort each patrol segment after this many steps")
+    patrol.add_argument(
+        "--odom-noise",
+        type=float,
+        default=0.0,
+        help="Simulated wheel-slip noise std (the estimate dead-reckons on clean commands and drifts)",
+    )
+    patrol.add_argument(
+        "--fix-blend", type=float, default=0.7, help="How strongly an accepted localization fix pulls the estimate"
+    )
+    patrol.add_argument("--seed", type=int, default=7, help="Random seed for the wheel-slip simulation")
+    patrol.add_argument("--gif", default=None, help="Optional GIF path showing captured stop views; requires --render")
+    patrol.add_argument("--device", default="cuda", help="torch device for rendering and localization")
+
     mgm = subparsers.add_parser(
         "merge-maps",
         help="Merge two 3DGS maps of the same place into one splat (collaborative mapping)",
@@ -4414,6 +4471,267 @@ def cmd_explore(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_patrol(args: argparse.Namespace) -> None:
+    """Handle the patrol subcommand."""
+    import re
+
+    import numpy as np
+
+    from gs_sim2real.robotics.camera_sim_node import camera_intrinsics_from_colmap, render_optical, scale_intrinsics
+    from gs_sim2real.robotics.gauge_alignment import quat_to_rotation
+    from gs_sim2real.robotics.gsplat_render_server import sigmoid
+    from gs_sim2real.robotics.occupancy_grid import GridParams, build_occupancy_grid
+    from gs_sim2real.robotics.patrol import (
+        PatrolParams,
+        PatrolWaypoint,
+        draw_patrol_trace,
+        evenly_spaced_keyframe_waypoints,
+        parse_xy_waypoints,
+        run_patrol,
+        waypoints_from_changes,
+    )
+    from gs_sim2real.robotics.splat_nav import NavParams, make_localize_observer, pose2d_to_camera_pose, world_to_pose2d
+    from gs_sim2real.viewer.web_viewer import load_ply
+
+    output_path = Path(args.output)
+    if output_path.suffix != ".json":
+        raise SystemExit(f"--output must be a .json path: {output_path}")
+
+    sources = [
+        args.to is not None,
+        args.goals is not None,
+        args.goal_keyframes is not None,
+        args.from_changes is not None,
+    ]
+    if sum(sources) > 1:
+        raise SystemExit(
+            "pass exactly one of --to / --goals / --goal-keyframes / --from-changes "
+            "(or none for evenly spaced keyframes)"
+        )
+
+    from gs_sim2real.robotics.localize import _load_cameras_txt, load_mapped_records, resolve_live_map_session
+
+    session = resolve_live_map_session(Path(args.map), round_index=args.round)
+    records = load_mapped_records(session)
+    ply = load_ply(session.round.ply_path)
+    opacities = (
+        sigmoid(np.asarray(ply.opacities, dtype=np.float32))
+        if ply.opacities is not None
+        else np.ones(len(ply.positions), dtype=np.float32)
+    )
+
+    try:
+        grid = build_occupancy_grid(
+            np.asarray(ply.positions),
+            opacities,
+            np.asarray([record.center for record in records], dtype=np.float64),
+            [record.qvec for record in records],
+            params=GridParams(trajectory_wins=True),
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    def record_pose2d(index: int):
+        record = records[index]
+        rotation_wc = quat_to_rotation(np.asarray(record.qvec, dtype=np.float64)).T
+        return world_to_pose2d(np.asarray(record.center, dtype=np.float64), rotation_wc, grid)
+
+    start = record_pose2d(args.start_keyframe)
+    nav = NavParams(
+        robot_radius=args.robot_radius,
+        speed=args.speed,
+        goal_tolerance=args.goal_tolerance,
+        localize_every=args.localize_every,
+        max_steps=args.max_steps,
+        odom_noise=args.odom_noise,
+        fix_blend=args.fix_blend,
+        seed=args.seed,
+    )
+    params = PatrolParams(return_to_start=args.return_to_start, nav=nav)
+    camera_centers = np.asarray([record.center for record in records], dtype=np.float64)
+
+    observer = None
+    if args.localize_every > 0:
+        from gs_sim2real.robotics.gsplat_render_server import HeadlessSplatRenderer
+        from gs_sim2real.robotics.localize import LocalizeConfig, SessionLocalizer
+
+        cameras = _load_cameras_txt(session.round.cameras_txt)
+        cam = cameras[records[0].camera_id]
+        native_w, native_h, fx, fy, cx, cy = camera_intrinsics_from_colmap(cam)
+        render_w = args.render_width
+        render_h = int(round(native_h * render_w / native_w))
+        intrinsics = scale_intrinsics((fx, fy, cx, cy), from_size=(native_w, native_h), to_size=(render_w, render_h))
+        renderer = HeadlessSplatRenderer(session.round.ply_path, backend="auto", max_points=None)
+        localizer = SessionLocalizer(
+            Path(args.map),
+            round_index=args.round,
+            config=LocalizeConfig(device=args.device, refine_iters=40, pyramid_scales=(0.25, 0.5)),
+        )
+        observer = make_localize_observer(
+            grid,
+            renderer,
+            localizer,
+            render_size=(render_w, render_h),
+            intrinsics=intrinsics,
+            camera_centers=camera_centers,
+            frame_callback=None,
+        )
+
+    if args.goals is not None:
+        try:
+            waypoints = parse_xy_waypoints(args.goals)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+    elif args.goal_keyframes is not None:
+        waypoints = []
+        for item in args.goal_keyframes.split(","):
+            if not item.strip():
+                continue
+            index = int(item.strip())
+            pose = record_pose2d(index)
+            waypoints.append(PatrolWaypoint(tuple(map(float, pose.position())), "keyframe", f"kf {index}"))
+    elif args.to is not None:
+        try:
+            from gs_sim2real.robotics.language_query import query_map
+        except ImportError as error:
+            raise SystemExit(
+                "open-vocabulary patrol needs the language-query extras; install transformers/CLIP dependencies"
+            ) from error
+
+        waypoints = []
+        prompts = [prompt.strip() for prompt in args.to.split(";") if prompt.strip()]
+        if not prompts:
+            raise SystemExit('--to must contain at least one prompt, e.g. "car;traffic sign"')
+        for prompt in prompts:
+            query_result, _points = query_map(Path(args.map), prompt, round_index=args.round, device=args.device)
+            hits = getattr(query_result, "hits", [])
+            if not hits:
+                raise SystemExit(f"no hits for {prompt!r}; try query-map first or lower the query threshold")
+            hit = hits[0]
+            waypoints.append(PatrolWaypoint(tuple(map(float, hit.goal_xy)), "language", prompt))
+    elif args.from_changes is not None:
+        changes_path = Path(args.from_changes)
+        report = json.loads(changes_path.read_text(encoding="utf-8"))
+        kinds = tuple(kind.strip() for kind in args.change_kinds.split(",") if kind.strip())
+        waypoints = waypoints_from_changes(report, grid, kinds=kinds, limit=args.max_stops)
+        if not waypoints:
+            raise SystemExit(
+                f"no {','.join(kinds)} clusters in {changes_path} - run detect-changes first "
+                "or include other --change-kinds"
+            )
+    else:
+        keyframe_xy = camera_centers @ grid.basis[:2].T
+        waypoints = evenly_spaced_keyframe_waypoints(keyframe_xy, args.num_waypoints)
+
+    if args.max_stops is not None and args.max_stops > 0:
+        waypoints = waypoints[: args.max_stops]
+
+    if not waypoints:
+        raise SystemExit("no patrol waypoints were selected")
+
+    capture_fn = None
+    if args.render:
+        from PIL import Image
+
+        from gs_sim2real.robotics.gsplat_render_server import HeadlessSplatRenderer
+
+        cameras = _load_cameras_txt(session.round.cameras_txt)
+        cam = cameras[records[0].camera_id]
+        native_w, native_h, fx, fy, cx, cy = camera_intrinsics_from_colmap(cam)
+        stop_render_w = args.render_width
+        stop_render_h = int(round(native_h * stop_render_w / native_w))
+        stop_intrinsics = scale_intrinsics(
+            (fx, fy, cx, cy),
+            from_size=(native_w, native_h),
+            to_size=(stop_render_w, stop_render_h),
+        )
+        stop_renderer = HeadlessSplatRenderer(session.round.ply_path, backend="auto", max_points=None)
+        keyframe_xy = camera_centers @ grid.basis[:2].T
+        keyframe_heights = camera_centers @ grid.basis[2]
+
+        def slugify(text: str) -> str:
+            slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", text.strip()).strip("_")
+            return slug[:48] or "stop"
+
+        def capture_stop(index: int, waypoint: PatrolWaypoint, pose) -> str:
+            nearest = int(np.argmin(np.linalg.norm(keyframe_xy - pose.position(), axis=1)))
+            height = float(keyframe_heights[nearest])
+            cam_pose = pose2d_to_camera_pose(pose, grid, height=height)
+            rgb, _depth = render_optical(
+                stop_renderer,
+                cam_pose,
+                width=stop_render_w,
+                height=stop_render_h,
+                intrinsics=stop_intrinsics,
+                near_clip=0.05,
+                far_clip=80.0,
+                point_radius=2,
+            )
+            path = output_path.parent / f"stop_{index + 1:02d}_{slugify(waypoint.label)}.png"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            Image.fromarray(rgb).save(path)
+            return str(path)
+
+        capture_fn = capture_stop
+
+    result = run_patrol(grid, start, waypoints, params=params, observe_fn=observer, capture_fn=capture_fn)
+
+    payload = {
+        "stops": result.stops,
+        "totals": {
+            "total_steps": result.total_steps,
+            "distance": result.distance,
+            "reached_count": result.reached_count,
+            "waypoint_count": len(result.stops),
+            "localization_fixes": result.localization_fixes,
+        },
+        "start_keyframe": args.start_keyframe,
+        "camera_height": grid.camera_height,
+        "note": "distances in the map's reconstruction gauge unless mapped with metric poses",
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    trace_path = draw_patrol_trace(grid, result, waypoints, output_path.with_suffix(".png"))
+
+    if args.gif:
+        if not args.render:
+            print("Skipping GIF: --gif requires --render")
+        else:
+            captures = [stop for stop in result.stops if stop.get("capture")]
+            if not captures:
+                print("Skipping GIF: no captured stop views")
+            else:
+                from PIL import Image, ImageDraw
+
+                frames = []
+                for stop in captures:
+                    frame = Image.open(stop["capture"]).convert("RGB")
+                    draw = ImageDraw.Draw(frame)
+                    draw.rectangle([0, 0, min(frame.width, 520), 34], fill=(0, 0, 0))
+                    draw.text((10, 9), str(stop["label"]), fill=(255, 255, 255))
+                    frames.append(frame)
+                durations = [1200] * len(frames)
+                durations[-1] = 2500
+                gif_path = Path(args.gif)
+                gif_path.parent.mkdir(parents=True, exist_ok=True)
+                frames[0].save(gif_path, save_all=True, append_images=frames[1:], duration=durations, loop=0)
+                print(f"Wrote {gif_path} ({len(frames)} stop views)")
+
+    print(f"Wrote {output_path} + {trace_path.name}")
+    print(
+        f"Patrol reached {result.reached_count}/{len(result.stops)} stops in {result.total_steps} steps "
+        f"(distance {result.distance:.3f} gauge units)"
+    )
+    for index, stop in enumerate(result.stops, start=1):
+        goal_xy = stop["goal_xy"]
+        status = "reached" if stop["reached"] else "not reached"
+        planned = "planned" if stop["planned"] else "unplanned"
+        print(
+            f"  stop {index}: {stop['label']} ({goal_xy[0]:.3f}, {goal_xy[1]:.3f}) "
+            f"{status}, {planned}, {stop['steps']} steps"
+        )
+
+
 def cmd_merge_maps(args: argparse.Namespace) -> None:
     """Handle the merge-maps subcommand."""
     from gs_sim2real.robotics.map_merge import merge_sessions
@@ -5344,6 +5662,7 @@ def main(argv: list[str] | None = None) -> None:
         "detect-changes": cmd_detect_changes,
         "navigate": cmd_navigate,
         "explore": cmd_explore,
+        "patrol": cmd_patrol,
         "merge-maps": cmd_merge_maps,
         "merge-live": cmd_merge_live,
         "query-map": cmd_query_map,
