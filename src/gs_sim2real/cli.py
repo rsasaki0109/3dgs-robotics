@@ -1299,7 +1299,9 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--output", required=True, help="Output explore_result.json path (a .png trace lands next to it)")
     exp.add_argument("--start-keyframe", type=int, default=0, help="Index into the mapped keyframes for the start pose")
     exp.add_argument("--sensor-range", type=float, default=4.0, help="Visibility ray length in camera-height units")
-    exp.add_argument("--coverage-target", type=float, default=0.95, help="Target fraction of reachable free cells observed")
+    exp.add_argument(
+        "--coverage-target", type=float, default=0.95, help="Target fraction of reachable free cells observed"
+    )
     exp.add_argument("--max-goals", type=int, default=30, help="Maximum number of self-chosen frontier goals")
     exp.add_argument("--min-frontier-cells", type=int, default=8, help="Ignore frontier clusters smaller than this")
     exp.add_argument("--robot-radius", type=float, default=0.4, help="Robot radius in camera-height units")
