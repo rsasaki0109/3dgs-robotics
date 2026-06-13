@@ -152,6 +152,46 @@ def test_run_query_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> Non
     }
 
 
+def test_run_clean_and_swap_invokes_cli_and_exports(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+    exports: list[tuple[Path, Path, Path, int | None]] = []
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        calls.append(list(args))
+        return SimpleNamespace(returncode=0)
+
+    def fake_export(session: Path, cleaned_ply: Path, output_splat: Path, *, round_index: int | None = None) -> int:
+        exports.append((Path(session), Path(cleaned_ply), Path(output_splat), round_index))
+        Path(output_splat).write_bytes(b"\x00" * 64)  # two 32-byte gaussians
+        return 2
+
+    config = click_to_go.ClickToGoConfig(round_index=3, device="cpu")
+    result = click_to_go.run_clean_and_swap(
+        session_dir, "car", config, run_cli=fake_run_cli, export_splat=fake_export
+    )
+
+    cleaned_ply = session_dir / "clickgo" / "cleaned.ply"
+    cleaned_splat = session_dir / "clickgo" / "cleaned.splat"
+    assert calls == [
+        [
+            "splat-clean",
+            "car",
+            "--map",
+            str(session_dir),
+            "--output",
+            str(cleaned_ply),
+            "--device",
+            "cpu",
+            "--round",
+            "3",
+        ],
+    ]
+    assert exports == [(session_dir, cleaned_ply, cleaned_splat, 3)]
+    assert result == {"prompt": "car", "splat": "/clickgo/cleaned.splat", "gaussians": 2}
+
+
 def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -172,12 +212,19 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
             )
         elif args[0] == "export-overlay":
             Path(args[args.index("--output") + 1]).write_text("{}", encoding="utf-8")
+        elif args[0] == "splat-clean":
+            Path(args[args.index("--output") + 1]).write_text("ply", encoding="utf-8")
         return SimpleNamespace(returncode=0)
+
+    def fake_export(session: Path, cleaned_ply: Path, output_splat: Path, *, round_index: int | None = None) -> int:
+        Path(output_splat).write_bytes(b"\x00" * 96)  # three 32-byte gaussians
+        return 3
 
     server = click_to_go.make_server(
         session_dir,
         click_to_go.ClickToGoConfig(port=0, device="cpu"),
         run_cli=fake_run_cli,
+        export_splat=fake_export,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -206,6 +253,16 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         assert body["overlay"] == "/clickgo/overlay.json"
 
         status, _, body = _request_json(host, port, "POST", "/query", {"prompt": "   "})
+        assert status == 400
+
+        status, _, body = _request_json(host, port, "POST", "/clean", {"prompt": "car"})
+        assert status == 200
+        assert body["prompt"] == "car"
+        assert body["splat"] == "/clickgo/cleaned.splat"
+        assert body["gaussians"] == 3
+        assert (session_dir / "clickgo" / "cleaned.splat").stat().st_size == 96
+
+        status, _, body = _request_json(host, port, "POST", "/clean", {"prompt": "   "})
         assert status == 400
 
         status, _, body = _request_raw(host, port, "POST", "/goal", b"{", "application/json")

@@ -213,12 +213,83 @@ def run_query_and_overlay(
     }
 
 
+def _export_aligned_splat(
+    session_dir: Path,
+    cleaned_ply: Path,
+    output_splat: Path,
+    *,
+    round_index: int | None = None,
+) -> int:
+    """Export a cleaned round PLY to a ``.splat`` aligned with the served scene.
+
+    ``splat-clean`` removes gaussian rows but keeps the round's full-precision
+    gauge, so replaying the session's similarity transform and normalization
+    params (the same pair that built ``scene.splat``) lands every surviving
+    gaussian exactly where it sat in the original viewer splat. Returns the
+    gaussian count actually written (32 bytes per gaussian).
+    """
+    from gs_sim2real.robotics import viewer_overlay
+    from gs_sim2real.robotics.localize import resolve_live_map_session
+    from gs_sim2real.viewer.web_export import ply_to_splat
+
+    session = resolve_live_map_session(Path(session_dir), round_index=round_index)
+    mapper = viewer_overlay.splat_frame_mapper(session)
+    ply_to_splat(
+        cleaned_ply,
+        output_splat,
+        similarity_transform=(float(mapper.scale), mapper.rotation, mapper.translation),
+        normalize_params=(mapper.centroid, float(mapper.factor)),
+    )
+    return int(Path(output_splat).stat().st_size // 32)
+
+
+def run_clean_and_swap(
+    session_dir: Path,
+    prompt: str,
+    config: ClickToGoConfig,
+    *,
+    run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+    export_splat: Callable[..., int] | None = None,
+) -> dict[str, Any]:
+    """Erase prompt-matching gaussians and re-export an aligned viewer splat."""
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cleaned_ply = output_dir / "cleaned.ply"
+    cleaned_splat = output_dir / "cleaned.splat"
+
+    runner = run_cli or _run_cli
+    exporter = export_splat or _export_aligned_splat
+
+    clean_args = [
+        "splat-clean",
+        prompt,
+        "--map",
+        str(session_dir),
+        "--output",
+        str(cleaned_ply),
+        "--device",
+        config.device,
+    ]
+    if config.round_index is not None:
+        clean_args.extend(["--round", str(config.round_index)])
+    runner(clean_args)
+
+    gaussians = exporter(session_dir, cleaned_ply, cleaned_splat, round_index=config.round_index)
+    return {
+        "prompt": prompt,
+        "splat": "/clickgo/cleaned.splat",
+        "gaussians": int(gaussians),
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
     session_dir: Path
     lock: threading.Lock
     runner: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None
+    exporter: Callable[..., int] | None = None
 
     def end_headers(self) -> None:  # noqa: N802 - http.server API
         self.send_header("Cache-Control", "no-store, must-revalidate")
@@ -239,6 +310,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_goal()
         elif self.path == "/query":
             self._handle_query()
+        elif self.path == "/clean":
+            self._handle_clean()
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -297,6 +370,33 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_clean(self) -> None:
+        try:
+            payload = self._read_json_body()
+            prompt = str(payload["prompt"]).strip()
+            if not prompt:
+                raise ValueError("prompt is empty")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            self._send_json(400, {"error": f"malformed JSON body: {exc}"})
+            return
+
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_clean_and_swap(
+                    self.session_dir, prompt, self.config, run_cli=self.runner, export_splat=self.exporter
+                )
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
@@ -319,6 +419,7 @@ def make_server(
     config: ClickToGoConfig,
     *,
     run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+    export_splat: Callable[..., int] | None = None,
 ) -> ThreadingHTTPServer:
     session_dir = Path(session_dir)
     frame = load_scene_frame(session_dir, round_index=config.round_index)
@@ -332,6 +433,7 @@ def make_server(
     BoundClickToGoHandler.lock = threading.Lock()
     # staticmethod keeps the callable from binding as a method when reached via self.runner
     BoundClickToGoHandler.runner = staticmethod(run_cli) if run_cli is not None else None
+    BoundClickToGoHandler.exporter = staticmethod(export_splat) if export_splat is not None else None
 
     handler = partial(BoundClickToGoHandler, directory=str(session_dir))
     server = ThreadingHTTPServer(("0.0.0.0", config.port), handler)
@@ -367,6 +469,7 @@ def main() -> None:
     print(f"viewer: {viewer_url}")
     print("double-click the road in the viewer to drive there")
     print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
+    print("hit Erase to delete the matching objects and reload the cleaned splat in place")
     print("coordinates use round-gauge camera-height units, not calibrated metric units")
     try:
         server.serve_forever()

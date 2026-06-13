@@ -833,6 +833,58 @@ async function main() {
                 querying = false;
             }
         });
+        // Editable axis: the same prompt drives `splat-clean`. The server erases
+        // the matching gaussians, re-exports a splat aligned to the original
+        // gauge, and we hot-swap it into the render worker so the object
+        // vanishes in place — no reload, same camera.
+        const eraseBtn = document.createElement("button");
+        eraseBtn.type = "button";
+        eraseBtn.innerText = "Erase matches";
+        eraseBtn.style.cssText =
+            "position:absolute;top:76px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(eraseBtn);
+        const swapSplat = async (splatUrl) => {
+            const res = await fetch(splatUrl, { mode: "cors", credentials: "omit", cache: "no-store" });
+            if (!res.ok) throw new Error("splat " + res.status);
+            const buffer = new Uint8Array(await res.arrayBuffer());
+            if (isPly(buffer) || buffer.length < rowLength) throw new Error("empty splat");
+            worker.postMessage({
+                buffer: buffer.buffer,
+                vertexCount: Math.floor(buffer.length / rowLength),
+            });
+        };
+        let erasing = false;
+        eraseBtn.addEventListener("click", async () => {
+            if (erasing || querying) return;
+            const prompt = queryBox.value.trim();
+            if (!prompt) {
+                clickStatus.innerText = "type what to erase first";
+                return;
+            }
+            erasing = true;
+            eraseBtn.disabled = true;
+            clickStatus.innerText = `erasing "${prompt}"…`;
+            try {
+                const res = await fetch(clickGoBase + "/clean", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                await swapSplat(clickGoBase + data.splat + "?t=" + Date.now());
+                overlayData = null; // the boxed object is gone; drop stale hit boxes
+                clickStatus.innerText =
+                    `erased "${prompt}" · ${data.gaussians.toLocaleString()} gaussians left`;
+            } catch (err) {
+                clickStatus.innerText = "erase failed: " + err.message;
+            } finally {
+                erasing = false;
+                eraseBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],
