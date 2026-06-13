@@ -893,6 +893,33 @@ async function main() {
         for (const marker of overlayData.markers || []) {
             const p = marker.position;
             const s = projectOverlayPoint(viewProj, p, w, h);
+            ctx.strokeStyle = marker.color || "#ff5050";
+            // ?overlay= query hits carry an eight-corner `box`: draw it as a 3D
+            // wireframe (twelve edges) so the hit reads as a volume in the scene
+            // rather than a flat circle. Edges link corners differing in one axis.
+            if (marker.box && marker.box.length === 8) {
+                const corners = marker.box.map((c) =>
+                    projectOverlayPoint(viewProj, c, w, h),
+                );
+                const edges = [
+                    [0, 1], [2, 3], [4, 5], [6, 7],
+                    [0, 2], [1, 3], [4, 6], [5, 7],
+                    [0, 4], [1, 5], [2, 6], [3, 7],
+                ];
+                ctx.beginPath();
+                for (const [a, b] of edges) {
+                    if (corners[a] && corners[b]) {
+                        ctx.moveTo(corners[a][0], corners[a][1]);
+                        ctx.lineTo(corners[b][0], corners[b][1]);
+                    }
+                }
+                ctx.stroke();
+                if (s && marker.label) {
+                    ctx.fillStyle = marker.color || "#ff5050";
+                    ctx.fillText(marker.label, s[0] + 6, s[1] - 6);
+                }
+                continue;
+            }
             if (!s) continue;
             // screen-space radius: probe one world-radius along each axis
             let radius = 4;

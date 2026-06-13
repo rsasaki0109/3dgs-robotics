@@ -194,13 +194,28 @@ def build_overlay(
     if query_json is not None:
         query = json.loads(Path(query_json).read_text(encoding="utf-8"))
         for rank, hit in enumerate(query.get("hits", []), start=1):
-            radius = max(float(np.mean(hit["extent"])) * 0.5, query.get("camera_height", 0.0) * 0.25)
+            centroid = np.asarray(hit["centroid"], dtype=np.float64)
+            extent = np.asarray(hit["extent"], dtype=np.float64)
+            radius = max(float(np.mean(extent)) * 0.5, query.get("camera_height", 0.0) * 0.25)
+            # The eight corners of the axis-aligned gauge-frame extent box; mapped
+            # into the splat frame they become a (possibly rotated) wireframe the
+            # viewer draws around the hit instead of a flat screen-space circle.
+            half = extent / 2.0
+            corners = np.asarray(
+                [
+                    centroid + (sx * half[0], sy * half[1], sz * half[2])
+                    for sx in (-1.0, 1.0)
+                    for sy in (-1.0, 1.0)
+                    for sz in (-1.0, 1.0)
+                ]
+            )
             markers.append(
                 {
                     "label": f"{query['prompt']} #{rank} ({hit['mean_score']:.2f})",
                     "color": HIT_COLOR,
-                    "position": mapper.points(np.asarray([hit["centroid"]]))[0].tolist(),
+                    "position": mapper.points(np.asarray([centroid]))[0].tolist(),
                     "radius": mapper.distance(radius),
+                    "box": mapper.points(corners).tolist(),
                 }
             )
 

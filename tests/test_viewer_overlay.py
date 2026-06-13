@@ -92,6 +92,10 @@ class TestBuildOverlay:
         hit = payload["markers"][1]
         assert hit["label"].startswith("object #1")
         assert hit["radius"] > 0
+        # the hit carries an eight-corner wireframe box centred on its position
+        box = np.asarray(hit["box"])
+        assert box.shape == (8, 3)
+        assert np.allclose(box.mean(axis=0), hit["position"], atol=1e-6)
         # the planned path hugs the road: its splat-frame points stay inside
         # the normalized scene extent
         path = np.asarray(payload["polylines"][1]["points"])
@@ -110,6 +114,7 @@ class TestViewerWiring:
         main_js = (_REPO_ROOT / "docs" / "splat-viewer" / "main.js").read_text(encoding="utf-8")
         assert 'params.get("overlay")' in main_js
         assert "drawOverlay(viewProj)" in main_js
+        assert "marker.box" in main_js  # query hits draw a 3D wireframe box
 
     def test_cli_export_overlay(self, tmp_path, capsys):
         from gs_sim2real import cli
