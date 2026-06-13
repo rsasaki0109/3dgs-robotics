@@ -161,6 +161,58 @@ def run_navigate_and_overlay(
     }
 
 
+def run_query_and_overlay(
+    session_dir: Path,
+    prompt: str,
+    config: ClickToGoConfig,
+    *,
+    run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    """Run an open-vocabulary query and export a hit overlay for the viewer."""
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    query_json = output_dir / "query.json"
+    overlay_json = output_dir / "overlay.json"
+
+    runner = run_cli or _run_cli
+
+    query_args = [
+        "query-map",
+        prompt,
+        "--map",
+        str(session_dir),
+        "--output",
+        str(query_json),
+        "--device",
+        config.device,
+    ]
+    if config.round_index is not None:
+        query_args.extend(["--round", str(config.round_index)])
+    runner(query_args)
+
+    overlay_args = [
+        "export-overlay",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(overlay_json),
+        "--query",
+        str(query_json),
+    ]
+    if config.round_index is not None:
+        overlay_args.extend(["--round", str(config.round_index)])
+    runner(overlay_args)
+
+    query_data = json.loads(query_json.read_text(encoding="utf-8"))
+    return {
+        "prompt": prompt,
+        "hits": len(query_data.get("hits", [])),
+        "overlay": "/clickgo/overlay.json",
+        "query_json": "/clickgo/query.json",
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -183,10 +235,14 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
-        if self.path != "/goal":
+        if self.path == "/goal":
+            self._handle_goal()
+        elif self.path == "/query":
+            self._handle_query()
+        else:
             self._send_json(404, {"error": "not found"})
-            return
 
+    def _handle_goal(self) -> None:
         try:
             payload = self._read_json_body()
             origin = payload["origin"]
@@ -208,6 +264,31 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
 
             try:
                 result = run_navigate_and_overlay(self.session_dir, goal_xy, self.config, run_cli=self.runner)
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
+    def _handle_query(self) -> None:
+        try:
+            payload = self._read_json_body()
+            prompt = str(payload["prompt"]).strip()
+            if not prompt:
+                raise ValueError("prompt is empty")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            self._send_json(400, {"error": f"malformed JSON body: {exc}"})
+            return
+
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_query_and_overlay(self.session_dir, prompt, self.config, run_cli=self.runner)
             except RuntimeError as exc:
                 self._send_json(500, {"error": str(exc)})
                 return
@@ -285,6 +366,7 @@ def main() -> None:
     print(f"splat: {splat_url}")
     print(f"viewer: {viewer_url}")
     print("double-click the road in the viewer to drive there")
+    print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
     print("coordinates use round-gauge camera-height units, not calibrated metric units")
     try:
         server.serve_forever()

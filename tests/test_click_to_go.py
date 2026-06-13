@@ -100,6 +100,58 @@ def test_run_navigate_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> 
     }
 
 
+def test_run_query_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        calls.append(list(args))
+        if args[0] == "query-map":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"hits": [{"centroid": [0, 0, 0]}, {"centroid": [1, 1, 1]}]}),
+                encoding="utf-8",
+            )
+        return SimpleNamespace(returncode=0)
+
+    config = click_to_go.ClickToGoConfig(round_index=3, device="cpu")
+    result = click_to_go.run_query_and_overlay(session_dir, "car", config, run_cli=fake_run_cli)
+
+    query_json = session_dir / "clickgo" / "query.json"
+    overlay_json = session_dir / "clickgo" / "overlay.json"
+    assert calls == [
+        [
+            "query-map",
+            "car",
+            "--map",
+            str(session_dir),
+            "--output",
+            str(query_json),
+            "--device",
+            "cpu",
+            "--round",
+            "3",
+        ],
+        [
+            "export-overlay",
+            "--map",
+            str(session_dir),
+            "--output",
+            str(overlay_json),
+            "--query",
+            str(query_json),
+            "--round",
+            "3",
+        ],
+    ]
+    assert result == {
+        "prompt": "car",
+        "hits": 2,
+        "overlay": "/clickgo/overlay.json",
+        "query_json": "/clickgo/query.json",
+    }
+
+
 def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -111,6 +163,11 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         if args[0] == "navigate":
             Path(args[args.index("--output") + 1]).write_text(
                 json.dumps({"reached": True, "steps": 7}),
+                encoding="utf-8",
+            )
+        elif args[0] == "query-map":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"hits": [{"centroid": [0, 0, 0]}]}),
                 encoding="utf-8",
             )
         elif args[0] == "export-overlay":
@@ -141,6 +198,15 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         assert body["reached"] is True
         assert body["steps"] == 7
         assert body["overlay"] == "/clickgo/overlay.json"
+
+        status, _, body = _request_json(host, port, "POST", "/query", {"prompt": "car"})
+        assert status == 200
+        assert body["prompt"] == "car"
+        assert body["hits"] == 1
+        assert body["overlay"] == "/clickgo/overlay.json"
+
+        status, _, body = _request_json(host, port, "POST", "/query", {"prompt": "   "})
+        assert status == 400
 
         status, _, body = _request_raw(host, port, "POST", "/goal", b"{", "application/json")
         assert status == 400

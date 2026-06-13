@@ -792,6 +792,47 @@ async function main() {
             "font:13px sans-serif;pointer-events:none";
         clickStatus.innerText = "double-click the road to drive there";
         document.body.appendChild(clickStatus);
+        // The same click-to-go server doubles as an open-vocabulary finder:
+        // type a prompt, the server runs `query-map` + `export-overlay`, and the
+        // hits come back as the 3D wireframe boxes drawn by drawOverlay().
+        const queryBox = document.createElement("input");
+        queryBox.type = "text";
+        queryBox.placeholder = "find objects, e.g. car";
+        queryBox.style.cssText =
+            "position:absolute;top:44px;right:10px;z-index:60;width:200px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(queryBox);
+        let querying = false;
+        queryBox.addEventListener("keydown", async (e) => {
+            if (e.key !== "Enter" || querying) return;
+            const prompt = queryBox.value.trim();
+            if (!prompt) return;
+            querying = true;
+            clickStatus.innerText = `searching "${prompt}"…`;
+            try {
+                const res = await fetch(clickGoBase + "/query", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                const overlayRes = await fetch(
+                    clickGoBase + data.overlay + "?t=" + Date.now(),
+                    { credentials: "omit" },
+                );
+                if (overlayRes.ok) {
+                    overlayData = await overlayRes.json();
+                    ensureOverlayCanvas();
+                }
+                clickStatus.innerText = `"${prompt}": ${data.hits} hit(s)`;
+            } catch (err) {
+                clickStatus.innerText = "query failed: " + err.message;
+            } finally {
+                querying = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],
