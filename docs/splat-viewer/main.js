@@ -1081,6 +1081,44 @@ async function main() {
                 qualityBtn.disabled = false;
             }
         });
+        // Surfel axis: a fifth research lens. Where Confidence scores how *big* a
+        // gaussian is, `/surfel` scores its *shape* — how flat it collapsed onto the
+        // surface it covers. Clean disc-like surface elements run cool; the round
+        // blobs the fit never flattened and the spiky needle artifacts run warm. No
+        // query, no CLI: the splat carries its own scale shape, so it is a pure recolor.
+        const surfelBtn = document.createElement("button");
+        surfelBtn.type = "button";
+        surfelBtn.innerText = "Show surfels";
+        surfelBtn.style.cssText =
+            "position:absolute;top:268px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(surfelBtn);
+        surfelBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            editing = true;
+            surfelBtn.disabled = true;
+            clickStatus.innerText = "scoring surfel flatness…";
+            try {
+                const res = await fetch(clickGoBase + "/surfel", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: "{}",
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                await swapSplat(clickGoBase + data.splat + "?t=" + Date.now());
+                overlayData = null; // the heatmap is the whole story; drop boxes
+                clickStatus.innerText =
+                    `surfels: ${data.surfels.toLocaleString()} flat ` +
+                    `of ${data.gaussians.toLocaleString()} gaussians`;
+            } catch (err) {
+                clickStatus.innerText = "surfel failed: " + err.message;
+            } finally {
+                editing = false;
+                surfelBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],

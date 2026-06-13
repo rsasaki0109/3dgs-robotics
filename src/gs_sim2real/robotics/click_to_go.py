@@ -584,6 +584,95 @@ def run_quality_and_swap(
     }
 
 
+# Surfel axis: paint every gaussian by how disc-like its footprint is. A clean
+# 3DGS reconstruction collapses each gaussian against the surface it covers, so a
+# good surface element is a thin oblate disc; the blobs that stayed round are
+# ambiguous volume the fit never flattened, and the needles are spiky artifacts.
+# Unlike Confidence (which scores the *size* of a gaussian), this scores its
+# *shape*, reading only the scale floats. The ratio is scale-free, so it needs no
+# per-scene calibration, and the heatmap runs warm (round/needle) -> cool (flat).
+FLAT_SURFEL_CUT = 0.5
+
+
+def _surfel_score(scales: np.ndarray) -> np.ndarray:
+    """Score each gaussian by how disc-like (surface-aligned) it is, in [0, 1].
+
+    Sorted ascending, a gaussian's axes are ``(c <= b <= a)``. A clean surfel
+    collapses its thinnest axis against a flat face, so ``c << b`` and the score
+    ``1 - c / b`` runs toward 1. An isotropic blob (``c ~ b``, ambiguous volume) or
+    a needle (``c ~ b``, both tiny under one long spike) keep ``c / b`` near 1, so
+    both score near 0. The ratio is scale-free — no per-scene calibration needed.
+    """
+    s = np.sort(np.asarray(scales, dtype=np.float64), axis=1)
+    c = s[:, 0]
+    b = s[:, 1]
+    score = 1.0 - np.divide(c, b, out=np.ones_like(c), where=b > 0)
+    return np.clip(score, 0.0, 1.0)
+
+
+def _surfel_splat_file(scene_splat: Path, output_splat: Path) -> dict[str, Any]:
+    """Heatmap the served splat by per-gaussian surfel flatness into a 32-byte splat.
+
+    Flatness reads only the scale floats (offset 12-23): the thinnest axis against
+    the middle one. Disc-like surface elements run cool, round blobs and needle
+    artifacts run warm. RGB (offset 24-26) is repainted to the heatmap colour and
+    alpha pinned to a readable constant. Returns the gaussian count, how many
+    cleared the flat-surfel cut, and the median flatness.
+    """
+    raw = np.frombuffer(Path(scene_splat).read_bytes(), dtype=np.uint8)
+    count = int(raw.size // 32)
+    arr = raw[: count * 32].reshape(count, 32).copy()
+    if count == 0:
+        Path(output_splat).write_bytes(arr.tobytes())
+        return {"gaussians": 0, "surfels": 0, "median_flatness": 0.0}
+
+    scales = arr[:, 12:24].copy().view(np.float32).astype(np.float64)
+    flatness = _surfel_score(scales)
+    arr[:, 24:27] = _confidence_color(flatness)
+    arr[:, 27] = QUALITY_ALPHA
+    Path(output_splat).write_bytes(arr.tobytes())
+    return {
+        "gaussians": count,
+        "surfels": int(np.count_nonzero(flatness >= FLAT_SURFEL_CUT)),
+        "median_flatness": float(np.median(flatness)),
+    }
+
+
+def _surfel_aligned_splat(session_dir: Path, output_splat: Path, *, round_index: int | None = None) -> dict[str, Any]:
+    """Heatmap the served ``scene.splat`` by per-gaussian surfel flatness."""
+    from gs_sim2real.robotics.localize import resolve_live_map_session
+
+    session = resolve_live_map_session(Path(session_dir), round_index=round_index)
+    scene_splat = session.round.round_dir / "scene.splat"
+    return _surfel_splat_file(scene_splat, output_splat)
+
+
+def run_surfel_and_swap(
+    session_dir: Path,
+    config: ClickToGoConfig,
+    *,
+    surfel_splat: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Recolor the served splat into a per-gaussian surfel-flatness heatmap.
+
+    Needs no query or CLI pass — the splat carries its own scale shape, so the
+    Surfel axis is a pure recolor the viewer can hot-swap in place.
+    """
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    surfel_splat_path = output_dir / "surfel.splat"
+
+    builder = surfel_splat or _surfel_aligned_splat
+    stats = builder(session_dir, surfel_splat_path, round_index=config.round_index)
+    return {
+        "splat": "/clickgo/surfel.splat",
+        "gaussians": int(stats["gaussians"]),
+        "surfels": int(stats["surfels"]),
+        "median_flatness": float(stats["median_flatness"]),
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -593,6 +682,7 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
     exporter: Callable[..., int] | None = None
     highlighter: Callable[..., int] | None = None
     qualitymapper: Callable[..., dict[str, Any]] | None = None
+    surfelmapper: Callable[..., dict[str, Any]] | None = None
 
     def end_headers(self) -> None:  # noqa: N802 - http.server API
         self.send_header("Cache-Control", "no-store, must-revalidate")
@@ -621,6 +711,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_highlight()
         elif self.path == "/quality":
             self._handle_quality()
+        elif self.path == "/surfel":
+            self._handle_surfel()
         elif self.path == "/changes":
             self._handle_changes()
         else:
@@ -778,6 +870,22 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_surfel(self) -> None:
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_surfel_and_swap(self.session_dir, self.config, surfel_splat=self.surfelmapper)
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _handle_changes(self) -> None:
         if not self.lock.acquire(blocking=False):
             self._send_json(409, {"error": "another request is already running"})
@@ -822,6 +930,7 @@ def make_server(
     export_splat: Callable[..., int] | None = None,
     highlight_splat: Callable[..., int] | None = None,
     quality_splat: Callable[..., dict[str, Any]] | None = None,
+    surfel_splat: Callable[..., dict[str, Any]] | None = None,
 ) -> ThreadingHTTPServer:
     session_dir = Path(session_dir)
     frame = load_scene_frame(session_dir, round_index=config.round_index)
@@ -838,6 +947,7 @@ def make_server(
     BoundClickToGoHandler.exporter = staticmethod(export_splat) if export_splat is not None else None
     BoundClickToGoHandler.highlighter = staticmethod(highlight_splat) if highlight_splat is not None else None
     BoundClickToGoHandler.qualitymapper = staticmethod(quality_splat) if quality_splat is not None else None
+    BoundClickToGoHandler.surfelmapper = staticmethod(surfel_splat) if surfel_splat is not None else None
 
     handler = partial(BoundClickToGoHandler, directory=str(session_dir))
     server = ThreadingHTTPServer(("0.0.0.0", config.port), handler)

@@ -349,6 +349,60 @@ def test_quality_splat_file_penalizes_bloated_gaussians(tmp_path: Path) -> None:
     assert out[0, 25] > out[-1, 25]  # smallest blob is greener
 
 
+def test_surfel_splat_file_heatmaps_by_flatness(tmp_path: Path) -> None:
+    # three gaussians: a flat disc, an isotropic blob, a needle. Only the disc is
+    # a clean surface element; the blob and the needle should both read warm.
+    shapes = [
+        (0.3, 0.3, 0.01),  # disc: thin third axis -> high flatness
+        (0.2, 0.2, 0.2),   # sphere: isotropic -> low flatness
+        (0.9, 0.02, 0.02),  # needle: one long spike -> low flatness
+    ]
+    raw = bytearray()
+    for sx, sy, sz in shapes:
+        raw += np.asarray([0.0, 0.0, 0.0, sx, sy, sz], dtype=np.float32).tobytes()
+        raw += bytes((10, 20, 30, 255))  # RGBA at offset 24
+        raw += bytes((0, 0, 0, 0))  # rotation
+    scene_splat = tmp_path / "scene.splat"
+    scene_splat.write_bytes(bytes(raw))
+    output_splat = tmp_path / "surfel.splat"
+
+    stats = click_to_go._surfel_splat_file(scene_splat, output_splat)
+
+    assert stats["gaussians"] == 3
+    assert stats["surfels"] == 1  # only the disc clears the flat-surfel cut
+    out = np.frombuffer(output_splat.read_bytes(), dtype=np.uint8).reshape(3, 32)
+    # alpha is pinned to the readable diagnostic constant for every gaussian
+    assert list(out[:, 27]) == [click_to_go.QUALITY_ALPHA] * 3
+    # the disc runs cool/green; the blob and needle run warm/red
+    assert out[0, 25] > out[1, 25]  # disc greener than the sphere
+    assert out[0, 25] > out[2, 25]  # disc greener than the needle
+    assert out[1, 24] > out[0, 24]  # sphere redder than the disc
+    assert out[2, 24] > out[0, 24]  # needle redder than the disc
+
+
+def test_run_surfel_and_swap_recolors_served_splat(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    builds: list[tuple[Path, Path, int | None]] = []
+
+    def fake_surfel(session: Path, output_splat: Path, *, round_index: int | None = None) -> dict:
+        builds.append((Path(session), Path(output_splat), round_index))
+        Path(output_splat).write_bytes(b"\x00" * 64)
+        return {"gaussians": 2, "surfels": 1, "median_flatness": 0.5}
+
+    config = click_to_go.ClickToGoConfig(round_index=6, device="cpu")
+    result = click_to_go.run_surfel_and_swap(session_dir, config, surfel_splat=fake_surfel)
+
+    surfel_splat = session_dir / "clickgo" / "surfel.splat"
+    assert builds == [(session_dir, surfel_splat, 6)]
+    assert result == {
+        "splat": "/clickgo/surfel.splat",
+        "gaussians": 2,
+        "surfels": 1,
+        "median_flatness": 0.5,
+    }
+
+
 def test_run_quality_and_swap_recolors_served_splat(tmp_path: Path) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -477,6 +531,10 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         Path(output_splat).write_bytes(b"\x00" * 160)  # five 32-byte gaussians
         return {"gaussians": 5, "low_confidence": 2, "median_opacity": 0.4}
 
+    def fake_surfel(session: Path, output_splat: Path, *, round_index: int | None = None) -> dict:
+        Path(output_splat).write_bytes(b"\x00" * 192)  # six 32-byte gaussians
+        return {"gaussians": 6, "surfels": 4, "median_flatness": 0.7}
+
     server = click_to_go.make_server(
         session_dir,
         click_to_go.ClickToGoConfig(port=0, device="cpu", baseline_round=1),
@@ -484,6 +542,7 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         export_splat=fake_export,
         highlight_splat=fake_highlight,
         quality_splat=fake_quality,
+        surfel_splat=fake_surfel,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -552,6 +611,14 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         assert body["low_confidence"] == 2
         assert body["median_opacity"] == 0.4
         assert (session_dir / "clickgo" / "quality.splat").stat().st_size == 160
+
+        status, _, body = _request_json(host, port, "POST", "/surfel", {})
+        assert status == 200
+        assert body["splat"] == "/clickgo/surfel.splat"
+        assert body["gaussians"] == 6
+        assert body["surfels"] == 4
+        assert body["median_flatness"] == 0.7
+        assert (session_dir / "clickgo" / "surfel.splat").stat().st_size == 192
 
         status, _, body = _request_json(host, port, "POST", "/changes", {})
         assert status == 200
