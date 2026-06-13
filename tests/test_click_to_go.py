@@ -325,6 +325,30 @@ def test_quality_splat_file_heatmaps_by_opacity(tmp_path: Path) -> None:
     assert tuple(out[2, 24:27]) == click_to_go._CONFIDENCE_STOPS[-1][1]
 
 
+def test_quality_splat_file_penalizes_bloated_gaussians(tmp_path: Path) -> None:
+    # every gaussian is fully opaque, so only the footprint can lower confidence:
+    # scales sweep small -> large, and the bloated tail should read as low quality
+    sizes = [round(0.1 * (i + 1), 3) for i in range(10)]  # 0.1 .. 1.0
+    raw = bytearray()
+    for size in sizes:
+        raw += np.asarray([0.0, 0.0, 0.0, size, size, size], dtype=np.float32).tobytes()
+        raw += bytes((10, 20, 30, 255))  # RGBA at offset 24 — uniform full opacity
+        raw += bytes((0, 0, 0, 0))  # rotation
+    scene_splat = tmp_path / "scene.splat"
+    scene_splat.write_bytes(bytes(raw))
+    output_splat = tmp_path / "quality.splat"
+
+    stats = click_to_go._quality_splat_file(scene_splat, output_splat)
+
+    assert stats["gaussians"] == 10
+    # opacity is uniform, so the only confidence drop comes from oversized blobs
+    assert stats["low_confidence"] >= 1
+    out = np.frombuffer(output_splat.read_bytes(), dtype=np.uint8).reshape(10, 32)
+    # the smallest gaussian stays cool/high; the largest is pushed warm/low
+    assert out[-1, 24] > out[0, 24]  # biggest blob is redder
+    assert out[0, 25] > out[-1, 25]  # smallest blob is greener
+
+
 def test_run_quality_and_swap_recolors_served_splat(tmp_path: Path) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()

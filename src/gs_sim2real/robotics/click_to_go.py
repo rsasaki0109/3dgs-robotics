@@ -475,8 +475,11 @@ def run_highlight_and_swap(
 
 
 # Confidence axis: paint every gaussian by how solid the optimizer made it.
-# A gaussian's opacity is its own confidence — translucent ones are the filler
-# the fit never committed to. The heatmap runs warm (low) -> cool (high), and
+# Two things betray a low-confidence gaussian: a translucent opacity (the filler
+# the fit never committed to) and an oversized footprint (a blurry blob smeared
+# over a region the fit could not resolve). The score multiplies opacity by a
+# size factor that fades the bloated upper tail toward zero, so either failure
+# mode reads as low confidence. The heatmap runs warm (low) -> cool (high), and
 # the diagnostic view forces a uniform readable alpha so the colours show.
 LOW_CONFIDENCE_OPACITY = 0.3
 QUALITY_ALPHA = 210
@@ -499,13 +502,32 @@ def _confidence_color(scores: np.ndarray) -> np.ndarray:
     return np.clip(np.rint(rgb), 0, 255).astype(np.uint8)
 
 
-def _quality_splat_file(scene_splat: Path, output_splat: Path) -> dict[str, Any]:
-    """Heatmap the served splat by per-gaussian opacity into a 32-byte splat.
+def _size_confidence(scales: np.ndarray) -> np.ndarray:
+    """Score each gaussian by how compact it is, in [0, 1] (small = 1, bloated = 0).
 
-    Reads the alpha byte (offset 27) of each record as a confidence score,
-    repaints RGB (offset 24-26) to the heatmap colour, and pins alpha to a
-    readable constant. Returns the gaussian count, how many fell below the
-    low-confidence opacity cut, and the median opacity.
+    A gaussian's footprint is the largest of its three principal-axis scales —
+    a single fat axis is enough to make it a smear. The cut is self-calibrated to
+    the scene: everything at or below the median size keeps a score of 1, and the
+    score fades to 0 across the upper tail (median -> 95th percentile), so only the
+    bloated blobs are penalised regardless of the scene's absolute units.
+    """
+    footprint = np.asarray(scales, dtype=np.float64).max(axis=1)
+    median = float(np.median(footprint))
+    p95 = float(np.percentile(footprint, 95))
+    span = p95 - median
+    if span <= 0:
+        return np.ones(footprint.shape[0], dtype=np.float64)
+    return np.clip(1.0 - (footprint - median) / span, 0.0, 1.0)
+
+
+def _quality_splat_file(scene_splat: Path, output_splat: Path) -> dict[str, Any]:
+    """Heatmap the served splat by per-gaussian confidence into a 32-byte splat.
+
+    Confidence multiplies the opacity byte (offset 27) by a size factor read from
+    the scale floats (offset 12-23): translucent *and* oversized gaussians both
+    score low. RGB (offset 24-26) is repainted to the heatmap colour and alpha is
+    pinned to a readable constant. Returns the gaussian count, how many fell below
+    the low-confidence cut, and the median opacity.
     """
     raw = np.frombuffer(Path(scene_splat).read_bytes(), dtype=np.uint8)
     count = int(raw.size // 32)
@@ -515,12 +537,14 @@ def _quality_splat_file(scene_splat: Path, output_splat: Path) -> dict[str, Any]
         return {"gaussians": 0, "low_confidence": 0, "median_opacity": 0.0}
 
     opacity = arr[:, 27].astype(np.float64) / 255.0
-    arr[:, 24:27] = _confidence_color(opacity)
+    scales = arr[:, 12:24].copy().view(np.float32).astype(np.float64)
+    confidence = opacity * _size_confidence(scales)
+    arr[:, 24:27] = _confidence_color(confidence)
     arr[:, 27] = QUALITY_ALPHA
     Path(output_splat).write_bytes(arr.tobytes())
     return {
         "gaussians": count,
-        "low_confidence": int(np.count_nonzero(opacity < LOW_CONFIDENCE_OPACITY)),
+        "low_confidence": int(np.count_nonzero(confidence < LOW_CONFIDENCE_OPACITY)),
         "median_opacity": float(np.median(opacity)),
     }
 
