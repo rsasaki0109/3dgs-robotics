@@ -354,7 +354,7 @@ def test_surfel_splat_file_heatmaps_by_flatness(tmp_path: Path) -> None:
     # a clean surface element; the blob and the needle should both read warm.
     shapes = [
         (0.3, 0.3, 0.01),  # disc: thin third axis -> high flatness
-        (0.2, 0.2, 0.2),   # sphere: isotropic -> low flatness
+        (0.2, 0.2, 0.2),  # sphere: isotropic -> low flatness
         (0.9, 0.02, 0.02),  # needle: one long spike -> low flatness
     ]
     raw = bytearray()
