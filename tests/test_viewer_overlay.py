@@ -67,6 +67,24 @@ class TestSplatFrameMapper:
         assert mapper.distance(1.0) == pytest.approx(1.0 / mapper.factor)
 
 
+def _write_changes_json(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "camera_height": 1.5,
+                "appeared": [
+                    {"centroid": [1.0, 0.0, 1.5], "extent": [0.4, 0.4, 0.6], "points": 50},
+                ],
+                "disappeared": [
+                    {"centroid": [-1.2, 0.3, 1.0], "extent": [0.5, 0.2, 0.4], "points": 21},
+                    {"centroid": [0.5, -0.7, 1.1], "extent": [0.3, 0.3, 0.3], "points": 12},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class TestBuildOverlay:
     def test_trajectory_nav_and_query(self, tmp_path):
         session_dir = tmp_path / "session"
@@ -101,6 +119,35 @@ class TestBuildOverlay:
         path = np.asarray(payload["polylines"][1]["points"])
         assert np.abs(path).max() < 17.0
 
+    def test_changes_boxes(self, tmp_path):
+        from gs_sim2real.robotics.viewer_overlay import APPEARED_COLOR, DISAPPEARED_COLOR
+
+        session_dir = tmp_path / "session"
+        _write_fake_session(session_dir)
+        _write_changes_json(tmp_path / "changes.json")
+
+        stats = build_overlay(
+            session_dir,
+            tmp_path / "overlay.json",
+            changes_json=tmp_path / "changes.json",
+        )
+        # one trajectory polyline, three change boxes (1 appeared + 2 disappeared)
+        assert stats["markers"] == 3
+
+        payload = json.loads((tmp_path / "overlay.json").read_text(encoding="utf-8"))
+        markers = payload["markers"]
+        appeared = [m for m in markers if m["color"] == APPEARED_COLOR]
+        disappeared = [m for m in markers if m["color"] == DISAPPEARED_COLOR]
+        assert len(appeared) == 1
+        assert len(disappeared) == 2
+        assert appeared[0]["label"].startswith("appeared #1")
+        assert "50 pts" in appeared[0]["label"]
+        # every change carries an eight-corner wireframe centred on its position
+        for marker in markers:
+            box = np.asarray(marker["box"])
+            assert box.shape == (8, 3)
+            assert np.allclose(box.mean(axis=0), marker["position"], atol=1e-6)
+
     def test_trajectory_only(self, tmp_path):
         session_dir = tmp_path / "session"
         _write_fake_session(session_dir)
@@ -118,6 +165,7 @@ class TestViewerWiring:
         assert "/clean" in main_js  # Editable: erase matching objects
         assert "/grab" in main_js  # Editable: isolate matching objects
         assert "swapSplat" in main_js  # hot-swap the edited splat in place
+        assert "/changes" in main_js  # Dynamic: diff against the baseline round
 
     def test_cli_export_overlay(self, tmp_path, capsys):
         from gs_sim2real import cli

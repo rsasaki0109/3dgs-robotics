@@ -31,6 +31,8 @@ TRAJECTORY_COLOR = "#4da3ff"
 PATH_COLOR = "#2ecc71"
 GOAL_COLOR = "#f5c542"
 HIT_COLOR = "#ff5050"
+APPEARED_COLOR = "#3ad29f"  # Dynamic diff: present now, absent in the baseline
+DISAPPEARED_COLOR = "#ff9f43"  # Dynamic diff: in the baseline, gone now
 
 
 @dataclass
@@ -96,6 +98,24 @@ def splat_frame_mapper(
     )
 
 
+def _extent_corners(centroid: np.ndarray, extent: np.ndarray) -> np.ndarray:
+    """The eight corners of an axis-aligned gauge-frame extent box around a centroid.
+
+    Mapped into the splat frame these become a (possibly rotated) wireframe the
+    viewer draws instead of a flat screen-space circle.
+    """
+    centroid = np.asarray(centroid, dtype=np.float64)
+    half = np.asarray(extent, dtype=np.float64) / 2.0
+    return np.asarray(
+        [
+            centroid + (sx * half[0], sy * half[1], sz * half[2])
+            for sx in (-1.0, 1.0)
+            for sy in (-1.0, 1.0)
+            for sz in (-1.0, 1.0)
+        ]
+    )
+
+
 def _lift_plane_points(
     plane_xy: np.ndarray,
     basis: np.ndarray,
@@ -129,6 +149,7 @@ def build_overlay(
     round_index: int | None = None,
     nav_json: Path | None = None,
     query_json: Path | None = None,
+    changes_json: Path | None = None,
     target_extent: float = 17.0,
     include_trajectory: bool = True,
 ) -> dict[str, Any]:
@@ -197,18 +218,7 @@ def build_overlay(
             centroid = np.asarray(hit["centroid"], dtype=np.float64)
             extent = np.asarray(hit["extent"], dtype=np.float64)
             radius = max(float(np.mean(extent)) * 0.5, query.get("camera_height", 0.0) * 0.25)
-            # The eight corners of the axis-aligned gauge-frame extent box; mapped
-            # into the splat frame they become a (possibly rotated) wireframe the
-            # viewer draws around the hit instead of a flat screen-space circle.
-            half = extent / 2.0
-            corners = np.asarray(
-                [
-                    centroid + (sx * half[0], sy * half[1], sz * half[2])
-                    for sx in (-1.0, 1.0)
-                    for sy in (-1.0, 1.0)
-                    for sz in (-1.0, 1.0)
-                ]
-            )
+            corners = _extent_corners(centroid, extent)
             markers.append(
                 {
                     "label": f"{query['prompt']} #{rank} ({hit['mean_score']:.2f})",
@@ -218,6 +228,28 @@ def build_overlay(
                     "box": mapper.points(corners).tolist(),
                 }
             )
+
+    if changes_json is not None:
+        changes = json.loads(Path(changes_json).read_text(encoding="utf-8"))
+        camera_height = float(changes.get("camera_height", 0.0))
+        # Dynamic diff clusters live in map A's gauge — the same round-gauge the
+        # mapper normalizes — so appeared/disappeared boxes land on the served
+        # splat. Colour keeps the two kinds apart for the viewer.
+        for kind, color in (("appeared", APPEARED_COLOR), ("disappeared", DISAPPEARED_COLOR)):
+            for rank, cluster in enumerate(changes.get(kind, []), start=1):
+                centroid = np.asarray(cluster["centroid"], dtype=np.float64)
+                extent = np.asarray(cluster["extent"], dtype=np.float64)
+                radius = max(float(np.mean(extent)) * 0.5, camera_height * 0.25)
+                corners = _extent_corners(centroid, extent)
+                markers.append(
+                    {
+                        "label": f"{kind} #{rank} ({int(cluster.get('points', 0))} pts)",
+                        "color": color,
+                        "position": mapper.points(np.asarray([centroid]))[0].tolist(),
+                        "radius": mapper.distance(radius),
+                        "box": mapper.points(corners).tolist(),
+                    }
+                )
 
     payload = {
         "frame": "splat",

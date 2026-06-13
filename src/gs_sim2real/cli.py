@@ -1559,6 +1559,11 @@ def build_parser() -> argparse.ArgumentParser:
     exo.add_argument("--nav", default=None, help="nav_result.json from `navigate` (draws the planned path + goal)")
     exo.add_argument("--query", default=None, help="query.json from `query-map` (draws the 3D hits)")
     exo.add_argument(
+        "--changes",
+        default=None,
+        help="changes.json from `detect-changes` (draws appeared/disappeared boxes, map A = this map)",
+    )
+    exo.add_argument(
         "--extent",
         type=float,
         default=17.0,
@@ -5206,6 +5211,7 @@ def cmd_export_overlay(args: argparse.Namespace) -> None:
             round_index=args.round,
             nav_json=Path(args.nav) if args.nav else None,
             query_json=Path(args.query) if args.query else None,
+            changes_json=Path(args.changes) if args.changes else None,
             target_extent=args.extent,
             include_trajectory=not args.no_trajectory,
         )

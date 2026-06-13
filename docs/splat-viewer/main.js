@@ -953,6 +953,48 @@ async function main() {
                 resetBtn.disabled = false;
             }
         });
+        // Dynamic axis: diff the served round against the server's baseline
+        // round. detect-changes' appeared/disappeared clusters come back as the
+        // green/orange boxes drawn by drawOverlay — no splat swap, the diff just
+        // boxes what changed on top of the current map.
+        const changesBtn = document.createElement("button");
+        changesBtn.type = "button";
+        changesBtn.innerText = "Diff vs baseline";
+        changesBtn.style.cssText =
+            "position:absolute;top:172px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(changesBtn);
+        changesBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            editing = true;
+            changesBtn.disabled = true;
+            clickStatus.innerText = "diffing against the baseline…";
+            try {
+                const res = await fetch(clickGoBase + "/changes", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: "{}",
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                const overlayRes = await fetch(
+                    clickGoBase + data.overlay + "?t=" + Date.now(),
+                    { credentials: "omit" },
+                );
+                if (overlayRes.ok) {
+                    overlayData = await overlayRes.json();
+                    ensureOverlayCanvas();
+                }
+                clickStatus.innerText =
+                    `diff: ${data.appeared} appeared · ${data.disappeared} disappeared`;
+            } catch (err) {
+                clickStatus.innerText = "diff failed: " + err.message;
+            } finally {
+                editing = false;
+                changesBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],

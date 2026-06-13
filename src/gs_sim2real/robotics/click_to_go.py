@@ -32,6 +32,8 @@ class ClickToGoConfig:
     localize_every: int = 0
     odom_noise: float = 0.0
     device: str = "cuda"
+    baseline_round: int | None = None
+    changes_align: str = "auto"
 
 
 @dataclass
@@ -323,6 +325,68 @@ def run_grab_and_swap(
     }
 
 
+def run_changes_and_overlay(
+    session_dir: Path,
+    config: ClickToGoConfig,
+    *,
+    run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    """Diff the served round against a baseline round and overlay the changes.
+
+    Map A is the served round (so appeared/disappeared boxes land on the
+    current splat); map B is the baseline. ``appeared`` clusters are solid now
+    but absent in the baseline, ``disappeared`` clusters are the reverse.
+    """
+    if config.baseline_round is None:
+        raise ValueError("no baseline round configured; restart click-to-go with --baseline-round")
+
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    changes_json = output_dir / "changes.json"
+    overlay_json = output_dir / "overlay.json"
+
+    runner = run_cli or _run_cli
+
+    changes_args = [
+        "detect-changes",
+        "--map-a",
+        str(session_dir),
+        "--round-b",
+        str(config.baseline_round),
+        "--align",
+        config.changes_align,
+        "--output",
+        str(changes_json),
+        "--device",
+        config.device,
+    ]
+    if config.round_index is not None:
+        changes_args.extend(["--round-a", str(config.round_index)])
+    runner(changes_args)
+
+    overlay_args = [
+        "export-overlay",
+        "--map",
+        str(session_dir),
+        "--output",
+        str(overlay_json),
+        "--changes",
+        str(changes_json),
+    ]
+    if config.round_index is not None:
+        overlay_args.extend(["--round", str(config.round_index)])
+    runner(overlay_args)
+
+    changes_data = json.loads(changes_json.read_text(encoding="utf-8"))
+    return {
+        "appeared": len(changes_data.get("appeared", [])),
+        "disappeared": len(changes_data.get("disappeared", [])),
+        "overlay": "/clickgo/overlay.json",
+        "changes_json": "/clickgo/changes.json",
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -354,6 +418,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_clean()
         elif self.path == "/grab":
             self._handle_grab()
+        elif self.path == "/changes":
+            self._handle_changes()
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -466,6 +532,25 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_changes(self) -> None:
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_changes_and_overlay(self.session_dir, self.config, run_cli=self.runner)
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
@@ -518,6 +603,18 @@ def main() -> None:
     parser.add_argument("--localize-every", type=int, default=0, help="Localization cadence for navigation")
     parser.add_argument("--odom-noise", type=float, default=0.0, help="Wheel odometry noise for navigation")
     parser.add_argument("--device", default="cuda", help="torch device for rendering and localization")
+    parser.add_argument(
+        "--baseline-round",
+        type=int,
+        default=None,
+        help="Earlier round to diff against for the Changes button (enables Dynamic diff)",
+    )
+    parser.add_argument(
+        "--changes-align",
+        choices=["auto", "shared", "localize", "none"],
+        default="auto",
+        help="Gauge alignment for detect-changes",
+    )
     args = parser.parse_args()
 
     config = ClickToGoConfig(
@@ -526,6 +623,8 @@ def main() -> None:
         localize_every=args.localize_every,
         odom_noise=args.odom_noise,
         device=args.device,
+        baseline_round=args.baseline_round,
+        changes_align=args.changes_align,
     )
     server = make_server(Path(args.map), config)
     port = int(server.server_address[1])
@@ -540,6 +639,8 @@ def main() -> None:
     print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
     print("hit Erase to delete the matching objects and reload the cleaned splat in place")
     print("hit Grab to keep only the matching objects, or Reset to restore the full map")
+    if config.baseline_round is not None:
+        print(f"hit Changes to box what appeared/disappeared since round {config.baseline_round}")
     print("coordinates use round-gauge camera-height units, not calibrated metric units")
     try:
         server.serve_forever()

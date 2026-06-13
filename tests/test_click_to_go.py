@@ -228,6 +228,70 @@ def test_run_grab_and_swap_invokes_cli_and_exports(tmp_path: Path) -> None:
     assert result == {"prompt": "car", "splat": "/clickgo/grabbed.splat", "gaussians": 3}
 
 
+def test_run_changes_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        calls.append(list(args))
+        if args[0] == "detect-changes":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"appeared": [{"points": 9}], "disappeared": [{"points": 4}, {"points": 7}]}),
+                encoding="utf-8",
+            )
+        return SimpleNamespace(returncode=0)
+
+    config = click_to_go.ClickToGoConfig(round_index=5, baseline_round=1, device="cpu")
+    result = click_to_go.run_changes_and_overlay(session_dir, config, run_cli=fake_run_cli)
+
+    changes_json = session_dir / "clickgo" / "changes.json"
+    overlay_json = session_dir / "clickgo" / "overlay.json"
+    assert calls == [
+        [
+            "detect-changes",
+            "--map-a",
+            str(session_dir),
+            "--round-b",
+            "1",
+            "--align",
+            "auto",
+            "--output",
+            str(changes_json),
+            "--device",
+            "cpu",
+            "--round-a",
+            "5",
+        ],
+        [
+            "export-overlay",
+            "--map",
+            str(session_dir),
+            "--output",
+            str(overlay_json),
+            "--changes",
+            str(changes_json),
+            "--round",
+            "5",
+        ],
+    ]
+    assert result == {
+        "appeared": 1,
+        "disappeared": 2,
+        "overlay": "/clickgo/overlay.json",
+        "changes_json": "/clickgo/changes.json",
+    }
+
+
+def test_run_changes_and_overlay_requires_baseline(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    config = click_to_go.ClickToGoConfig(device="cpu")  # no baseline_round
+
+    with pytest.raises(ValueError, match="no baseline round configured"):
+        click_to_go.run_changes_and_overlay(session_dir, config, run_cli=lambda args: SimpleNamespace(returncode=0))
+
+
 def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -250,6 +314,11 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
             Path(args[args.index("--output") + 1]).write_text("{}", encoding="utf-8")
         elif args[0] in ("splat-clean", "splat-grab"):
             Path(args[args.index("--output") + 1]).write_text("ply", encoding="utf-8")
+        elif args[0] == "detect-changes":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"appeared": [{"points": 5}, {"points": 6}], "disappeared": [{"points": 3}]}),
+                encoding="utf-8",
+            )
         return SimpleNamespace(returncode=0)
 
     def fake_export(session: Path, cleaned_ply: Path, output_splat: Path, *, round_index: int | None = None) -> int:
@@ -258,7 +327,7 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
     server = click_to_go.make_server(
         session_dir,
-        click_to_go.ClickToGoConfig(port=0, device="cpu"),
+        click_to_go.ClickToGoConfig(port=0, device="cpu", baseline_round=1),
         run_cli=fake_run_cli,
         export_splat=fake_export,
     )
@@ -310,6 +379,12 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
         status, _, body = _request_json(host, port, "POST", "/grab", {"prompt": "   "})
         assert status == 400
+
+        status, _, body = _request_json(host, port, "POST", "/changes", {})
+        assert status == 200
+        assert body["appeared"] == 2
+        assert body["disappeared"] == 1
+        assert body["overlay"] == "/clickgo/overlay.json"
 
         status, _, body = _request_raw(host, port, "POST", "/goal", b"{", "application/json")
         assert status == 400
