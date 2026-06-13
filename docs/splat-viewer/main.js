@@ -995,6 +995,54 @@ async function main() {
                 changesBtn.disabled = false;
             }
         });
+        // Semantic axis, the glow companion to search: `/highlight` re-runs the
+        // query, then recolors the gaussians inside the hit boxes to a glow and
+        // dims the rest. We hot-swap that splat and redraw the boxes, so the
+        // match lights up inside the map instead of only being framed.
+        const highlightBtn = document.createElement("button");
+        highlightBtn.type = "button";
+        highlightBtn.innerText = "Highlight matches";
+        highlightBtn.style.cssText =
+            "position:absolute;top:204px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(highlightBtn);
+        highlightBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            const prompt = queryBox.value.trim();
+            if (!prompt) {
+                clickStatus.innerText = "type what to highlight first";
+                return;
+            }
+            editing = true;
+            highlightBtn.disabled = true;
+            clickStatus.innerText = `highlighting "${prompt}"…`;
+            try {
+                const res = await fetch(clickGoBase + "/highlight", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                await swapSplat(clickGoBase + data.splat + "?t=" + Date.now());
+                const overlayRes = await fetch(
+                    clickGoBase + data.overlay + "?t=" + Date.now(),
+                    { credentials: "omit" },
+                );
+                if (overlayRes.ok) {
+                    overlayData = await overlayRes.json();
+                    ensureOverlayCanvas();
+                }
+                clickStatus.innerText =
+                    `highlighted "${prompt}" · ${data.highlighted.toLocaleString()} gaussians lit`;
+            } catch (err) {
+                clickStatus.innerText = "highlight failed: " + err.message;
+            } finally {
+                editing = false;
+                highlightBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],

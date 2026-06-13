@@ -387,6 +387,93 @@ def run_changes_and_overlay(
     }
 
 
+# Semantic glow: the colour painted onto gaussians that fall inside a query hit
+# box, and the alpha multiplier that fades everything else so the match pops.
+GLOW_RGBA = (94, 234, 178, 255)
+DIM_ALPHA_SCALE = 0.32
+
+
+def _overlay_box_aabbs(overlay_json: Path) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Read an overlay's wireframe boxes back as splat-frame AABBs (low, high)."""
+    overlay = json.loads(Path(overlay_json).read_text(encoding="utf-8"))
+    aabbs: list[tuple[np.ndarray, np.ndarray]] = []
+    for marker in overlay.get("markers", []):
+        box = marker.get("box")
+        if not box:
+            continue
+        corners = np.asarray(box, dtype=np.float64)
+        aabbs.append((corners.min(axis=0), corners.max(axis=0)))
+    return aabbs
+
+
+def _highlight_splat_file(scene_splat: Path, output_splat: Path, aabbs: list[tuple[np.ndarray, np.ndarray]]) -> int:
+    """Glow the gaussians inside any AABB and dim the rest into a 32-byte splat.
+
+    Works entirely in the served splat frame — the box corners already live
+    there — so no gauge replay is needed. Each record is 32 bytes: position
+    (float32x3), scale (float32x3), RGBA (uint8x4 at offset 24), rotation
+    (uint8x4). Returns the number of gaussians lit.
+    """
+    raw = np.frombuffer(Path(scene_splat).read_bytes(), dtype=np.uint8)
+    count = int(raw.size // 32)
+    arr = raw[: count * 32].reshape(count, 32).copy()
+    if count == 0 or not aabbs:
+        Path(output_splat).write_bytes(arr.tobytes())
+        return 0
+
+    positions = np.ascontiguousarray(arr[:, 0:12]).view(np.float32).reshape(count, 3).astype(np.float64)
+    inside = np.zeros(count, dtype=bool)
+    for low, high in aabbs:
+        inside |= np.all((positions >= low) & (positions <= high), axis=1)
+
+    arr[inside, 24:28] = np.asarray(GLOW_RGBA, dtype=np.uint8)
+    arr[~inside, 27] = (arr[~inside, 27].astype(np.float64) * DIM_ALPHA_SCALE).astype(np.uint8)
+
+    Path(output_splat).write_bytes(arr.tobytes())
+    return int(np.count_nonzero(inside))
+
+
+def _highlight_aligned_splat(
+    session_dir: Path, overlay_json: Path, output_splat: Path, *, round_index: int | None = None
+) -> int:
+    """Recolor the served ``scene.splat`` so the overlay's hit boxes glow."""
+    from gs_sim2real.robotics.localize import resolve_live_map_session
+
+    session = resolve_live_map_session(Path(session_dir), round_index=round_index)
+    scene_splat = session.round.round_dir / "scene.splat"
+    return _highlight_splat_file(scene_splat, output_splat, _overlay_box_aabbs(overlay_json))
+
+
+def run_highlight_and_swap(
+    session_dir: Path,
+    prompt: str,
+    config: ClickToGoConfig,
+    *,
+    run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+    highlight_splat: Callable[..., int] | None = None,
+) -> dict[str, Any]:
+    """Box prompt matches and recolor them to glow inside the served splat.
+
+    Reuses ``run_query_and_overlay`` to write the hit boxes, then lights the
+    gaussians inside those boxes so the viewer can hot-swap a splat where the
+    search result glows and everything else fades back.
+    """
+    session_dir = Path(session_dir)
+    query_result = run_query_and_overlay(session_dir, prompt, config, run_cli=run_cli)
+    overlay_json = session_dir / "clickgo" / "overlay.json"
+    highlighted_splat = session_dir / "clickgo" / "highlighted.splat"
+
+    highlighter = highlight_splat or _highlight_aligned_splat
+    highlighted = highlighter(session_dir, overlay_json, highlighted_splat, round_index=config.round_index)
+    return {
+        "prompt": prompt,
+        "hits": int(query_result["hits"]),
+        "highlighted": int(highlighted),
+        "splat": "/clickgo/highlighted.splat",
+        "overlay": "/clickgo/overlay.json",
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -394,6 +481,7 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
     lock: threading.Lock
     runner: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None
     exporter: Callable[..., int] | None = None
+    highlighter: Callable[..., int] | None = None
 
     def end_headers(self) -> None:  # noqa: N802 - http.server API
         self.send_header("Cache-Control", "no-store, must-revalidate")
@@ -418,6 +506,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_clean()
         elif self.path == "/grab":
             self._handle_grab()
+        elif self.path == "/highlight":
+            self._handle_highlight()
         elif self.path == "/changes":
             self._handle_changes()
         else:
@@ -532,6 +622,33 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_highlight(self) -> None:
+        try:
+            payload = self._read_json_body()
+            prompt = str(payload["prompt"]).strip()
+            if not prompt:
+                raise ValueError("prompt is empty")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            self._send_json(400, {"error": f"malformed JSON body: {exc}"})
+            return
+
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_highlight_and_swap(
+                    self.session_dir, prompt, self.config, run_cli=self.runner, highlight_splat=self.highlighter
+                )
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _handle_changes(self) -> None:
         if not self.lock.acquire(blocking=False):
             self._send_json(409, {"error": "another request is already running"})
@@ -574,6 +691,7 @@ def make_server(
     *,
     run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
     export_splat: Callable[..., int] | None = None,
+    highlight_splat: Callable[..., int] | None = None,
 ) -> ThreadingHTTPServer:
     session_dir = Path(session_dir)
     frame = load_scene_frame(session_dir, round_index=config.round_index)
@@ -588,6 +706,7 @@ def make_server(
     # staticmethod keeps the callable from binding as a method when reached via self.runner
     BoundClickToGoHandler.runner = staticmethod(run_cli) if run_cli is not None else None
     BoundClickToGoHandler.exporter = staticmethod(export_splat) if export_splat is not None else None
+    BoundClickToGoHandler.highlighter = staticmethod(highlight_splat) if highlight_splat is not None else None
 
     handler = partial(BoundClickToGoHandler, directory=str(session_dir))
     server = ThreadingHTTPServer(("0.0.0.0", config.port), handler)
@@ -637,6 +756,7 @@ def main() -> None:
     print(f"viewer: {viewer_url}")
     print("double-click the road in the viewer to drive there")
     print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
+    print("hit Highlight to glow the matching gaussians inside the splat and dim the rest")
     print("hit Erase to delete the matching objects and reload the cleaned splat in place")
     print("hit Grab to keep only the matching objects, or Reset to restore the full map")
     if config.baseline_round is not None:

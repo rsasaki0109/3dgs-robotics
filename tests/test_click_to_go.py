@@ -228,6 +228,74 @@ def test_run_grab_and_swap_invokes_cli_and_exports(tmp_path: Path) -> None:
     assert result == {"prompt": "car", "splat": "/clickgo/grabbed.splat", "gaussians": 3}
 
 
+def test_highlight_splat_file_glows_inside_box_and_dims_rest(tmp_path: Path) -> None:
+    # three gaussians: one inside the box, two outside, all opaque (alpha 200)
+    records = [
+        (0.0, 0.0, 0.0, (10, 20, 30, 200)),  # inside the unit box at the origin
+        (5.0, 5.0, 5.0, (40, 50, 60, 200)),  # far outside
+        (-5.0, 0.0, 0.0, (70, 80, 90, 200)),  # far outside
+    ]
+    raw = bytearray()
+    for x, y, z, rgba in records:
+        raw += np.asarray([x, y, z, 0.1, 0.1, 0.1], dtype=np.float32).tobytes()
+        raw += bytes(rgba)  # RGBA at offset 24
+        raw += bytes((0, 0, 0, 0))  # rotation
+    scene_splat = tmp_path / "scene.splat"
+    scene_splat.write_bytes(bytes(raw))
+    output_splat = tmp_path / "highlighted.splat"
+
+    aabb = (np.array([-1.0, -1.0, -1.0]), np.array([1.0, 1.0, 1.0]))
+    lit = click_to_go._highlight_splat_file(scene_splat, output_splat, [aabb])
+
+    assert lit == 1
+    out = np.frombuffer(output_splat.read_bytes(), dtype=np.uint8).reshape(3, 32)
+    # the inside gaussian is repainted to the glow colour at full alpha
+    assert tuple(out[0, 24:28]) == click_to_go.GLOW_RGBA
+    # the outside gaussians keep their colour but their alpha is faded
+    assert tuple(out[1, 24:27]) == (40, 50, 60)
+    assert out[1, 27] == int(200 * click_to_go.DIM_ALPHA_SCALE)
+    assert out[2, 27] == int(200 * click_to_go.DIM_ALPHA_SCALE)
+
+
+def test_run_highlight_and_swap_queries_then_recolors(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    calls: list[list[str]] = []
+    highlights: list[tuple[Path, Path, Path, int | None]] = []
+
+    def fake_run_cli(args: Sequence[str]) -> SimpleNamespace:
+        calls.append(list(args))
+        if args[0] == "query-map":
+            Path(args[args.index("--output") + 1]).write_text(
+                json.dumps({"hits": [{"centroid": [0, 0, 0]}, {"centroid": [1, 1, 1]}]}),
+                encoding="utf-8",
+            )
+        return SimpleNamespace(returncode=0)
+
+    def fake_highlight(session: Path, overlay_json: Path, output_splat: Path, *, round_index: int | None = None) -> int:
+        highlights.append((Path(session), Path(overlay_json), Path(output_splat), round_index))
+        Path(output_splat).write_bytes(b"\x00" * 96)
+        return 2
+
+    config = click_to_go.ClickToGoConfig(round_index=4, device="cpu")
+    result = click_to_go.run_highlight_and_swap(
+        session_dir, "car", config, run_cli=fake_run_cli, highlight_splat=fake_highlight
+    )
+
+    overlay_json = session_dir / "clickgo" / "overlay.json"
+    highlighted_splat = session_dir / "clickgo" / "highlighted.splat"
+    # the query + overlay pass runs first, exactly as run_query_and_overlay does
+    assert [call[0] for call in calls] == ["query-map", "export-overlay"]
+    assert highlights == [(session_dir, overlay_json, highlighted_splat, 4)]
+    assert result == {
+        "prompt": "car",
+        "hits": 2,
+        "highlighted": 2,
+        "splat": "/clickgo/highlighted.splat",
+        "overlay": "/clickgo/overlay.json",
+    }
+
+
 def test_run_changes_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -325,11 +393,16 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         Path(output_splat).write_bytes(b"\x00" * 96)  # three 32-byte gaussians
         return 3
 
+    def fake_highlight(session: Path, overlay_json: Path, output_splat: Path, *, round_index: int | None = None) -> int:
+        Path(output_splat).write_bytes(b"\x00" * 128)  # four 32-byte gaussians
+        return 4
+
     server = click_to_go.make_server(
         session_dir,
         click_to_go.ClickToGoConfig(port=0, device="cpu", baseline_round=1),
         run_cli=fake_run_cli,
         export_splat=fake_export,
+        highlight_splat=fake_highlight,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -378,6 +451,17 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         assert (session_dir / "clickgo" / "grabbed.splat").stat().st_size == 96
 
         status, _, body = _request_json(host, port, "POST", "/grab", {"prompt": "   "})
+        assert status == 400
+
+        status, _, body = _request_json(host, port, "POST", "/highlight", {"prompt": "car"})
+        assert status == 200
+        assert body["prompt"] == "car"
+        assert body["splat"] == "/clickgo/highlighted.splat"
+        assert body["highlighted"] == 4
+        assert body["overlay"] == "/clickgo/overlay.json"
+        assert (session_dir / "clickgo" / "highlighted.splat").stat().st_size == 128
+
+        status, _, body = _request_json(host, port, "POST", "/highlight", {"prompt": "   "})
         assert status == 400
 
         status, _, body = _request_json(host, port, "POST", "/changes", {})

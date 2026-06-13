@@ -165,6 +165,7 @@ class TestViewerWiring:
         assert "/clean" in main_js  # Editable: erase matching objects
         assert "/grab" in main_js  # Editable: isolate matching objects
         assert "swapSplat" in main_js  # hot-swap the edited splat in place
+        assert "/highlight" in main_js  # Semantic: glow the matching gaussians
         assert "/changes" in main_js  # Dynamic: diff against the baseline round
 
     def test_cli_export_overlay(self, tmp_path, capsys):
