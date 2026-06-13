@@ -674,6 +674,33 @@ reported honestly (the planner snaps to the nearest free cell; the run can
 end "did not reach"). `--localize-every`/`--odom-noise` pass through to
 `navigate`. Coordinates are reconstruction-gauge camera-height units.
 
+The same server is also a hands-on bench for the three 3DGS research axes —
+all on the served map, no page reload between them:
+
+```bash
+3dgs-robotics-click-to-go --map outputs/live_mapping/session --port 8787 \
+  --baseline-round 1          # enables the Dynamic "Diff vs baseline" button
+```
+
+- **Semantic** — type a prompt in the search box. The server runs `query-map`
+  + `export-overlay` and the open-vocabulary hits come back as 3D wireframe
+  boxes drawn over the splat (`POST /query`).
+- **Editable** — **Erase** runs `splat-clean` and **Grab** runs `splat-grab`
+  on the same prompt; the cleaned/isolated PLY is re-exported through the
+  round's similarity transform and normalization params, so the result lands
+  in the exact gauge as the served `scene.splat`. The viewer hot-swaps the new
+  splat into its render worker in place — same camera, no reload — so the
+  object vanishes (Erase) or floats alone (Grab). **Reset** swaps the original
+  splat back, making edits a non-destructive toggle (`POST /clean`, `/grab`).
+- **Dynamic** — **Diff vs baseline** runs `detect-changes` between the served
+  round (map A) and `--baseline-round` (map B). Clusters that appeared since
+  the baseline box in green, ones that disappeared box in orange; because the
+  diff report lives in map A's gauge the boxes land on the current splat with
+  no swap (`POST /changes`). Without `--baseline-round` the button reports that
+  no baseline is configured.
+
+One server backs the lot: `/query`, `/clean`, `/grab`, `/changes`, and `/goal`.
+
 ## How rounds are scheduled
 
 | Knob | Default | Meaning |
