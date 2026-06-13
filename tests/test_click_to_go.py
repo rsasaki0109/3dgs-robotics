@@ -168,9 +168,7 @@ def test_run_clean_and_swap_invokes_cli_and_exports(tmp_path: Path) -> None:
         return 2
 
     config = click_to_go.ClickToGoConfig(round_index=3, device="cpu")
-    result = click_to_go.run_clean_and_swap(
-        session_dir, "car", config, run_cli=fake_run_cli, export_splat=fake_export
-    )
+    result = click_to_go.run_clean_and_swap(session_dir, "car", config, run_cli=fake_run_cli, export_splat=fake_export)
 
     cleaned_ply = session_dir / "clickgo" / "cleaned.ply"
     cleaned_splat = session_dir / "clickgo" / "cleaned.splat"
