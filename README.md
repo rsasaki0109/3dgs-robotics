@@ -69,7 +69,7 @@ More material: [open-vocabulary map inventory](docs/images/robotics/inventory.pn
 | **Go look at what changed** | `3dgs-robotics patrol --map outputs/live_mapping --from-changes changes/changes.json --output patrol/patrol_result.json` | [docs/live-mapping.md](docs/live-mapping.md#inspection-patrol-drive-to-every-stop--or-to-every-change) |
 | **Two robots, one map** | `3dgs-robotics merge-maps --map-a run1 --map-b run2 --output merged/merged.ply` (one-shot) or `merge-live` (as they drive) | [docs/live-mapping.md](docs/live-mapping.md#merging-two-maps-collaborative-mapping) |
 | **Show robot results in the browser** | `3dgs-robotics export-overlay --map outputs/live_mapping --nav nav/nav_result.json --output overlay.json` then `splat.html?overlay=...` | [docs/live-mapping.md](docs/live-mapping.md#overlaying-robot-results-in-the-browser-viewer) |
-| **Double-click the map, robot drives there** | `3dgs-robotics-click-to-go --map outputs/live_mapping --port 8787` then open the printed viewer URL | [docs/live-mapping.md](docs/live-mapping.md#click-to-go-double-click-the-map-the-robot-drives-there) |
+| **One browser viewer for all of it** | `3dgs-robotics-click-to-go --map outputs/live_mapping --port 8787 --baseline-round 1` then open the printed viewer URL: search to box objects, **Erase**/**Grab**/**Reset** to edit, **Diff vs baseline** to see changes, double-click the road to drive | [docs/live-mapping.md](docs/live-mapping.md#click-to-go-double-click-the-map-the-robot-drives-there) |
 | **Replay a session in rerun.io** | `3dgs-robotics rerun-replay --map outputs/live_mapping` | [docs/live-mapping.md](docs/live-mapping.md#replay-a-session-into-rerun) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 
@@ -83,6 +83,17 @@ More material: [open-vocabulary map inventory](docs/images/robotics/inventory.pn
 | **"Remove the car from the map"** | `3dgs-robotics splat-clean "car" --map outputs/live_mapping --output clean/no_car.ply` | [docs/live-mapping.md](docs/live-mapping.md#erasing-objects-by-language-remove-the-car) |
 | **"Take the car, put it in map B"** | `3dgs-robotics splat-grab "car" --map mapA --output car.ply` then `splat-paste car.ply --map mapB --at 1.0,0.05 --output scene.ply` | [docs/live-mapping.md](docs/live-mapping.md#grab--paste-objects-between-maps-take-the-car-put-it-there) |
 | **Let Claude operate the map** | `claude mcp add talk-to-your-map -- 3dgs-robotics-mcp --root outputs/live_mapping` | [Talk to Your Map](#talk-to-your-map--mcp-server), [docs/mcp.md](docs/mcp.md) |
+
+### One map, three research axes — live in the browser
+
+`3dgs-robotics-click-to-go` serves an interactive viewer that puts all three 3DGS
+research directions on the **same** served map, with no reload between them:
+
+- **Semantic** — type a prompt in the search box; open-vocabulary hits come back as 3D boxes drawn over the splat.
+- **Editable** — **Erase** deletes the matching gaussians, **Grab** keeps only them, **Reset** restores the full map. Each edit re-exports a gauge-aligned splat and hot-swaps it into the viewer in place — same camera, no reload.
+- **Dynamic** — **Diff vs baseline** runs `detect-changes` against an earlier round (`--baseline-round`) and boxes what appeared (green) / disappeared (orange).
+
+…and double-clicking the road still drives the robot there. A single server backs the lot: `/query`, `/clean`, `/grab`, `/changes`, and `/goal`.
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
 
