@@ -283,6 +283,46 @@ def run_clean_and_swap(
     }
 
 
+def run_grab_and_swap(
+    session_dir: Path,
+    prompt: str,
+    config: ClickToGoConfig,
+    *,
+    run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
+    export_splat: Callable[..., int] | None = None,
+) -> dict[str, Any]:
+    """Isolate prompt-matching gaussians and export them as an aligned splat."""
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    grabbed_ply = output_dir / "grabbed.ply"
+    grabbed_splat = output_dir / "grabbed.splat"
+
+    runner = run_cli or _run_cli
+    exporter = export_splat or _export_aligned_splat
+
+    grab_args = [
+        "splat-grab",
+        prompt,
+        "--map",
+        str(session_dir),
+        "--output",
+        str(grabbed_ply),
+        "--device",
+        config.device,
+    ]
+    if config.round_index is not None:
+        grab_args.extend(["--round", str(config.round_index)])
+    runner(grab_args)
+
+    gaussians = exporter(session_dir, grabbed_ply, grabbed_splat, round_index=config.round_index)
+    return {
+        "prompt": prompt,
+        "splat": "/clickgo/grabbed.splat",
+        "gaussians": int(gaussians),
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -312,6 +352,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_query()
         elif self.path == "/clean":
             self._handle_clean()
+        elif self.path == "/grab":
+            self._handle_grab()
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -397,6 +439,33 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_grab(self) -> None:
+        try:
+            payload = self._read_json_body()
+            prompt = str(payload["prompt"]).strip()
+            if not prompt:
+                raise ValueError("prompt is empty")
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            self._send_json(400, {"error": f"malformed JSON body: {exc}"})
+            return
+
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_grab_and_swap(
+                    self.session_dir, prompt, self.config, run_cli=self.runner, export_splat=self.exporter
+                )
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
@@ -470,6 +539,7 @@ def main() -> None:
     print("double-click the road in the viewer to drive there")
     print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
     print("hit Erase to delete the matching objects and reload the cleaned splat in place")
+    print("hit Grab to keep only the matching objects, or Reset to restore the full map")
     print("coordinates use round-gauge camera-height units, not calibrated metric units")
     try:
         server.serve_forever()

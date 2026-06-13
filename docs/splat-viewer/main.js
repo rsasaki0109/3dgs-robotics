@@ -885,6 +885,74 @@ async function main() {
                 eraseBtn.disabled = false;
             }
         });
+        // Editable axis, the other half: `splat-grab` keeps only the matching
+        // gaussians. The server isolates the object into its own gauge-aligned
+        // splat and we swap it in, so everything but the grabbed object falls
+        // away and it floats exactly where it sat in the map.
+        const grabBtn = document.createElement("button");
+        grabBtn.type = "button";
+        grabBtn.innerText = "Grab matches";
+        grabBtn.style.cssText =
+            "position:absolute;top:108px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(grabBtn);
+        // Reset swaps the originally served splat back in, so erase/grab stay a
+        // non-destructive toggle on the view.
+        const resetBtn = document.createElement("button");
+        resetBtn.type = "button";
+        resetBtn.innerText = "Reset map";
+        resetBtn.style.cssText =
+            "position:absolute;top:140px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(resetBtn);
+        let editing = false;
+        grabBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            const prompt = queryBox.value.trim();
+            if (!prompt) {
+                clickStatus.innerText = "type what to grab first";
+                return;
+            }
+            editing = true;
+            grabBtn.disabled = true;
+            clickStatus.innerText = `grabbing "${prompt}"…`;
+            try {
+                const res = await fetch(clickGoBase + "/grab", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                await swapSplat(clickGoBase + data.splat + "?t=" + Date.now());
+                overlayData = null; // the object is now the whole scene; drop boxes
+                clickStatus.innerText =
+                    `grabbed "${prompt}" · ${data.gaussians.toLocaleString()} gaussians`;
+            } catch (err) {
+                clickStatus.innerText = "grab failed: " + err.message;
+            } finally {
+                editing = false;
+                grabBtn.disabled = false;
+            }
+        });
+        resetBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            editing = true;
+            resetBtn.disabled = true;
+            clickStatus.innerText = "restoring the full map…";
+            try {
+                await swapSplat(url);
+                overlayData = null;
+                clickStatus.innerText = "restored the full map";
+            } catch (err) {
+                clickStatus.innerText = "reset failed: " + err.message;
+            } finally {
+                editing = false;
+                resetBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],

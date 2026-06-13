@@ -116,7 +116,8 @@ class TestViewerWiring:
         assert "drawOverlay(viewProj)" in main_js
         assert "marker.box" in main_js  # query hits draw a 3D wireframe box
         assert "/clean" in main_js  # Editable: erase matching objects
-        assert "swapSplat" in main_js  # hot-swap the cleaned splat in place
+        assert "/grab" in main_js  # Editable: isolate matching objects
+        assert "swapSplat" in main_js  # hot-swap the edited splat in place
 
     def test_cli_export_overlay(self, tmp_path, capsys):
         from gs_sim2real import cli
