@@ -1043,6 +1043,44 @@ async function main() {
                 highlightBtn.disabled = false;
             }
         });
+        // Confidence axis: a fourth research lens beyond semantic/editable/
+        // dynamic. `/quality` recolors every gaussian by its own opacity — how
+        // solid the optimizer made it — into a warm-low/cool-high heatmap, so
+        // the under-reconstructed corners of the map light up red. No query, no
+        // CLI: the splat carries its own confidence, so it is a pure recolor.
+        const qualityBtn = document.createElement("button");
+        qualityBtn.type = "button";
+        qualityBtn.innerText = "Show confidence";
+        qualityBtn.style.cssText =
+            "position:absolute;top:236px;right:10px;z-index:60;width:216px;" +
+            "padding:5px 8px;border-radius:6px;border:1px solid #444;cursor:pointer;" +
+            "background:rgba(20,24,34,0.85);color:#eee;font:13px sans-serif";
+        document.body.appendChild(qualityBtn);
+        qualityBtn.addEventListener("click", async () => {
+            if (editing || erasing || querying) return;
+            editing = true;
+            qualityBtn.disabled = true;
+            clickStatus.innerText = "scoring map confidence…";
+            try {
+                const res = await fetch(clickGoBase + "/quality", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: "{}",
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || res.status);
+                await swapSplat(clickGoBase + data.splat + "?t=" + Date.now());
+                overlayData = null; // the heatmap is the whole story; drop boxes
+                clickStatus.innerText =
+                    `confidence: ${data.low_confidence.toLocaleString()} low-confidence ` +
+                    `of ${data.gaussians.toLocaleString()} gaussians`;
+            } catch (err) {
+                clickStatus.innerText = "confidence failed: " + err.message;
+            } finally {
+                editing = false;
+                qualityBtn.disabled = false;
+            }
+        });
         const applyClickVec4 = (m, v) => [
             m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
             m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],

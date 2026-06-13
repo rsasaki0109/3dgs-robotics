@@ -296,6 +296,58 @@ def test_run_highlight_and_swap_queries_then_recolors(tmp_path: Path) -> None:
     }
 
 
+def test_quality_splat_file_heatmaps_by_opacity(tmp_path: Path) -> None:
+    # three gaussians at opacity 0.0, ~0.5, 1.0 — low / mid / high confidence
+    alphas = [0, 128, 255]
+    raw = bytearray()
+    for alpha in alphas:
+        raw += np.asarray([0.0, 0.0, 0.0, 0.1, 0.1, 0.1], dtype=np.float32).tobytes()
+        raw += bytes((10, 20, 30, alpha))  # RGBA at offset 24
+        raw += bytes((0, 0, 0, 0))  # rotation
+    scene_splat = tmp_path / "scene.splat"
+    scene_splat.write_bytes(bytes(raw))
+    output_splat = tmp_path / "quality.splat"
+
+    stats = click_to_go._quality_splat_file(scene_splat, output_splat)
+
+    assert stats["gaussians"] == 3
+    assert stats["low_confidence"] == 1  # only opacity 0.0 is below the 0.3 cut
+    assert stats["median_opacity"] == pytest.approx(128 / 255.0)
+    out = np.frombuffer(output_splat.read_bytes(), dtype=np.uint8).reshape(3, 32)
+    # alpha is pinned to the readable diagnostic constant for every gaussian
+    assert list(out[:, 27]) == [click_to_go.QUALITY_ALPHA] * 3
+    # the heatmap runs warm (low opacity) -> cool (high opacity): the low one is
+    # redder, the high one is greener (RGB lives at byte offsets 24, 25, 26)
+    assert out[0, 24] > out[2, 24]  # more red at low confidence
+    assert out[2, 25] > out[0, 25]  # more green at high confidence
+    # the endpoints land on the configured heatmap stops
+    assert tuple(out[0, 24:27]) == click_to_go._CONFIDENCE_STOPS[0][1]
+    assert tuple(out[2, 24:27]) == click_to_go._CONFIDENCE_STOPS[-1][1]
+
+
+def test_run_quality_and_swap_recolors_served_splat(tmp_path: Path) -> None:
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    builds: list[tuple[Path, Path, int | None]] = []
+
+    def fake_quality(session: Path, output_splat: Path, *, round_index: int | None = None) -> dict:
+        builds.append((Path(session), Path(output_splat), round_index))
+        Path(output_splat).write_bytes(b"\x00" * 64)
+        return {"gaussians": 2, "low_confidence": 1, "median_opacity": 0.5}
+
+    config = click_to_go.ClickToGoConfig(round_index=6, device="cpu")
+    result = click_to_go.run_quality_and_swap(session_dir, config, quality_splat=fake_quality)
+
+    quality_splat = session_dir / "clickgo" / "quality.splat"
+    assert builds == [(session_dir, quality_splat, 6)]
+    assert result == {
+        "splat": "/clickgo/quality.splat",
+        "gaussians": 2,
+        "low_confidence": 1,
+        "median_opacity": 0.5,
+    }
+
+
 def test_run_changes_and_overlay_invokes_cli_and_summarizes(tmp_path: Path) -> None:
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -397,12 +449,17 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         Path(output_splat).write_bytes(b"\x00" * 128)  # four 32-byte gaussians
         return 4
 
+    def fake_quality(session: Path, output_splat: Path, *, round_index: int | None = None) -> dict:
+        Path(output_splat).write_bytes(b"\x00" * 160)  # five 32-byte gaussians
+        return {"gaussians": 5, "low_confidence": 2, "median_opacity": 0.4}
+
     server = click_to_go.make_server(
         session_dir,
         click_to_go.ClickToGoConfig(port=0, device="cpu", baseline_round=1),
         run_cli=fake_run_cli,
         export_splat=fake_export,
         highlight_splat=fake_highlight,
+        quality_splat=fake_quality,
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -463,6 +520,14 @@ def test_http_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
         status, _, body = _request_json(host, port, "POST", "/highlight", {"prompt": "   "})
         assert status == 400
+
+        status, _, body = _request_json(host, port, "POST", "/quality", {})
+        assert status == 200
+        assert body["splat"] == "/clickgo/quality.splat"
+        assert body["gaussians"] == 5
+        assert body["low_confidence"] == 2
+        assert body["median_opacity"] == 0.4
+        assert (session_dir / "clickgo" / "quality.splat").stat().st_size == 160
 
         status, _, body = _request_json(host, port, "POST", "/changes", {})
         assert status == 200

@@ -474,6 +474,92 @@ def run_highlight_and_swap(
     }
 
 
+# Confidence axis: paint every gaussian by how solid the optimizer made it.
+# A gaussian's opacity is its own confidence — translucent ones are the filler
+# the fit never committed to. The heatmap runs warm (low) -> cool (high), and
+# the diagnostic view forces a uniform readable alpha so the colours show.
+LOW_CONFIDENCE_OPACITY = 0.3
+QUALITY_ALPHA = 210
+_CONFIDENCE_STOPS = (
+    (0.0, (229, 57, 53)),
+    (0.5, (251, 192, 45)),
+    (1.0, (38, 198, 158)),
+)
+
+
+def _confidence_color(scores: np.ndarray) -> np.ndarray:
+    """Map confidence scores in [0, 1] to a warm-low -> cool-high RGB heatmap."""
+    scores = np.clip(np.asarray(scores, dtype=np.float64), 0.0, 1.0)
+    rgb = np.zeros((scores.size, 3), dtype=np.float64)
+    for (t0, c0), (t1, c1) in zip(_CONFIDENCE_STOPS[:-1], _CONFIDENCE_STOPS[1:]):
+        mask = (scores >= t0) & (scores <= t1)
+        span = t1 - t0
+        frac = (scores[mask] - t0) / span if span else np.zeros(int(mask.sum()))
+        rgb[mask] = np.outer(1.0 - frac, c0) + np.outer(frac, c1)
+    return np.clip(np.rint(rgb), 0, 255).astype(np.uint8)
+
+
+def _quality_splat_file(scene_splat: Path, output_splat: Path) -> dict[str, Any]:
+    """Heatmap the served splat by per-gaussian opacity into a 32-byte splat.
+
+    Reads the alpha byte (offset 27) of each record as a confidence score,
+    repaints RGB (offset 24-26) to the heatmap colour, and pins alpha to a
+    readable constant. Returns the gaussian count, how many fell below the
+    low-confidence opacity cut, and the median opacity.
+    """
+    raw = np.frombuffer(Path(scene_splat).read_bytes(), dtype=np.uint8)
+    count = int(raw.size // 32)
+    arr = raw[: count * 32].reshape(count, 32).copy()
+    if count == 0:
+        Path(output_splat).write_bytes(arr.tobytes())
+        return {"gaussians": 0, "low_confidence": 0, "median_opacity": 0.0}
+
+    opacity = arr[:, 27].astype(np.float64) / 255.0
+    arr[:, 24:27] = _confidence_color(opacity)
+    arr[:, 27] = QUALITY_ALPHA
+    Path(output_splat).write_bytes(arr.tobytes())
+    return {
+        "gaussians": count,
+        "low_confidence": int(np.count_nonzero(opacity < LOW_CONFIDENCE_OPACITY)),
+        "median_opacity": float(np.median(opacity)),
+    }
+
+
+def _quality_aligned_splat(session_dir: Path, output_splat: Path, *, round_index: int | None = None) -> dict[str, Any]:
+    """Heatmap the served ``scene.splat`` by per-gaussian confidence."""
+    from gs_sim2real.robotics.localize import resolve_live_map_session
+
+    session = resolve_live_map_session(Path(session_dir), round_index=round_index)
+    scene_splat = session.round.round_dir / "scene.splat"
+    return _quality_splat_file(scene_splat, output_splat)
+
+
+def run_quality_and_swap(
+    session_dir: Path,
+    config: ClickToGoConfig,
+    *,
+    quality_splat: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Recolor the served splat into a per-gaussian confidence heatmap.
+
+    Needs no query or CLI pass — the splat carries its own opacity, so the
+    Confidence axis is a pure recolor the viewer can hot-swap in place.
+    """
+    session_dir = Path(session_dir)
+    output_dir = session_dir / "clickgo"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    quality_splat_path = output_dir / "quality.splat"
+
+    builder = quality_splat or _quality_aligned_splat
+    stats = builder(session_dir, quality_splat_path, round_index=config.round_index)
+    return {
+        "splat": "/clickgo/quality.splat",
+        "gaussians": int(stats["gaussians"]),
+        "low_confidence": int(stats["low_confidence"]),
+        "median_opacity": float(stats["median_opacity"]),
+    }
+
+
 class ClickToGoHandler(SimpleHTTPRequestHandler):
     frame: SceneFrame
     config: ClickToGoConfig
@@ -482,6 +568,7 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
     runner: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None
     exporter: Callable[..., int] | None = None
     highlighter: Callable[..., int] | None = None
+    qualitymapper: Callable[..., dict[str, Any]] | None = None
 
     def end_headers(self) -> None:  # noqa: N802 - http.server API
         self.send_header("Cache-Control", "no-store, must-revalidate")
@@ -508,6 +595,8 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
             self._handle_grab()
         elif self.path == "/highlight":
             self._handle_highlight()
+        elif self.path == "/quality":
+            self._handle_quality()
         elif self.path == "/changes":
             self._handle_changes()
         else:
@@ -649,6 +738,22 @@ class ClickToGoHandler(SimpleHTTPRequestHandler):
         finally:
             self.lock.release()
 
+    def _handle_quality(self) -> None:
+        if not self.lock.acquire(blocking=False):
+            self._send_json(409, {"error": "another request is already running"})
+            return
+
+        try:
+            try:
+                result = run_quality_and_swap(self.session_dir, self.config, quality_splat=self.qualitymapper)
+            except RuntimeError as exc:
+                self._send_json(500, {"error": str(exc)})
+                return
+
+            self._send_json(200, result)
+        finally:
+            self.lock.release()
+
     def _handle_changes(self) -> None:
         if not self.lock.acquire(blocking=False):
             self._send_json(409, {"error": "another request is already running"})
@@ -692,6 +797,7 @@ def make_server(
     run_cli: Callable[[Sequence[str]], subprocess.CompletedProcess[str]] | None = None,
     export_splat: Callable[..., int] | None = None,
     highlight_splat: Callable[..., int] | None = None,
+    quality_splat: Callable[..., dict[str, Any]] | None = None,
 ) -> ThreadingHTTPServer:
     session_dir = Path(session_dir)
     frame = load_scene_frame(session_dir, round_index=config.round_index)
@@ -707,6 +813,7 @@ def make_server(
     BoundClickToGoHandler.runner = staticmethod(run_cli) if run_cli is not None else None
     BoundClickToGoHandler.exporter = staticmethod(export_splat) if export_splat is not None else None
     BoundClickToGoHandler.highlighter = staticmethod(highlight_splat) if highlight_splat is not None else None
+    BoundClickToGoHandler.qualitymapper = staticmethod(quality_splat) if quality_splat is not None else None
 
     handler = partial(BoundClickToGoHandler, directory=str(session_dir))
     server = ThreadingHTTPServer(("0.0.0.0", config.port), handler)
@@ -757,6 +864,7 @@ def main() -> None:
     print("double-click the road in the viewer to drive there")
     print("type a prompt in the search box to box open-vocabulary hits (e.g. car)")
     print("hit Highlight to glow the matching gaussians inside the splat and dim the rest")
+    print("hit Confidence to heatmap the map by how solid each gaussian is (warm = low)")
     print("hit Erase to delete the matching objects and reload the cleaned splat in place")
     print("hit Grab to keep only the matching objects, or Reset to restore the full map")
     if config.baseline_round is not None:
