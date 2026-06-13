@@ -36,7 +36,7 @@ commands in this repo. Map units are camera-height-relative, not calibrated mete
 | --- | --- |
 | **Autonomous exploration** — `explore` picks its own frontier goals and covers 97.9% of the reachable free space.<br>![Autonomous exploration](docs/images/robotics/explore.gif) | **Active mapping** — the robot decides where to look next and the live map grows there, round after round.<br>![Active mapping](docs/images/robotics/active-mapping.gif) |
 | **Two robots, one live map** — `merge-live` fuses two live sessions as new rounds arrive, absorbing a 1.8x scale difference.<br>![Live multi-robot merge](docs/images/robotics/live-merge.gif) | **Erase objects by language** — `splat-clean "car"` removes the leading-car ghost from the splat.<br>![Erase objects by language](docs/images/robotics/splat-clean.gif) |
-| **One viewer, three axes** — double-click the road to drive there, search to box objects (Semantic), and **Erase**/**Grab**/**Diff vs baseline** to edit and inspect the splat live (Editable + Dynamic).<br>![Click-to-go in the browser viewer](docs/images/robotics/click-to-go.png) | **Grab & paste between maps** — `splat-grab "car"` cuts the object out of map A and ground-anchors it into map B.<br>![Grab and paste between maps](docs/images/robotics/splat-grab-paste.png) |
+| **One viewer, four axes** — double-click the road to drive there, search to box or glow objects (Semantic), **Erase**/**Grab** to edit, **Diff vs baseline** to inspect changes (Editable + Dynamic), and **Show confidence** to heatmap reconstruction quality (Confidence) — all live on the splat.<br>![Click-to-go in the browser viewer](docs/images/robotics/click-to-go.png) | **Grab & paste between maps** — `splat-grab "car"` cuts the object out of map A and ground-anchors it into map B.<br>![Grab and paste between maps](docs/images/robotics/splat-grab-paste.png) |
 
 More material: [open-vocabulary map inventory](docs/images/robotics/inventory.png) ·
 [patrol over detected changes](docs/images/robotics/patrol-trace.png) ·
@@ -69,7 +69,7 @@ More material: [open-vocabulary map inventory](docs/images/robotics/inventory.pn
 | **Go look at what changed** | `3dgs-robotics patrol --map outputs/live_mapping --from-changes changes/changes.json --output patrol/patrol_result.json` | [docs/live-mapping.md](docs/live-mapping.md#inspection-patrol-drive-to-every-stop--or-to-every-change) |
 | **Two robots, one map** | `3dgs-robotics merge-maps --map-a run1 --map-b run2 --output merged/merged.ply` (one-shot) or `merge-live` (as they drive) | [docs/live-mapping.md](docs/live-mapping.md#merging-two-maps-collaborative-mapping) |
 | **Show robot results in the browser** | `3dgs-robotics export-overlay --map outputs/live_mapping --nav nav/nav_result.json --output overlay.json` then `splat.html?overlay=...` | [docs/live-mapping.md](docs/live-mapping.md#overlaying-robot-results-in-the-browser-viewer) |
-| **One browser viewer for all of it** | `3dgs-robotics-click-to-go --map outputs/live_mapping --port 8787 --baseline-round 1` then open the printed viewer URL: search to box objects, **Erase**/**Grab**/**Reset** to edit, **Diff vs baseline** to see changes, double-click the road to drive | [docs/live-mapping.md](docs/live-mapping.md#click-to-go-double-click-the-map-the-robot-drives-there) |
+| **One browser viewer for all of it** | `3dgs-robotics-click-to-go --map outputs/live_mapping --port 8787 --baseline-round 1` then open the printed viewer URL: search to box objects, **Erase**/**Grab**/**Reset** to edit, **Diff vs baseline** to see changes, **Show confidence** to heatmap quality, double-click the road to drive | [docs/live-mapping.md](docs/live-mapping.md#click-to-go-double-click-the-map-the-robot-drives-there) |
 | **Replay a session in rerun.io** | `3dgs-robotics rerun-replay --map outputs/live_mapping` | [docs/live-mapping.md](docs/live-mapping.md#replay-a-session-into-rerun) |
 | **Existing splats for policy evaluation** | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `3dgs-robotics route-policy-benchmark ...` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
 
@@ -84,16 +84,17 @@ More material: [open-vocabulary map inventory](docs/images/robotics/inventory.pn
 | **"Take the car, put it in map B"** | `3dgs-robotics splat-grab "car" --map mapA --output car.ply` then `splat-paste car.ply --map mapB --at 1.0,0.05 --output scene.ply` | [docs/live-mapping.md](docs/live-mapping.md#grab--paste-objects-between-maps-take-the-car-put-it-there) |
 | **Let Claude operate the map** | `claude mcp add talk-to-your-map -- 3dgs-robotics-mcp --root outputs/live_mapping` | [Talk to Your Map](#talk-to-your-map--mcp-server), [docs/mcp.md](docs/mcp.md) |
 
-### One map, three research axes — live in the browser
+### One map, four research axes — live in the browser
 
-`3dgs-robotics-click-to-go` serves an interactive viewer that puts all three 3DGS
+`3dgs-robotics-click-to-go` serves an interactive viewer that puts all four 3DGS
 research directions on the **same** served map, with no reload between them:
 
-- **Semantic** — type a prompt in the search box; open-vocabulary hits come back as 3D boxes drawn over the splat.
+- **Semantic** — type a prompt in the search box; open-vocabulary hits come back as 3D boxes drawn over the splat, or **Highlight** recolors the matching gaussians to glow inside the splat and dims the rest.
 - **Editable** — **Erase** deletes the matching gaussians, **Grab** keeps only them, **Reset** restores the full map. Each edit re-exports a gauge-aligned splat and hot-swaps it into the viewer in place — same camera, no reload.
 - **Dynamic** — **Diff vs baseline** runs `detect-changes` against an earlier round (`--baseline-round`) and boxes what appeared (green) / disappeared (orange).
+- **Confidence** — **Show confidence** heatmaps the map by how solid each gaussian is, recoloring it by per-gaussian opacity (warm = low confidence, cool = high) so under-reconstructed regions glow red.
 
-…and double-clicking the road still drives the robot there. A single server backs the lot: `/query`, `/clean`, `/grab`, `/changes`, and `/goal`.
+…and double-clicking the road still drives the robot there. A single server backs the lot: `/query`, `/highlight`, `/clean`, `/grab`, `/changes`, `/quality`, and `/goal`.
 
 Supervised rosbag pipelines and large-scale tiling: [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
 

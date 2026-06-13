@@ -674,7 +674,7 @@ reported honestly (the planner snaps to the nearest free cell; the run can
 end "did not reach"). `--localize-every`/`--odom-noise` pass through to
 `navigate`. Coordinates are reconstruction-gauge camera-height units.
 
-The same server is also a hands-on bench for the three 3DGS research axes —
+The same server is also a hands-on bench for the four 3DGS research axes —
 all on the served map, no page reload between them:
 
 ```bash
@@ -684,7 +684,10 @@ all on the served map, no page reload between them:
 
 - **Semantic** — type a prompt in the search box. The server runs `query-map`
   + `export-overlay` and the open-vocabulary hits come back as 3D wireframe
-  boxes drawn over the splat (`POST /query`).
+  boxes drawn over the splat (`POST /query`). **Highlight** goes further and
+  recolors the gaussians inside those hit boxes to a bright glow while dimming
+  everything else, then hot-swaps the recolored splat in place so the match
+  lights up within the map itself (`POST /highlight`).
 - **Editable** — **Erase** runs `splat-clean` and **Grab** runs `splat-grab`
   on the same prompt; the cleaned/isolated PLY is re-exported through the
   round's similarity transform and normalization params, so the result lands
@@ -698,8 +701,16 @@ all on the served map, no page reload between them:
   diff report lives in map A's gauge the boxes land on the current splat with
   no swap (`POST /changes`). Without `--baseline-round` the button reports that
   no baseline is configured.
+- **Confidence** — **Show confidence** reads the per-gaussian opacity of the
+  served `scene.splat` as a reconstruction-confidence score and recolors every
+  gaussian on a heatmap (warm = low confidence, cool = high), pinning the alpha
+  to a readable constant so under-reconstructed regions glow red. It needs no
+  query and no CLI — the recolor is computed straight from the served splat and
+  hot-swapped in place, and the status line reports how many low-confidence
+  gaussians remain (`POST /quality`).
 
-One server backs the lot: `/query`, `/clean`, `/grab`, `/changes`, and `/goal`.
+One server backs the lot: `/query`, `/highlight`, `/clean`, `/grab`,
+`/changes`, `/quality`, and `/goal`.
 
 ## How rounds are scheduled
 
